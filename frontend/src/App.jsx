@@ -13,6 +13,17 @@ import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.js
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import { clearToken, fetchMe, getToken } from "./api.js";
 
+const SIDEBAR_STORAGE_KEY = "dovela:sidebar-visible";
+
+function leerPreferenciaSidebar() {
+  try {
+    const guardado = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    return guardado === null ? true : guardado === "true";
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
   const [pagina, setPagina] = useState("inicio");
   const [solicitudSeleccionadaId, setSolicitudSeleccionadaId] = useState(null);
@@ -23,6 +34,7 @@ export default function App() {
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get("reset_token"),
   );
+  const [sidebarVisible, setSidebarVisible] = useState(leerPreferenciaSidebar);
 
   useEffect(() => {
     if (!getToken()) {
@@ -88,14 +100,27 @@ export default function App() {
     setPagina("inicio");
   };
 
+  const alternarSidebar = () => {
+    setSidebarVisible((actual) => {
+      const nuevo = !actual;
+      try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, String(nuevo));
+      } catch {
+        // la preferencia simplemente no persiste (p. ej. modo privado)
+      }
+      return nuevo;
+    });
+  };
+
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
   const requiereSesion = !usuarioActual;
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
+  const puedeMostrarSidebar = usuarioActual && !debeCambiarPassword;
 
   return (
     <div className="app-layout">
-      {usuarioActual && !debeCambiarPassword && (
+      {puedeMostrarSidebar && sidebarVisible && (
         <Sidebar
           paginaActual={pagina}
           onCambiarPagina={setPagina}
@@ -106,6 +131,19 @@ export default function App() {
       )}
       <div className="main-content">
         <header>
+          <div className="sidebar-toggle-wrap">
+            {puedeMostrarSidebar && (
+              <button
+                type="button"
+                className="theme-toggle"
+                onClick={alternarSidebar}
+                aria-label={sidebarVisible ? "Ocultar menú lateral" : "Mostrar menú lateral"}
+                title={sidebarVisible ? "Ocultar menú" : "Mostrar menú"}
+              >
+                ☰
+              </button>
+            )}
+          </div>
           <h1>Portal de Seguimiento DOVELA</h1>
           <div className="theme-toggle-wrap">
             <ThemeToggle />

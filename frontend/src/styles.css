@@ -101,10 +101,12 @@ textarea {
   overflow-y: auto;
 }
 
-.sidebar-titulo {
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  margin: 0 0 1rem 0.5rem;
+.sidebar-logo {
+  display: block;
+  width: 100%;
+  max-width: 150px;
+  height: auto;
+  margin: 0 auto 1.25rem;
 }
 
 .sidebar ul {
@@ -180,6 +182,11 @@ header h1 {
 .theme-toggle-wrap {
   grid-column: 3;
   justify-self: end;
+}
+
+.sidebar-toggle-wrap {
+  grid-column: 1;
+  justify-self: start;
 }
 
 .theme-toggle {

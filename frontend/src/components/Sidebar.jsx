@@ -1,3 +1,5 @@
+import logoDovela from "../assets/logo-dovela.png";
+
 const OPCIONES = [
   { id: "inicio", etiqueta: "Inicio" },
   { id: "chat", etiqueta: "Solicitud por Chat" },
@@ -10,7 +12,7 @@ export default function Sidebar({ paginaActual, onCambiarPagina, usuarioActual, 
 
   return (
     <nav className="sidebar">
-      <p className="sidebar-titulo">DOVELA</p>
+      <img src={logoDovela} alt="Dovela Software" className="sidebar-logo" />
       <ul>
         {opciones.map((opcion) => (
           <li key={opcion.id}>
