@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { login, setToken } from "../api.js";
+import RecuperarPasswordPage from "./RecuperarPasswordPage.jsx";
 
 export default function LoginPage({ onIngreso }) {
+  const [vista, setVista] = useState("login");
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+
+  if (vista === "recuperar") {
+    return <RecuperarPasswordPage onVolverALogin={() => setVista("login")} />;
+  }
 
   const enviar = async (event) => {
     event.preventDefault();
@@ -29,6 +35,7 @@ export default function LoginPage({ onIngreso }) {
 
   return (
     <div className="inicio-page">
+      <h1>Portal de Seguimiento DOVELA</h1>
       <h2>Iniciar sesión</h2>
       <p>Esta sección es solo para el equipo DOVELA.</p>
       <form className="crear-solicitud-form" onSubmit={enviar}>
@@ -60,6 +67,9 @@ export default function LoginPage({ onIngreso }) {
         <div className="resumen-acciones">
           <button type="submit" disabled={enviando}>
             {enviando ? "Entrando..." : "Entrar"}
+          </button>
+          <button type="button" className="enlace" onClick={() => setVista("recuperar")}>
+            ¿Olvidaste tu contraseña?
           </button>
         </div>
       </form>

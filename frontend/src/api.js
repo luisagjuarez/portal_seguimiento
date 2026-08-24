@@ -94,6 +94,33 @@ export async function fetchMe() {
   return parseJsonOrThrow(response);
 }
 
+export async function forgotPassword(correoElectronico) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ correo_electronico: correoElectronico }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function resetPassword(token, passwordNueva) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password_nueva: passwordNueva }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function changePassword(passwordActual, passwordNueva) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ password_actual: passwordActual, password_nueva: passwordNueva }),
+  });
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchRolesScrum() {
   const response = await fetch(`${API_BASE_URL}/api/roles-scrum`);
   return parseJsonOrThrow(response);

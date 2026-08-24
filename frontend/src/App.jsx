@@ -8,15 +8,9 @@ import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
+import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
+import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.jsx";
 import { clearToken, fetchMe, getToken } from "./api.js";
-
-const PAGINAS_QUE_REQUIEREN_SESION = new Set([
-  "solicitudes",
-  "solicitud-detalle",
-  "tablero",
-  "tarea-detalle",
-  "usuarios",
-]);
 
 export default function App() {
   const [pagina, setPagina] = useState("inicio");
@@ -25,6 +19,9 @@ export default function App() {
   const [origenTarea, setOrigenTarea] = useState("solicitud");
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [restaurandoSesion, setRestaurandoSesion] = useState(Boolean(getToken()));
+  const [resetToken, setResetToken] = useState(
+    () => new URLSearchParams(window.location.search).get("reset_token"),
+  );
 
   useEffect(() => {
     if (!getToken()) {
@@ -76,29 +73,51 @@ export default function App() {
     setPagina("inicio");
   };
 
+  const limpiarResetToken = () => {
+    window.history.replaceState({}, "", window.location.pathname);
+    setResetToken(null);
+  };
+
+  const alCambiarPasswordObligatorio = () => {
+    setUsuarioActual((actual) => ({ ...actual, debe_cambiar_password: false }));
+  };
+
+  const alCambiarPasswordAutoservicio = () => {
+    setUsuarioActual((actual) => ({ ...actual, debe_cambiar_password: false }));
+    setPagina("inicio");
+  };
+
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
-  const requiereSesion = PAGINAS_QUE_REQUIEREN_SESION.has(pagina) && !usuarioActual;
+  const requiereSesion = !usuarioActual;
+  const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
+  const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
 
   return (
     <div className="app-layout">
-      <Sidebar
-        paginaActual={pagina}
-        onCambiarPagina={setPagina}
-        usuarioActual={usuarioActual}
-        esScrumMaster={esScrumMaster}
-        onCerrarSesion={cerrarSesion}
-      />
+      {usuarioActual && !debeCambiarPassword && (
+        <Sidebar
+          paginaActual={pagina}
+          onCambiarPagina={setPagina}
+          usuarioActual={usuarioActual}
+          esScrumMaster={esScrumMaster}
+          onCerrarSesion={cerrarSesion}
+        />
+      )}
       <div className="main-content">
         <header>
           <h1>Portal de Seguimiento DOVELA</h1>
         </header>
-        <main>
-          {restaurandoSesion && <p>Cargando...</p>}
-          {!restaurandoSesion && requiereSesion && <LoginPage onIngreso={setUsuarioActual} />}
-          {!restaurandoSesion && !requiereSesion && (
+        <main className={pantallaSinSidebar ? "pantalla-centrada" : ""}>
+          {resetToken && <ResetPasswordPage token={resetToken} onListo={limpiarResetToken} />}
+          {!resetToken && restaurandoSesion && <p>Cargando...</p>}
+          {!resetToken && !restaurandoSesion && requiereSesion && <LoginPage onIngreso={setUsuarioActual} />}
+          {!resetToken && !restaurandoSesion && !requiereSesion && debeCambiarPassword && (
+            <CambiarPasswordFormulario obligatorio onCambiada={alCambiarPasswordObligatorio} />
+          )}
+          {!resetToken && !restaurandoSesion && !requiereSesion && !debeCambiarPassword && (
             <>
               {pagina === "inicio" && <InicioPage onIrA={setPagina} />}
-              {pagina === "chat" && <ChatWindow />}
+              {pagina === "chat" && <ChatWindow usuarioActual={usuarioActual} />}
               {pagina === "solicitudes" && <SolicitudesPage onVerDetalle={verDetalleSolicitud} />}
               {pagina === "solicitud-detalle" && (
                 <SolicitudDetallePage
@@ -117,6 +136,13 @@ export default function App() {
                 />
               )}
               {pagina === "usuarios" && esScrumMaster && <UsuariosPage />}
+              {pagina === "cambiar-password" && (
+                <CambiarPasswordFormulario
+                  obligatorio={false}
+                  onCambiada={alCambiarPasswordAutoservicio}
+                  onCancelar={() => setPagina("inicio")}
+                />
+              )}
             </>
           )}
         </main>

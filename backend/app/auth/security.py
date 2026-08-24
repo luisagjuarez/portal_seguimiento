@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -39,3 +41,11 @@ def decode_access_token(token: str) -> dict | None:
         return jwt.decode(token, settings.jwt_secret_key, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
         return None
+
+
+def generar_token_reset() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

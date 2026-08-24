@@ -4,7 +4,12 @@ from app.api.app import app
 from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
 
 USUARIO_DE_PRUEBA = UsuarioActual(
-    id=1, usuario="DOVELA_LG", nombre_completo="Luis Gómez", codigo_rol_scrum="SCRUM MASTER"
+    id=1,
+    usuario="DOVELA_LG",
+    nombre_completo="Luis Gómez",
+    codigo_rol_scrum="SCRUM MASTER",
+    correo_electronico="luis.gomez@dovela.com",
+    debe_cambiar_password=False,
 )
 
 

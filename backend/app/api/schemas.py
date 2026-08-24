@@ -158,6 +158,8 @@ class UsuarioActualOut(BaseModel):
     usuario: str
     nombre_completo: str
     codigo_rol_scrum: str | None
+    correo_electronico: str | None
+    debe_cambiar_password: bool
 
 
 class LoginResponse(BaseModel):
@@ -188,3 +190,17 @@ class ActualizarAccesoRequest(BaseModel):
     codigo_rol_scrum: str | None = Field(default=None, min_length=1, max_length=20)
     acceso_activo: bool | None = None
     password: str | None = Field(default=None, min_length=8, max_length=255)
+
+
+class ForgotPasswordRequest(BaseModel):
+    correo_electronico: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    password_nueva: str = Field(min_length=8, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    password_actual: str = Field(min_length=1, max_length=255)
+    password_nueva: str = Field(min_length=8, max_length=255)

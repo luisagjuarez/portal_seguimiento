@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import pytest
@@ -18,6 +20,12 @@ class _FakeConnection:
     def cursor(self):
         return _FakeCursor()
 
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
     def close(self):
         pass
 
@@ -30,6 +38,8 @@ def _fake_miembro(**overrides):
         "password_hash": hash_password("clave-secreta-1"),
         "codigo_rol_scrum": "SCRUM MASTER",
         "acceso_activo": True,
+        "correo_electronico": "luis.gomez@dovela.com",
+        "debe_cambiar_password": False,
     }
     base.update(overrides)
     return base
@@ -127,3 +137,128 @@ def test_get_current_user_success(monkeypatch):
 
     assert usuario_actual.usuario == "DOVELA_LG"
     assert usuario_actual.codigo_rol_scrum == "SCRUM MASTER"
+
+
+def test_forgot_password_correo_existente_envia_correo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_miembro_by_email", lambda cursor, correo: _fake_miembro())
+    monkeypatch.setattr(routes.repository, "crear_token_reset", lambda cursor, miembro_id, token_hash, expira_en: 1)
+
+    correos_enviados = []
+    monkeypatch.setattr(
+        routes, "enviar_correo", lambda destinatario, asunto, cuerpo: correos_enviados.append(destinatario)
+    )
+
+    response = client.post("/api/auth/forgot-password", json={"correo_electronico": "luis.gomez@dovela.com"})
+
+    assert response.status_code == 200
+    assert correos_enviados == ["luis.gomez@dovela.com"]
+
+
+def test_forgot_password_correo_inexistente_no_envia_correo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_miembro_by_email", lambda cursor, correo: None)
+
+    correos_enviados = []
+    monkeypatch.setattr(
+        routes, "enviar_correo", lambda destinatario, asunto, cuerpo: correos_enviados.append(destinatario)
+    )
+
+    response = client.post("/api/auth/forgot-password", json={"correo_electronico": "no-existe@dovela.com"})
+
+    assert response.status_code == 200
+    assert correos_enviados == []
+    assert response.json()["detail"] == routes._MENSAJE_FORGOT_PASSWORD
+
+
+def test_reset_password_token_valido(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    registro = {
+        "id": 10,
+        "miembro_id": 1,
+        "expira_en": datetime.now(timezone.utc) + timedelta(minutes=10),
+        "usado_en": None,
+    }
+    monkeypatch.setattr(routes.repository, "get_token_reset", lambda cursor, token_hash: registro)
+    monkeypatch.setattr(routes.repository, "set_password_miembro", lambda cursor, miembro_id, password_hash: None)
+    marcados = []
+    monkeypatch.setattr(routes.repository, "marcar_token_usado", lambda cursor, token_id: marcados.append(token_id))
+
+    response = client.post("/api/auth/reset-password", json={"token": "token-valido", "password_nueva": "nueva-clave-1"})
+
+    assert response.status_code == 200
+    assert marcados == [10]
+
+
+def test_reset_password_token_inexistente(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_token_reset", lambda cursor, token_hash: None)
+
+    response = client.post("/api/auth/reset-password", json={"token": "token-inventado", "password_nueva": "nueva-clave-1"})
+
+    assert response.status_code == 400
+
+
+def test_reset_password_token_expirado(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    registro = {
+        "id": 10,
+        "miembro_id": 1,
+        "expira_en": datetime.now(timezone.utc) - timedelta(minutes=1),
+        "usado_en": None,
+    }
+    monkeypatch.setattr(routes.repository, "get_token_reset", lambda cursor, token_hash: registro)
+
+    response = client.post("/api/auth/reset-password", json={"token": "token-expirado", "password_nueva": "nueva-clave-1"})
+
+    assert response.status_code == 400
+
+
+def test_reset_password_token_ya_usado(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    registro = {
+        "id": 10,
+        "miembro_id": 1,
+        "expira_en": datetime.now(timezone.utc) + timedelta(minutes=10),
+        "usado_en": datetime.now(timezone.utc),
+    }
+    monkeypatch.setattr(routes.repository, "get_token_reset", lambda cursor, token_hash: registro)
+
+    response = client.post("/api/auth/reset-password", json={"token": "token-usado", "password_nueva": "nueva-clave-1"})
+
+    assert response.status_code == 400
+
+
+def test_change_password_success(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_miembro_by_id", lambda cursor, id: _fake_miembro())
+    monkeypatch.setattr(routes.repository, "set_password_miembro", lambda cursor, miembro_id, password_hash: None)
+
+    response = client.post(
+        "/api/auth/change-password",
+        json={"password_actual": "clave-secreta-1", "password_nueva": "clave-nueva-2"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_change_password_actual_incorrecta(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_miembro_by_id", lambda cursor, id: _fake_miembro())
+
+    response = client.post(
+        "/api/auth/change-password",
+        json={"password_actual": "clave-equivocada", "password_nueva": "clave-nueva-2"},
+    )
+
+    # 400 y no 401: un typo de contraseña actual no debe disparar el logout automático
+    # del frontend (que trata cualquier 401 como sesión expirada).
+    assert response.status_code == 400

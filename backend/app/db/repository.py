@@ -197,7 +197,8 @@ def get_miembro_by_usuario(cursor, usuario: str) -> dict | None:
     list_miembros (que nunca debe exponer el hash por API)."""
     cursor.execute(
         """
-        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo
+        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo,
+               correo_electronico, debe_cambiar_password
         FROM miembros_equipo
         WHERE usuario ILIKE %(usuario)s
         """,
@@ -206,7 +207,10 @@ def get_miembro_by_usuario(cursor, usuario: str) -> dict | None:
     row = cursor.fetchone()
     if row is None:
         return None
-    columnas = ["id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo"]
+    columnas = [
+        "id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo",
+        "correo_electronico", "debe_cambiar_password",
+    ]
     return dict(zip(columnas, row))
 
 
@@ -215,7 +219,8 @@ def get_miembro_by_id(cursor, miembro_id: int) -> dict | None:
     Scrum Master desactivó el acceso o cambió el rol después de emitido el token."""
     cursor.execute(
         """
-        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo
+        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo,
+               correo_electronico, debe_cambiar_password
         FROM miembros_equipo
         WHERE id = %(id)s
         """,
@@ -224,7 +229,32 @@ def get_miembro_by_id(cursor, miembro_id: int) -> dict | None:
     row = cursor.fetchone()
     if row is None:
         return None
-    columnas = ["id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo"]
+    columnas = [
+        "id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo",
+        "correo_electronico", "debe_cambiar_password",
+    ]
+    return dict(zip(columnas, row))
+
+
+def get_miembro_by_email(cursor, correo: str) -> dict | None:
+    """Usado por forgot-password. A diferencia de find_miembro_id_by_email (que solo
+    resuelve un id para atribuir solicitudes), aquí hace falta el registro completo."""
+    cursor.execute(
+        """
+        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo,
+               correo_electronico, debe_cambiar_password
+        FROM miembros_equipo
+        WHERE correo_electronico ILIKE %(correo)s
+        """,
+        {"correo": correo},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = [
+        "id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo",
+        "correo_electronico", "debe_cambiar_password",
+    ]
     return dict(zip(columnas, row))
 
 
@@ -243,11 +273,14 @@ def list_miembros_con_acceso(cursor) -> list[dict]:
 
 
 def otorgar_acceso_miembro(cursor, miembro_id: int, password_hash: str, codigo_rol_scrum: str) -> int:
+    """La contraseña la elige el Scrum Master, no el propio usuario: se marca
+    debe_cambiar_password para forzarlo a fijar la suya en su primer login."""
     cursor.execute(
         """
         UPDATE miembros_equipo
         SET password_hash = %(password_hash)s, codigo_rol_scrum = %(codigo_rol_scrum)s,
-            acceso_activo = true, actualizado_en = now(), actualizado_por = current_user
+            acceso_activo = true, debe_cambiar_password = true,
+            actualizado_en = now(), actualizado_por = current_user
         WHERE id = %(id)s
         """,
         {"password_hash": password_hash, "codigo_rol_scrum": codigo_rol_scrum, "id": miembro_id},
@@ -263,13 +296,19 @@ def actualizar_acceso_miembro(
     password_hash: str | None,
 ) -> int:
     """Todos los campos son opcionales (solo se actualiza lo que no sea None) — el mismo
-    endpoint sirve para cambiar rol, activar/desactivar, y/o resetear la contraseña."""
+    endpoint sirve para cambiar rol, activar/desactivar, y/o resetear la contraseña. Igual
+    que en otorgar_acceso_miembro, si viene password_hash (el Scrum Master reseteó la
+    contraseña de alguien) se fuerza debe_cambiar_password."""
     cursor.execute(
         """
         UPDATE miembros_equipo
         SET codigo_rol_scrum = COALESCE(%(codigo_rol_scrum)s, codigo_rol_scrum),
             acceso_activo = COALESCE(%(acceso_activo)s, acceso_activo),
             password_hash = COALESCE(%(password_hash)s, password_hash),
+            debe_cambiar_password = CASE
+                WHEN %(password_hash)s IS NOT NULL THEN true
+                ELSE debe_cambiar_password
+            END,
             actualizado_en = now(), actualizado_por = current_user
         WHERE id = %(id)s
         """,
@@ -281,6 +320,56 @@ def actualizar_acceso_miembro(
         },
     )
     return cursor.rowcount
+
+
+def set_password_miembro(cursor, miembro_id: int, password_hash: str) -> None:
+    """Usado tanto por reset-password (link de correo) como por change-password
+    (autoservicio) — en ambos casos el usuario fijó su propia contraseña, así que se limpia
+    debe_cambiar_password."""
+    cursor.execute(
+        """
+        UPDATE miembros_equipo
+        SET password_hash = %(password_hash)s, debe_cambiar_password = false,
+            actualizado_en = now(), actualizado_por = current_user
+        WHERE id = %(id)s
+        """,
+        {"password_hash": password_hash, "id": miembro_id},
+    )
+
+
+def crear_token_reset(cursor, miembro_id: int, token_hash: str, expira_en) -> int:
+    cursor.execute(
+        """
+        INSERT INTO tokens_reset_password (miembro_id, token_hash, expira_en)
+        VALUES (%(miembro_id)s, %(token_hash)s, %(expira_en)s)
+        RETURNING id
+        """,
+        {"miembro_id": miembro_id, "token_hash": token_hash, "expira_en": expira_en},
+    )
+    return cursor.fetchone()[0]
+
+
+def get_token_reset(cursor, token_hash: str) -> dict | None:
+    cursor.execute(
+        """
+        SELECT id, miembro_id, expira_en, usado_en
+        FROM tokens_reset_password
+        WHERE token_hash = %(token_hash)s
+        """,
+        {"token_hash": token_hash},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "miembro_id", "expira_en", "usado_en"]
+    return dict(zip(columnas, row))
+
+
+def marcar_token_usado(cursor, token_id: int) -> None:
+    cursor.execute(
+        "UPDATE tokens_reset_password SET usado_en = now() WHERE id = %(id)s",
+        {"id": token_id},
+    )
 
 
 def list_roles_scrum(cursor) -> list[dict]:

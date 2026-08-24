@@ -15,6 +15,8 @@ class UsuarioActual:
     usuario: str
     nombre_completo: str
     codigo_rol_scrum: str | None
+    correo_electronico: str | None
+    debe_cambiar_password: bool
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> UsuarioActual:
@@ -42,6 +44,8 @@ def get_current_user(authorization: str | None = Header(default=None)) -> Usuari
         usuario=miembro["usuario"],
         nombre_completo=miembro["nombre_completo"],
         codigo_rol_scrum=miembro["codigo_rol_scrum"],
+        correo_electronico=miembro["correo_electronico"],
+        debe_cambiar_password=miembro["debe_cambiar_password"],
     )
 
 

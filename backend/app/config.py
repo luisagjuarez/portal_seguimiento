@@ -58,5 +58,14 @@ class Settings:
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", "")
     jwt_expire_minutes: int = _get_int("JWT_EXPIRE_MINUTES", 480)
 
+    # Envío de correo saliente (recuperación de contraseña)
+    smtp_host: str = os.environ.get("SMTP_HOST", "localhost")
+    smtp_port: int = _get_int("SMTP_PORT", 25)
+    smtp_user: str = os.environ.get("SMTP_USER", "")
+    smtp_password: str = os.environ.get("SMTP_PASSWORD", "")
+    smtp_use_tls: bool = _get_bool("SMTP_USE_TLS", False)
+    smtp_from: str = os.environ.get("SMTP_FROM", "no-responder@dovela.com")
+    reset_token_expire_minutes: int = _get_int("RESET_TOKEN_EXPIRE_MINUTES", 30)
+
 
 settings = Settings()

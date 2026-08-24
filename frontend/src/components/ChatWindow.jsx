@@ -4,9 +4,8 @@ import ClienteAutocomplete from "./ClienteAutocomplete.jsx";
 import AdjuntosPaso from "./AdjuntosPaso.jsx";
 import { crearSolicitudChat } from "../api.js";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const PASOS = ["email", "titulo", "descripcion", "cliente", "adjuntos", "resumen", "listo"];
+const PASOS = ["titulo", "descripcion", "cliente", "adjuntos", "resumen", "listo"];
+const SALUDO_INICIAL = "¡Hola! Vamos a registrar tu solicitud. ¿Cuál es el título breve de tu solicitud?";
 
 function TextoInputPaso({ placeholder, multiline, onSubmit }) {
   const [valor, setValor] = useState("");
@@ -50,12 +49,17 @@ function TextoInputPaso({ placeholder, multiline, onSubmit }) {
   );
 }
 
-export default function ChatWindow() {
+export default function ChatWindow({ usuarioActual }) {
+  const emailUsuario = usuarioActual?.correo_electronico || "";
   const [pasoIndex, setPasoIndex] = useState(0);
-  const [datos, setDatos] = useState({ email: "", titulo: "", descripcion: "", cliente: null, adjuntos: [] });
-  const [historial, setHistorial] = useState([
-    { from: "bot", texto: "¡Hola! Vamos a registrar tu solicitud. ¿Cuál es tu correo?" },
-  ]);
+  const [datos, setDatos] = useState({
+    email: emailUsuario,
+    titulo: "",
+    descripcion: "",
+    cliente: null,
+    adjuntos: [],
+  });
+  const [historial, setHistorial] = useState([{ from: "bot", texto: SALUDO_INICIAL }]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -69,20 +73,6 @@ export default function ChatWindow() {
 
   const responderUsuario = (texto) => {
     setHistorial((prev) => [...prev, { from: "user", texto }]);
-  };
-
-  const manejarEmail = (valor) => {
-    if (!EMAIL_PATTERN.test(valor)) {
-      setHistorial((prev) => [
-        ...prev,
-        { from: "user", texto: valor },
-        { from: "bot", texto: "Ese correo no parece válido. ¿Puedes escribirlo de nuevo?" },
-      ]);
-      return;
-    }
-    responderUsuario(valor);
-    setDatos((d) => ({ ...d, email: valor }));
-    avanzar("¿Cuál es el título breve de tu solicitud?");
   };
 
   const manejarTitulo = (valor) => {
@@ -149,9 +139,6 @@ export default function ChatWindow() {
       </div>
 
       <div className="chat-paso-actual">
-        {paso === "email" && (
-          <TextoInputPaso placeholder="tu.correo@dovela.com" onSubmit={manejarEmail} />
-        )}
         {paso === "titulo" && (
           <TextoInputPaso placeholder="Ej. Reporte de gastos personalizado" onSubmit={manejarTitulo} />
         )}
@@ -203,10 +190,8 @@ export default function ChatWindow() {
             <button
               type="button"
               onClick={() => {
-                setDatos({ email: "", titulo: "", descripcion: "", cliente: null, adjuntos: [] });
-                setHistorial([
-                  { from: "bot", texto: "¡Hola! Vamos a registrar tu solicitud. ¿Cuál es tu correo?" },
-                ]);
+                setDatos({ email: emailUsuario, titulo: "", descripcion: "", cliente: null, adjuntos: [] });
+                setHistorial([{ from: "bot", texto: SALUDO_INICIAL }]);
                 setResultado(null);
                 setPasoIndex(0);
               }}

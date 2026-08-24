@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-23
+Última actualización: 2026-08-24
 
 ## Dónde vamos en el roadmap
 
@@ -14,16 +14,81 @@
 [x] Fase 1.7 (extraoficial) — Vista maestro-detalle, editar/borrar solicitud, CRUD de tareas ✅ implementado y verificado end-to-end (2026-08-23)
 [ ] Fase 2   — Actualización de tareas      ⬜ no iniciado (parcialmente cubierto por el CRUD de tareas de la Fase 1.7, ver abajo)
 [x] Fase 1.8 (extraoficial) — Autenticación, roles Scrum y borrado lógico ✅ implementado y verificado end-to-end (2026-08-23)
+[x] Fase 1.9 (extraoficial) — Login obligatorio total, cambio forzado/autoservicio y recuperación de contraseña ✅ implementado y verificado end-to-end (2026-08-24)
 ```
 
-**Cambio importante de arquitectura (2026-08-23):** el portal ya no es de acceso libre en
-sus páginas internas. Hay login real (usuario/contraseña) sobre `miembros_equipo`, con 3
-roles Scrum (Product Owner, Scrum Master, Team) y una sola regla de permisos por ahora:
-**solo el Scrum Master puede crear tareas**. El wizard de "Solicitud por Chat" y la
-ingesta por correo siguen abiertos (canal externo). Los borrados de solicitud/tarea/
-comentario/hito ya no son físicos: son lógicos (`borrado_en`/`borrado_por`), y
-`creado_por`/`actualizado_por` ahora guardan el `usuario` real de portal, no el rol de
-conexión a Postgres. Detalle completo en `00_ARCHIVOS/BITACORAS/2026-08-23.md`.
+**Cambio importante de arquitectura (2026-08-23, ampliado 2026-08-24):** el portal ya no es
+de acceso libre. Hay login real (usuario/contraseña) sobre `miembros_equipo`, con 3 roles
+Scrum (Product Owner, Scrum Master, Team) y una sola regla de permisos por ahora: **solo el
+Scrum Master puede crear tareas**. Los borrados de solicitud/tarea/comentario/hito ya no son
+físicos: son lógicos (`borrado_en`/`borrado_por`), y `creado_por`/`actualizado_por` ahora
+guardan el `usuario` real de portal, no el rol de conexión a Postgres. Detalle completo en
+`00_ARCHIVOS/BITACORAS/2026-08-23.md`.
+
+**2026-08-24 — Login obligatorio en todo el portal (incluye Inicio y Solicitud por Chat):**
+el 23 el login solo protegía las páginas internas (Solicitudes/Tablero/Usuarios/detalle);
+"Inicio" y el wizard de "Solicitud por Chat" seguían siendo de acceso libre pensando en
+solicitantes externos. El usuario pidió cerrar eso: ahora **todo** el portal exige sesión,
+sin excepción (`frontend/src/App.jsx` ya no distingue páginas — si no hay `usuarioActual`,
+se muestra `LoginPage` sin importar la página elegida). Como consecuencia, el wizard de chat
+ya conoce quién es el solicitante: el primer paso (pedir el correo escribiéndolo a mano) se
+quitó (`PASOS` en `ChatWindow.jsx` ya no incluye `"email"`), y el correo se toma directo de
+`usuarioActual.correo_electronico` — nuevo campo expuesto en `GET /api/auth/me` y en la
+respuesta de `POST /api/auth/login` (`UsuarioActualOut`, `UsuarioActual` en
+`app/auth/dependencies.py`, columnas nuevas en `get_miembro_by_usuario`/`get_miembro_by_id`
+de `repository.py`). Verificado en navegador con la sesión de `DOVELA_LG`: el chat arranca
+directo en "¿Cuál es el título...?" y el resumen final muestra el correo real de sesión sin
+haberlo preguntado.
+
+**Pendiente para más adelante (anotado, no iniciado):** el usuario está contemplando un
+**segundo portal, separado de este**, que exponga *solo* el wizard de "Solicitud por Chat"
+para solicitantes externos (sin login de equipo DOVELA) — ahora que el portal principal cerró
+el chat a solo usuarios internos autenticados, hace falta algún canal para quien no es del
+equipo. Sin diseño todavía (¿subdominio aparte? ¿misma API con un endpoint público distinto?
+¿reusa `POST /api/solicitudes/chat` tal cual?) — a definir con el usuario cuando lo retome.
+
+**2026-08-24 (mismo día) — Sidebar oculto pre-login, cambio de contraseña forzado/
+autoservicio, y recuperación por correo:** el usuario notó que el menú lateral con todas las
+opciones del portal se veía incluso antes de iniciar sesión — se ocultó (`Sidebar` en
+`App.jsx` ahora solo se renderiza si hay `usuarioActual`). Además pidió tres funcionalidades
+de contraseña que no existían: forzar cambio en el primer acceso, recuperación por correo, y
+cambio autoservicio ya logueado. Las tres quedaron implementadas — detalle completo del
+diseño y la implementación en `00_ARCHIVOS/BITACORAS/2026-08-24.md` y en el plan
+`/home/lg/.claude/plans/golden-wiggling-mitten.md`. Resumen:
+
+- Nueva columna `miembros_equipo.debe_cambiar_password` (migración
+  `backend/sql/007_password_reset.sql`, corrida contra la BD real): se pone en `true` cada
+  vez que el Scrum Master otorga acceso por primera vez o resetea la contraseña de alguien
+  (`otorgar_acceso_miembro`/`actualizar_acceso_miembro` en `repository.py`); se limpia en
+  cuanto el propio usuario fija su contraseña (reset por correo o autoservicio). **No se
+  aplicó retroactivamente** a los 3 usuarios ya activos (`DOVELA_LG`, `DOVELA_WA`,
+  `DOVELA_JC`) — nacen en `false`.
+- `App.jsx` bloquea toda la app (sin sidebar) mostrando `CambiarPasswordFormulario
+  obligatorio` mientras `usuarioActual.debe_cambiar_password` sea `true`.
+- Recuperación por correo: nueva tabla `tokens_reset_password` (token hasheado con SHA-256,
+  vence a los 30 min, un solo uso), endpoints `POST /api/auth/forgot-password` y
+  `POST /api/auth/reset-password` (`routes_auth.py`), y nuevo módulo de envío
+  `backend/app/email_send/mailer.py` (`smtplib` puro, sin dependencias nuevas). **El envío
+  usa el mismo mailserver de pruebas (greenmail, `--profile local-test`, puerto 3025) que ya
+  se usaba para IMAP — no hay SMTP real configurado.** Mismo tipo de pendiente que el bloqueo
+  de IMAP M365: para producción hace falta un proveedor SMTP real y las variables `SMTP_*` en
+  `.env` (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_USE_TLS`/`SMTP_FROM`,
+  `RESET_TOKEN_EXPIRE_MINUTES`). El enlace del correo apunta a
+  `{FRONTEND_ORIGIN}/?reset_token=...`; `App.jsx` lo detecta por query string al montar y
+  muestra `ResetPasswordPage` sin pasar por login.
+- Cambio autoservicio: `POST /api/auth/change-password` (exige contraseña actual), accesible
+  desde un botón "Cambiar contraseña" nuevo en el sidebar (`pagina = "cambiar-password"`).
+  Devuelve `400` (no `401`) si la contraseña actual es incorrecta, a propósito — un `401`
+  hubiera disparado el logout automático del interceptor global de `api.js` ante un simple
+  typo.
+- Verificado end-to-end en navegador y por `curl`: sidebar ausente antes de login; a
+  `DOVELA_AR` se le otorgó acceso de prueba y su login cayó directo en la pantalla
+  obligatoria (sin sidebar), completó el cambio y pasó a "Inicio" sin volver a loguearse;
+  recuperación por correo probada de punta a punta leyendo el mailserver de pruebas por IMAP
+  (`localhost:3143`) para extraer el link real y completar el reset; cambio autoservicio
+  probado con `DOVELA_LG`. El usuario de prueba (`DOVELA_AR`) quedó restaurado a
+  `acceso_activo=false` al terminar, y la contraseña de `DOVELA_LG` quedó de nuevo en
+  `DovelaScrum2026!` (la ya documentada arriba). 89 tests de backend en verde (17 nuevos).
 
 **Credenciales creadas durante la implementación (pendiente que el usuario las cambie o
 las tome nota):** `DOVELA_LG` (Scrum Master) → `DovelaScrum2026!`. También se otorgó
@@ -280,6 +345,24 @@ Castañeda, `canal=1`).
 7. Revisar si otras tablas con carga inicial masiva (además de `tareas`, ya corregida en la
    Fase 1.7) tienen la secuencia `IDENTITY` desincronizada antes de que alguien intente
    insertar en ellas por primera vez desde la app.
+8. **Segundo portal para solicitantes externos (anotado 2026-08-24, sin diseñar).** Ahora
+   que "Solicitud por Chat" exige login de equipo DOVELA, ya no hay canal web para quien no
+   es del equipo (el correo y la ingesta por email siguen siendo la única vía externa hoy).
+   El usuario quiere un portal aparte, más adelante, que exponga solo el wizard de chat para
+   externos. Falta definir arquitectura (¿app/subdominio separado? ¿mismo backend con un
+   endpoint público distinto al de `POST /api/solicitudes/chat` actual, que ahora asume un
+   solicitante interno?).
+9. **⭐ Conseguir SMTP real para recuperación de contraseña (anotado 2026-08-24).** El correo
+   de "olvidé mi contraseña" hoy se envía contra el mailserver de pruebas (`greenmail`,
+   `--profile local-test`, puerto 3025) — funciona en este entorno pero **no envía nada fuera
+   de él**. Hace falta un proveedor SMTP real (¿M365/Graph, igual que se evaluó para el IMAP
+   de entrada? ¿otro proveedor?) y completar `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/
+   `SMTP_PASSWORD`/`SMTP_USE_TLS`/`SMTP_FROM` en `.env` — sin cambios de código, el módulo
+   `backend/app/email_send/mailer.py` ya es agnóstico al proveedor.
+10. Considerar si conviene forzar `debe_cambiar_password = true` también para los 3 usuarios
+    ya activos hoy (`DOVELA_LG`, `DOVELA_WA`, `DOVELA_JC`), ya que sus contraseñas actuales
+    quedaron documentadas en texto plano en este mismo archivo — un simple `UPDATE` cuando el
+    usuario lo pida.
 
 ## Dónde quedó guardado el plan de la Fase 1.2
 
