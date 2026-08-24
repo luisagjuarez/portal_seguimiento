@@ -100,12 +100,14 @@ def is_message_processed(cursor, message_id: str) -> bool:
     return cursor.fetchone() is not None
 
 
-def insert_solicitud(cursor, solicitud: NuevaSolicitud) -> int:
+def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") -> int:
     """Inserta en solicitudes. A diferencia del diseño anterior (acoplado a Oracle/APEX,
     con un trigger que llenaba auditoría e ID), este esquema no tiene triggers ni column
     defaults: hay que llenar creado_en/creado_por/actualizado_en/actualizado_por a mano, y
     resolver cliente/tipo/canal/solicitante (FKs numéricas) a partir de los valores de texto
-    que trae NuevaSolicitud."""
+    que trae NuevaSolicitud. `actor` es quien queda como creado_por/actualizado_por: el
+    `usuario` del portal autenticado, o "PUBLICO" para los canales sin login (chat/correo),
+    que siguen abiertos a clientes externos."""
     solicitante_id = find_miembro_id_by_email(cursor, solicitud.solicitante_email)
     cliente_id = find_cliente_id_by_name(cursor, solicitud.cliente) if solicitud.cliente else None
     tipo_id = find_tipo_id(cursor, solicitud.tipo)
@@ -118,8 +120,8 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud) -> int:
              orden_prioridad, creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES
             (%(nombre)s, %(descripcion)s, %(solicitante)s, %(cliente)s, %(tipo)s,
-             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, now(), current_user,
-             now(), current_user)
+             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, now(), %(actor)s,
+             now(), %(actor)s)
         RETURNING id
         """,
         {
@@ -131,6 +133,7 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud) -> int:
             "codigo_estatus": solicitud.status_cd,
             "canal": canal_id,
             "orden_prioridad": solicitud.orden_prioridad,
+            "actor": actor,
         },
     )
     return cursor.fetchone()[0]
@@ -189,6 +192,102 @@ def list_miembros(cursor) -> list[dict]:
     ]
 
 
+def get_miembro_by_usuario(cursor, usuario: str) -> dict | None:
+    """Usado por el login: trae también password_hash/acceso_activo, a diferencia de
+    list_miembros (que nunca debe exponer el hash por API)."""
+    cursor.execute(
+        """
+        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo
+        FROM miembros_equipo
+        WHERE usuario ILIKE %(usuario)s
+        """,
+        {"usuario": usuario},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo"]
+    return dict(zip(columnas, row))
+
+
+def get_miembro_by_id(cursor, miembro_id: int) -> dict | None:
+    """Usado por get_current_user en cada request, para no confiar solo en el JWT si el
+    Scrum Master desactivó el acceso o cambió el rol después de emitido el token."""
+    cursor.execute(
+        """
+        SELECT id, usuario, nombre_completo, password_hash, codigo_rol_scrum, acceso_activo
+        FROM miembros_equipo
+        WHERE id = %(id)s
+        """,
+        {"id": miembro_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "usuario", "nombre_completo", "password_hash", "codigo_rol_scrum", "acceso_activo"]
+    return dict(zip(columnas, row))
+
+
+def list_miembros_con_acceso(cursor) -> list[dict]:
+    cursor.execute(
+        """
+        SELECT m.id, m.usuario, m.nombre_completo, m.codigo_rol_scrum,
+               r.descripcion AS rol_scrum_descripcion, m.acceso_activo
+        FROM miembros_equipo m
+        LEFT JOIN roles_scrum r ON r.codigo = m.codigo_rol_scrum
+        ORDER BY m.nombre_completo
+        """
+    )
+    columnas = ["id", "usuario", "nombre_completo", "codigo_rol_scrum", "rol_scrum_descripcion", "acceso_activo"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def otorgar_acceso_miembro(cursor, miembro_id: int, password_hash: str, codigo_rol_scrum: str) -> int:
+    cursor.execute(
+        """
+        UPDATE miembros_equipo
+        SET password_hash = %(password_hash)s, codigo_rol_scrum = %(codigo_rol_scrum)s,
+            acceso_activo = true, actualizado_en = now(), actualizado_por = current_user
+        WHERE id = %(id)s
+        """,
+        {"password_hash": password_hash, "codigo_rol_scrum": codigo_rol_scrum, "id": miembro_id},
+    )
+    return cursor.rowcount
+
+
+def actualizar_acceso_miembro(
+    cursor,
+    miembro_id: int,
+    codigo_rol_scrum: str | None,
+    acceso_activo: bool | None,
+    password_hash: str | None,
+) -> int:
+    """Todos los campos son opcionales (solo se actualiza lo que no sea None) — el mismo
+    endpoint sirve para cambiar rol, activar/desactivar, y/o resetear la contraseña."""
+    cursor.execute(
+        """
+        UPDATE miembros_equipo
+        SET codigo_rol_scrum = COALESCE(%(codigo_rol_scrum)s, codigo_rol_scrum),
+            acceso_activo = COALESCE(%(acceso_activo)s, acceso_activo),
+            password_hash = COALESCE(%(password_hash)s, password_hash),
+            actualizado_en = now(), actualizado_por = current_user
+        WHERE id = %(id)s
+        """,
+        {
+            "codigo_rol_scrum": codigo_rol_scrum,
+            "acceso_activo": acceso_activo,
+            "password_hash": password_hash,
+            "id": miembro_id,
+        },
+    )
+    return cursor.rowcount
+
+
+def list_roles_scrum(cursor) -> list[dict]:
+    cursor.execute("SELECT codigo, descripcion FROM roles_scrum ORDER BY orden_visualizacion")
+    return [{"codigo": row[0], "descripcion": row[1]} for row in cursor.fetchall()]
+
+
 def list_tipos_solicitud(cursor) -> list[dict]:
     cursor.execute("SELECT id, tipo FROM tipos_solicitud WHERE tipo IS NOT NULL ORDER BY orden")
     return [{"id": row[0], "tipo": row[1]} for row in cursor.fetchall()]
@@ -214,7 +313,7 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
         LEFT JOIN estatus e ON e.codigo = s.codigo_estatus
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
-        WHERE s.id = %(id)s
+        WHERE s.id = %(id)s AND s.borrado_en IS NULL
         """,
         {"id": solicitud_id},
     )
@@ -237,14 +336,15 @@ def update_solicitud(
     cliente_id: int | None,
     tipo_id: int | None,
     codigo_estatus: str,
+    actor: str,
 ) -> int:
     cursor.execute(
         """
         UPDATE solicitudes
         SET nombre = %(nombre)s, descripcion = %(descripcion)s, cliente = %(cliente)s,
             tipo = %(tipo)s, codigo_estatus = %(codigo_estatus)s,
-            actualizado_en = now(), actualizado_por = current_user
-        WHERE id = %(id)s
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
         {
             "nombre": nombre,
@@ -253,29 +353,34 @@ def update_solicitud(
             "tipo": tipo_id,
             "codigo_estatus": codigo_estatus,
             "id": solicitud_id,
+            "actor": actor,
         },
     )
     return cursor.rowcount
 
 
-def delete_solicitud(cursor, solicitud_id: int) -> int:
-    """Borra una solicitud y su información dependiente. tareas/hitos/comentarios/
-    enlaces_tarea/tarea_por_hacer se borran solos vía ON DELETE CASCADE, pero
-    solicitudes_adjuntos, adjuntos, solicitudes_md y emails_procesados NO tienen cascada
-    en el esquema real (confirmado contra la BD): hay que borrarlos a mano antes, o el
-    DELETE de solicitudes falla por violación de FK."""
+def delete_solicitud(cursor, solicitud_id: int, actor: str) -> int:
+    """Borrado lógico: la solicitud y su información dependiente (tareas, comentarios,
+    hitos) quedan marcadas con borrado_en/borrado_por en vez de desaparecer — así se puede
+    saber quién borró qué y cuándo. Ya no hace falta tocar solicitudes_adjuntos/adjuntos/
+    solicitudes_md/emails_procesados: como la solicitud sigue existiendo (solo marcada como
+    borrada), esas filas siguen siendo válidas apuntando a ella."""
     cursor.execute(
-        "SELECT adjunto_id FROM solicitudes_adjuntos WHERE solicitud_id = %(id)s",
-        {"id": solicitud_id},
+        "UPDATE tareas SET borrado_en = now(), borrado_por = %(actor)s WHERE solicitud_id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": solicitud_id},
     )
-    adjunto_ids = [row[0] for row in cursor.fetchall()]
-
-    cursor.execute("DELETE FROM solicitudes_adjuntos WHERE solicitud_id = %(id)s", {"id": solicitud_id})
-    if adjunto_ids:
-        cursor.execute("DELETE FROM adjuntos WHERE id = ANY(%(ids)s)", {"ids": adjunto_ids})
-    cursor.execute("DELETE FROM solicitudes_md WHERE solicitud_id = %(id)s", {"id": solicitud_id})
-    cursor.execute("DELETE FROM emails_procesados WHERE solicitud_id = %(id)s", {"id": solicitud_id})
-    cursor.execute("DELETE FROM solicitudes WHERE id = %(id)s", {"id": solicitud_id})
+    cursor.execute(
+        "UPDATE comentarios SET borrado_en = now(), borrado_por = %(actor)s WHERE solicitud_id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": solicitud_id},
+    )
+    cursor.execute(
+        "UPDATE hitos SET borrado_en = now(), borrado_por = %(actor)s WHERE solicitud_id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": solicitud_id},
+    )
+    cursor.execute(
+        "UPDATE solicitudes SET borrado_en = now(), borrado_por = %(actor)s WHERE id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": solicitud_id},
+    )
     return cursor.rowcount
 
 
@@ -293,7 +398,7 @@ def list_tareas(
     """Listado global para el Tablero Scrum: todas las tareas de todas las solicitudes,
     con el mismo shape que get_tarea_by_id (necesario para que el PUT de drag-and-drop no
     borre campos que no vienen en la tarjeta) más solicitud_nombre/cliente de referencia."""
-    condiciones = []
+    condiciones = ["t.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
         condiciones.append("c.nombre ILIKE %(cliente)s")
@@ -302,7 +407,7 @@ def list_tareas(
         condiciones.append("t.responsable_id = %(responsable_id)s")
         parametros["responsable_id"] = responsable_id
 
-    where = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
+    where = f"WHERE {' AND '.join(condiciones)}"
     cursor.execute(
         f"""
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
@@ -339,7 +444,7 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.solicitud_id = %(id)s
+        WHERE t.solicitud_id = %(id)s AND t.borrado_en IS NULL
         ORDER BY t.creado_en
         """,
         {"id": solicitud_id},
@@ -359,6 +464,7 @@ def insert_tarea(
     descripcion: str | None,
     responsable_id: int | None,
     codigo_estatus_tarea: str,
+    actor: str,
     fecha_inicio: date | None = None,
     fecha_fin: date | None = None,
     horas_estimadas: int | None = None,
@@ -376,7 +482,7 @@ def insert_tarea(
             (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(responsable_id)s, %(codigo_estatus_tarea)s,
              COALESCE(%(fecha_inicio)s, now()::date),
              COALESCE(%(fecha_fin)s, (now() + interval '7 days')::date),
-             %(horas_estimadas)s, %(horas_reales)s, now(), current_user, now(), current_user)
+             %(horas_estimadas)s, %(horas_reales)s, now(), %(actor)s, now(), %(actor)s)
         RETURNING id
         """,
         {
@@ -389,6 +495,7 @@ def insert_tarea(
             "fecha_fin": fecha_fin,
             "horas_estimadas": horas_estimadas,
             "horas_reales": horas_reales,
+            "actor": actor,
         },
     )
     return cursor.fetchone()[0]
@@ -401,6 +508,7 @@ def update_tarea(
     descripcion: str | None,
     responsable_id: int | None,
     codigo_estatus_tarea: str,
+    actor: str,
     fecha_inicio: date | None = None,
     fecha_fin: date | None = None,
     horas_estimadas: int | None = None,
@@ -417,8 +525,8 @@ def update_tarea(
             fecha_inicio = COALESCE(%(fecha_inicio)s, fecha_inicio),
             fecha_fin = COALESCE(%(fecha_fin)s, fecha_fin),
             horas_estimadas = %(horas_estimadas)s, horas_reales = %(horas_reales)s,
-            actualizado_en = now(), actualizado_por = current_user
-        WHERE id = %(id)s
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
         {
             "nombre": nombre,
@@ -430,6 +538,7 @@ def update_tarea(
             "horas_estimadas": horas_estimadas,
             "horas_reales": horas_reales,
             "id": tarea_id,
+            "actor": actor,
         },
     )
     return cursor.rowcount
@@ -445,7 +554,7 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.id = %(id)s
+        WHERE t.id = %(id)s AND t.borrado_en IS NULL
         """,
         {"id": tarea_id},
     )
@@ -460,22 +569,33 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     return dict(zip(columnas, row))
 
 
-def delete_tarea(cursor, tarea_id: int) -> int:
-    """enlaces_tarea, tarea_por_hacer y comentarios (tarea_id) se borran solos vía
-    ON DELETE CASCADE. El hito propio de la tarea (tareas.hito_id) no tiene cascada hacia
-    ese lado: se borra a mano, ya que hoy no hay ninguna vista que lo muestre fuera del
-    detalle de esta tarea (dejarlo huérfano no serviría de nada)."""
-    cursor.execute("SELECT hito_id FROM tareas WHERE id = %(id)s", {"id": tarea_id})
+def delete_tarea(cursor, tarea_id: int, actor: str) -> int:
+    """Borrado lógico. enlaces_tarea y tarea_por_hacer se borran físicos solos vía
+    ON DELETE CASCADE (son detalle interno, no una de las 4 entidades con auditoría
+    pedida); el hito propio de la tarea y sus comentarios se marcan borrados también
+    (cascada manual, igual que en delete_solicitud)."""
+    cursor.execute(
+        "SELECT hito_id FROM tareas WHERE id = %(id)s AND borrado_en IS NULL", {"id": tarea_id}
+    )
     row = cursor.fetchone()
-    hito_id = row[0] if row else None
+    if row is None:
+        return 0
+    hito_id = row[0]
 
-    cursor.execute("DELETE FROM tareas WHERE id = %(id)s", {"id": tarea_id})
-    filas_afectadas = cursor.rowcount
-
-    if filas_afectadas and hito_id:
-        cursor.execute("DELETE FROM hitos WHERE id = %(hito_id)s", {"hito_id": hito_id})
-
-    return filas_afectadas
+    cursor.execute(
+        "UPDATE comentarios SET borrado_en = now(), borrado_por = %(actor)s WHERE tarea_id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": tarea_id},
+    )
+    if hito_id:
+        cursor.execute(
+            "UPDATE hitos SET borrado_en = now(), borrado_por = %(actor)s WHERE id = %(hito_id)s AND borrado_en IS NULL",
+            {"actor": actor, "hito_id": hito_id},
+        )
+    cursor.execute(
+        "UPDATE tareas SET borrado_en = now(), borrado_por = %(actor)s WHERE id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": tarea_id},
+    )
+    return cursor.rowcount
 
 
 def get_hito_by_tarea(cursor, tarea_id: int) -> dict | None:
@@ -485,7 +605,7 @@ def get_hito_by_tarea(cursor, tarea_id: int) -> dict | None:
                h.creado_en, h.actualizado_en
         FROM hitos h
         JOIN tareas t ON t.hito_id = h.id
-        WHERE t.id = %(tarea_id)s
+        WHERE t.id = %(tarea_id)s AND h.borrado_en IS NULL
         """,
         {"tarea_id": tarea_id},
     )
@@ -503,13 +623,14 @@ def insert_hito_para_tarea(
     nombre: str,
     descripcion: str | None,
     fecha_vencimiento: date,
+    actor: str,
 ) -> int:
     cursor.execute(
         """
         INSERT INTO hitos (solicitud_id, nombre, descripcion, fecha_vencimiento,
                             creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(fecha_vencimiento)s,
-                now(), current_user, now(), current_user)
+                now(), %(actor)s, now(), %(actor)s)
         RETURNING id
         """,
         {
@@ -517,6 +638,7 @@ def insert_hito_para_tarea(
             "nombre": nombre,
             "descripcion": descripcion,
             "fecha_vencimiento": fecha_vencimiento,
+            "actor": actor,
         },
     )
     hito_id = cursor.fetchone()[0]
@@ -527,23 +649,36 @@ def insert_hito_para_tarea(
     return hito_id
 
 
-def update_hito(cursor, hito_id: int, nombre: str, descripcion: str | None, fecha_vencimiento: date) -> int:
+def update_hito(
+    cursor, hito_id: int, nombre: str, descripcion: str | None, fecha_vencimiento: date, actor: str
+) -> int:
     cursor.execute(
         """
         UPDATE hitos
         SET nombre = %(nombre)s, descripcion = %(descripcion)s,
             fecha_vencimiento = %(fecha_vencimiento)s,
-            actualizado_en = now(), actualizado_por = current_user
-        WHERE id = %(id)s
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
-        {"nombre": nombre, "descripcion": descripcion, "fecha_vencimiento": fecha_vencimiento, "id": hito_id},
+        {
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "fecha_vencimiento": fecha_vencimiento,
+            "id": hito_id,
+            "actor": actor,
+        },
     )
     return cursor.rowcount
 
 
-def delete_hito(cursor, hito_id: int) -> int:
-    """tareas.hito_id vuelve a NULL solo, vía el ON DELETE SET NULL ya existente."""
-    cursor.execute("DELETE FROM hitos WHERE id = %(id)s", {"id": hito_id})
+def delete_hito(cursor, hito_id: int, actor: str) -> int:
+    """Borrado lógico: tareas.hito_id se deja como está (sigue apuntando al hito, que
+    ahora está marcado como borrado) — get_hito_by_tarea ya filtra borrado_en IS NULL, así
+    que deja de mostrarse igual que si se hubiera desvinculado."""
+    cursor.execute(
+        "UPDATE hitos SET borrado_en = now(), borrado_por = %(actor)s WHERE id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": hito_id},
+    )
     return cursor.rowcount
 
 
@@ -553,7 +688,7 @@ def list_comentarios_by_tarea(cursor, tarea_id: int) -> list[dict]:
         SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
                actualizado_en, actualizado_por
         FROM comentarios
-        WHERE tarea_id = %(tarea_id)s
+        WHERE tarea_id = %(tarea_id)s AND borrado_en IS NULL
         ORDER BY creado_en
         """,
         {"tarea_id": tarea_id},
@@ -565,15 +700,15 @@ def list_comentarios_by_tarea(cursor, tarea_id: int) -> list[dict]:
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
-def insert_comentario(cursor, solicitud_id: int, tarea_id: int | None, texto: str) -> int:
+def insert_comentario(cursor, solicitud_id: int, tarea_id: int | None, texto: str, actor: str) -> int:
     cursor.execute(
         """
         INSERT INTO comentarios (solicitud_id, tarea_id, texto_comentario,
                                   creado_en, creado_por, actualizado_en, actualizado_por)
-        VALUES (%(solicitud_id)s, %(tarea_id)s, %(texto)s, now(), current_user, now(), current_user)
+        VALUES (%(solicitud_id)s, %(tarea_id)s, %(texto)s, now(), %(actor)s, now(), %(actor)s)
         RETURNING id
         """,
-        {"solicitud_id": solicitud_id, "tarea_id": tarea_id, "texto": texto},
+        {"solicitud_id": solicitud_id, "tarea_id": tarea_id, "texto": texto, "actor": actor},
     )
     return cursor.fetchone()[0]
 
@@ -584,7 +719,7 @@ def get_comentario_by_id(cursor, comentario_id: int) -> dict | None:
         SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
                actualizado_en, actualizado_por
         FROM comentarios
-        WHERE id = %(id)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
         {"id": comentario_id},
     )
@@ -598,20 +733,23 @@ def get_comentario_by_id(cursor, comentario_id: int) -> dict | None:
     return dict(zip(columnas, row))
 
 
-def update_comentario(cursor, comentario_id: int, texto: str) -> int:
+def update_comentario(cursor, comentario_id: int, texto: str, actor: str) -> int:
     cursor.execute(
         """
         UPDATE comentarios
-        SET texto_comentario = %(texto)s, actualizado_en = now(), actualizado_por = current_user
-        WHERE id = %(id)s
+        SET texto_comentario = %(texto)s, actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
-        {"texto": texto, "id": comentario_id},
+        {"texto": texto, "id": comentario_id, "actor": actor},
     )
     return cursor.rowcount
 
 
-def delete_comentario(cursor, comentario_id: int) -> int:
-    cursor.execute("DELETE FROM comentarios WHERE id = %(id)s", {"id": comentario_id})
+def delete_comentario(cursor, comentario_id: int, actor: str) -> int:
+    cursor.execute(
+        "UPDATE comentarios SET borrado_en = now(), borrado_por = %(actor)s WHERE id = %(id)s AND borrado_en IS NULL",
+        {"actor": actor, "id": comentario_id},
+    )
     return cursor.rowcount
 
 
@@ -624,7 +762,7 @@ def list_solicitudes(
 ) -> list[dict]:
     """Listado para la página de Solicitudes (Fase 1.6). Trae nombres legibles de los
     catálogos (no solo ids) vía LEFT JOIN, más recientes primero."""
-    condiciones = []
+    condiciones = ["s.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
         condiciones.append("c.nombre ILIKE %(cliente)s")
@@ -636,7 +774,7 @@ def list_solicitudes(
         condiciones.append("s.codigo_estatus = %(estatus)s")
         parametros["estatus"] = estatus
 
-    where = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
+    where = f"WHERE {' AND '.join(condiciones)}"
     cursor.execute(
         f"""
         SELECT s.id, s.nombre, c.nombre AS cliente, t.tipo AS tipo,

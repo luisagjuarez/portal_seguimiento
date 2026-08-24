@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import EmailStr
 
 from app.api.schemas import (
@@ -19,6 +19,7 @@ from app.api.schemas import (
     TareaCreateUpdate,
     TareaOut,
 )
+from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
 from app.config import settings
 from app.db import repository
 from app.db.connection import get_connection, release_connection
@@ -62,8 +63,9 @@ def _crear_solicitud_con_adjuntos(
     contenidos: list[tuple[str, bytes, str | None]],
     dedupe_seed: str,
     now: datetime,
+    actor: str = "PUBLICO",
 ) -> int:
-    id_solicitud = repository.insert_solicitud(cursor, solicitud)
+    id_solicitud = repository.insert_solicitud(cursor, solicitud, actor=actor)
 
     rutas_adjuntos = []
     for filename, contenido, content_type in contenidos:
@@ -107,6 +109,7 @@ def listar_solicitudes(
     cliente: str = Query(default="", max_length=200),
     nombre: str = Query(default="", max_length=200),
     estatus: str = Query(default="", max_length=15),
+    _: UsuarioActual = Depends(get_current_user),
 ) -> list[SolicitudResumen]:
     db_conn = get_connection()
     try:
@@ -176,7 +179,7 @@ async def crear_solicitud_chat(
 
 
 @router.get("/solicitudes/{solicitud_id}", response_model=SolicitudDetalle)
-def obtener_solicitud(solicitud_id: int) -> SolicitudDetalle:
+def obtener_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> SolicitudDetalle:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -189,7 +192,9 @@ def obtener_solicitud(solicitud_id: int) -> SolicitudDetalle:
 
 
 @router.put("/solicitudes/{solicitud_id}", response_model=SolicitudDetalle)
-def actualizar_solicitud(solicitud_id: int, body: SolicitudUpdate) -> SolicitudDetalle:
+def actualizar_solicitud(
+    solicitud_id: int, body: SolicitudUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> SolicitudDetalle:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -206,6 +211,7 @@ def actualizar_solicitud(solicitud_id: int, body: SolicitudUpdate) -> SolicitudD
             cliente_id=cliente_id,
             tipo_id=tipo_id,
             codigo_estatus=body.codigo_estatus,
+            actor=usuario_actual.usuario,
         )
         if filas_afectadas == 0:
             db_conn.rollback()
@@ -226,11 +232,11 @@ def actualizar_solicitud(solicitud_id: int, body: SolicitudUpdate) -> SolicitudD
 
 
 @router.delete("/solicitudes/{solicitud_id}", status_code=204)
-def borrar_solicitud(solicitud_id: int) -> None:
+def borrar_solicitud(solicitud_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas_afectadas = repository.delete_solicitud(cursor, solicitud_id)
+        filas_afectadas = repository.delete_solicitud(cursor, solicitud_id, actor=usuario_actual.usuario)
         if filas_afectadas == 0:
             db_conn.rollback()
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
@@ -246,7 +252,7 @@ def borrar_solicitud(solicitud_id: int) -> None:
 
 
 @router.get("/solicitudes/{solicitud_id}/tareas", response_model=list[TareaOut])
-def listar_tareas(solicitud_id: int) -> list[TareaOut]:
+def listar_tareas(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[TareaOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -257,7 +263,9 @@ def listar_tareas(solicitud_id: int) -> list[TareaOut]:
 
 
 @router.post("/solicitudes/{solicitud_id}/tareas", response_model=TareaOut, status_code=201)
-def crear_tarea(solicitud_id: int, body: TareaCreateUpdate) -> TareaOut:
+def crear_tarea(
+    solicitud_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(require_scrum_master)
+) -> TareaOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -268,6 +276,7 @@ def crear_tarea(solicitud_id: int, body: TareaCreateUpdate) -> TareaOut:
             descripcion=body.descripcion,
             responsable_id=body.responsable_id,
             codigo_estatus_tarea=body.codigo_estatus_tarea,
+            actor=usuario_actual.usuario,
             fecha_inicio=body.fecha_inicio,
             fecha_fin=body.fecha_fin,
             horas_estimadas=body.horas_estimadas,
@@ -293,6 +302,7 @@ async def crear_solicitud_formulario(
     tipo: Annotated[str, Form(min_length=1, max_length=100)],
     cliente: Annotated[str | None, Form(max_length=100)] = None,
     files: Annotated[list[UploadFile], File()] = [],
+    usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> ChatSolicitudResponse:
     """Fase 1.6 — página de Solicitudes: formulario tradicional (un solo paso), con
     solicitante y tipo elegidos de catálogo en vez de resueltos/asumidos como en chat/correo."""
@@ -318,7 +328,9 @@ async def crear_solicitud_formulario(
             canal_origen="FORMULARIO",
         )
 
-        id_solicitud = _crear_solicitud_con_adjuntos(cursor, solicitud, contenidos, dedupe_seed, now)
+        id_solicitud = _crear_solicitud_con_adjuntos(
+            cursor, solicitud, contenidos, dedupe_seed, now, actor=usuario_actual.usuario
+        )
 
         db_conn.commit()
         logger.info(

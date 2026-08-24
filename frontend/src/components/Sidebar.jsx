@@ -5,12 +5,14 @@ const OPCIONES = [
   { id: "tablero", etiqueta: "Tablero" },
 ];
 
-export default function Sidebar({ paginaActual, onCambiarPagina }) {
+export default function Sidebar({ paginaActual, onCambiarPagina, usuarioActual, esScrumMaster, onCerrarSesion }) {
+  const opciones = esScrumMaster ? [...OPCIONES, { id: "usuarios", etiqueta: "Usuarios" }] : OPCIONES;
+
   return (
     <nav className="sidebar">
       <p className="sidebar-titulo">DOVELA</p>
       <ul>
-        {OPCIONES.map((opcion) => (
+        {opciones.map((opcion) => (
           <li key={opcion.id}>
             <button
               type="button"
@@ -22,6 +24,16 @@ export default function Sidebar({ paginaActual, onCambiarPagina }) {
           </li>
         ))}
       </ul>
+
+      {usuarioActual && (
+        <div className="sidebar-usuario">
+          <p className="sidebar-usuario-nombre">{usuarioActual.nombre_completo}</p>
+          <p className="sidebar-usuario-rol">{usuarioActual.codigo_rol_scrum}</p>
+          <button type="button" className="secundario" onClick={onCerrarSesion}>
+            Cerrar sesión
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

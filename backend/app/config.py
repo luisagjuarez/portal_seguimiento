@@ -54,5 +54,9 @@ class Settings:
     # API HTTP (Fase 1.2 — chat web)
     frontend_origin: str = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
+    # Autenticación (login usuario/contraseña + JWT)
+    jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", "")
+    jwt_expire_minutes: int = _get_int("JWT_EXPIRE_MINUTES", 480)
+
 
 settings = Settings()

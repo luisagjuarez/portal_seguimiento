@@ -176,7 +176,7 @@ def test_borrar_tarea_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_tarea", lambda cursor, id: 1)
+    monkeypatch.setattr(routes.repository, "delete_tarea", lambda cursor, id, **kwargs: 1)
 
     response = client.delete("/api/tareas/1")
 
@@ -188,7 +188,7 @@ def test_borrar_tarea_404(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_tarea", lambda cursor, id: 0)
+    monkeypatch.setattr(routes.repository, "delete_tarea", lambda cursor, id, **kwargs: 0)
 
     response = client.delete("/api/tareas/999")
 
@@ -315,7 +315,7 @@ def test_borrar_hito_tarea_success(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
     monkeypatch.setattr(routes.repository, "get_hito_by_tarea", lambda cursor, id: _fake_hito())
-    monkeypatch.setattr(routes.repository, "delete_hito", lambda cursor, id: 1)
+    monkeypatch.setattr(routes.repository, "delete_hito", lambda cursor, id, **kwargs: 1)
 
     response = client.delete("/api/tareas/1/hito")
 

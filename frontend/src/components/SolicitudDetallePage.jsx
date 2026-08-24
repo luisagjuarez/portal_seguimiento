@@ -13,7 +13,7 @@ function formatearFecha(iso) {
   }
 }
 
-export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea }) {
+export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea, esScrumMaster }) {
   const [solicitud, setSolicitud] = useState(null);
   const [tareas, setTareas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -135,17 +135,22 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
       <div className="solicitud-detalle-tareas">
         <div className="solicitudes-encabezado">
           <h3>Tareas</h3>
-          <button
-            type="button"
-            onClick={() => {
-              setTareaEnEdicion(null);
-              setMostrarFormularioTarea(true);
-            }}
-          >
-            Agregar Tarea
-          </button>
+          {esScrumMaster && (
+            <button
+              type="button"
+              onClick={() => {
+                setTareaEnEdicion(null);
+                setMostrarFormularioTarea(true);
+              }}
+            >
+              Agregar Tarea
+            </button>
+          )}
         </div>
 
+        {!esScrumMaster && (
+          <p className="adjuntos-ayuda">Solo el Scrum Master puede agregar tareas.</p>
+        )}
         {tareas.length === 0 && <p>Esta solicitud todavía no tiene tareas.</p>}
 
         <div className="tarea-lista">

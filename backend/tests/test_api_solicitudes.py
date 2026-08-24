@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.app import app
+from app.auth.dependencies import require_scrum_master
 import app.api.routes_solicitudes as routes
 
 
@@ -52,7 +54,7 @@ def test_crear_solicitud_chat_success(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
     monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
-    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud: 123)
+    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud, **kwargs: 123)
     monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
     monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "123.md"))
 
@@ -115,7 +117,7 @@ def test_crear_solicitud_chat_con_adjuntos(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
     monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
-    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud: 456)
+    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud, **kwargs: 456)
     monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
     monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "456.md"))
 
@@ -215,7 +217,7 @@ def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
     monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
-    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud: 789)
+    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud, **kwargs: 789)
     monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
     monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
 
@@ -342,7 +344,7 @@ def test_borrar_solicitud_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_solicitud", lambda cursor, id: 1)
+    monkeypatch.setattr(routes.repository, "delete_solicitud", lambda cursor, id, **kwargs: 1)
 
     response = client.delete("/api/solicitudes/1")
 
@@ -354,7 +356,7 @@ def test_borrar_solicitud_404(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_solicitud", lambda cursor, id: 0)
+    monkeypatch.setattr(routes.repository, "delete_solicitud", lambda cursor, id, **kwargs: 0)
 
     response = client.delete("/api/solicitudes/999")
 
@@ -407,6 +409,18 @@ def test_crear_tarea_success(monkeypatch):
     assert response.status_code == 201
     assert response.json()["nombre"] == "Levantar requerimientos"
     assert fake_conn.committed is True
+
+
+def test_crear_tarea_403_si_no_es_scrum_master():
+    def _denegar_scrum_master():
+        raise HTTPException(status_code=403, detail="Solo el Scrum Master puede hacer esto")
+
+    app.dependency_overrides[require_scrum_master] = _denegar_scrum_master
+    try:
+        response = client.post("/api/solicitudes/1/tareas", json={"nombre": "Levantar requerimientos"})
+        assert response.status_code == 403
+    finally:
+        del app.dependency_overrides[require_scrum_master]
 
 
 def test_crear_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):

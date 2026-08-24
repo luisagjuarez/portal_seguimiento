@@ -20,6 +20,8 @@ body {
   background: #111827;
   color: #f3f4f6;
   padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-titulo {
@@ -53,6 +55,27 @@ body {
 .sidebar button.sidebar-activo {
   background: #2563eb;
   color: #fff;
+}
+
+.sidebar-usuario {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #1f2937;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sidebar-usuario-nombre {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f3f4f6;
+}
+
+.sidebar-usuario-rol {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
 }
 
 .main-content {
@@ -632,4 +655,23 @@ button:disabled {
 
 .tarea-card-tablero-arrastrando {
   opacity: 0.5;
+}
+
+.tabla-usuarios {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla-usuarios th {
+  text-align: left;
+  font-size: 0.85rem;
+  color: #6b7280;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tabla-usuarios td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f2f4f7;
+  font-size: 0.9rem;
 }

@@ -146,3 +146,45 @@ class ComentarioOut(BaseModel):
 
 class ComentarioCreateUpdate(BaseModel):
     texto_comentario: str = Field(min_length=1, max_length=4000)
+
+
+class LoginRequest(BaseModel):
+    usuario: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+
+class UsuarioActualOut(BaseModel):
+    id: int
+    usuario: str
+    nombre_completo: str
+    codigo_rol_scrum: str | None
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    usuario_actual: UsuarioActualOut
+
+
+class RolScrumOut(BaseModel):
+    codigo: str
+    descripcion: str
+
+
+class MiembroAccesoOut(BaseModel):
+    id: int
+    usuario: str
+    nombre_completo: str
+    codigo_rol_scrum: str | None
+    rol_scrum_descripcion: str | None
+    acceso_activo: bool
+
+
+class OtorgarAccesoRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=255)
+    codigo_rol_scrum: str = Field(min_length=1, max_length=20)
+
+
+class ActualizarAccesoRequest(BaseModel):
+    codigo_rol_scrum: str | None = Field(default=None, min_length=1, max_length=20)
+    acceso_activo: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=255)

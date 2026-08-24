@@ -13,7 +13,24 @@
 [x] Fase 1.6 — Página de Solicitudes (listado + formulario) ✅ implementado, verificado por API/tests
 [x] Fase 1.7 (extraoficial) — Vista maestro-detalle, editar/borrar solicitud, CRUD de tareas ✅ implementado y verificado end-to-end (2026-08-23)
 [ ] Fase 2   — Actualización de tareas      ⬜ no iniciado (parcialmente cubierto por el CRUD de tareas de la Fase 1.7, ver abajo)
+[x] Fase 1.8 (extraoficial) — Autenticación, roles Scrum y borrado lógico ✅ implementado y verificado end-to-end (2026-08-23)
 ```
+
+**Cambio importante de arquitectura (2026-08-23):** el portal ya no es de acceso libre en
+sus páginas internas. Hay login real (usuario/contraseña) sobre `miembros_equipo`, con 3
+roles Scrum (Product Owner, Scrum Master, Team) y una sola regla de permisos por ahora:
+**solo el Scrum Master puede crear tareas**. El wizard de "Solicitud por Chat" y la
+ingesta por correo siguen abiertos (canal externo). Los borrados de solicitud/tarea/
+comentario/hito ya no son físicos: son lógicos (`borrado_en`/`borrado_por`), y
+`creado_por`/`actualizado_por` ahora guardan el `usuario` real de portal, no el rol de
+conexión a Postgres. Detalle completo en `00_ARCHIVOS/BITACORAS/2026-08-23.md`.
+
+**Credenciales creadas durante la implementación (pendiente que el usuario las cambie o
+las tome nota):** `DOVELA_LG` (Scrum Master) → `DovelaScrum2026!`. También se otorgó
+acceso de prueba a `DOVELA_WA` (Team) → `ClaveInicial2026!` y `DOVELA_JC` (Product Owner)
+→ `ClaveJC2026!` — el resto de los 12 miembros del equipo siguen sin acceso
+(`acceso_activo=false`) hasta que el Scrum Master se los otorgue desde la página
+"Usuarios".
 
 A partir de esta sesión, el detalle de cada tarea trabajada se registra en
 `00_ARCHIVOS/BITACORAS/AAAA-MM-DD.md` (un archivo por día). Este documento sigue siendo la

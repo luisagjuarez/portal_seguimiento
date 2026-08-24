@@ -48,7 +48,7 @@ def test_actualizar_comentario_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "update_comentario", lambda cursor, id, texto: 1)
+    monkeypatch.setattr(routes.repository, "update_comentario", lambda cursor, id, texto, **kwargs: 1)
     monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
 
     response = client.put("/api/comentarios/1", json={"texto_comentario": "Comentario editado."})
@@ -62,7 +62,7 @@ def test_actualizar_comentario_404(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "update_comentario", lambda cursor, id, texto: 0)
+    monkeypatch.setattr(routes.repository, "update_comentario", lambda cursor, id, texto, **kwargs: 0)
 
     response = client.put("/api/comentarios/999", json={"texto_comentario": "No existe"})
 
@@ -74,7 +74,7 @@ def test_borrar_comentario_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_comentario", lambda cursor, id: 1)
+    monkeypatch.setattr(routes.repository, "delete_comentario", lambda cursor, id, **kwargs: 1)
 
     response = client.delete("/api/comentarios/1")
 
@@ -86,7 +86,7 @@ def test_borrar_comentario_404(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "delete_comentario", lambda cursor, id: 0)
+    monkeypatch.setattr(routes.repository, "delete_comentario", lambda cursor, id, **kwargs: 0)
 
     response = client.delete("/api/comentarios/999")
 

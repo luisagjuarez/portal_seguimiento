@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.schemas import (
     ComentarioCreateUpdate,
@@ -13,6 +13,7 @@ from app.api.schemas import (
     TareaOut,
     TareaTableroOut,
 )
+from app.auth.dependencies import UsuarioActual, get_current_user
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api")
 def listar_tareas(
     cliente: str = Query(default="", max_length=200),
     responsable_id: int | None = Query(default=None),
+    _: UsuarioActual = Depends(get_current_user),
 ) -> list[TareaTableroOut]:
     db_conn = get_connection()
     try:
@@ -35,7 +37,7 @@ def listar_tareas(
 
 
 @router.get("/tareas/{tarea_id}", response_model=TareaOut)
-def obtener_tarea(tarea_id: int) -> TareaOut:
+def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> TareaOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -48,7 +50,9 @@ def obtener_tarea(tarea_id: int) -> TareaOut:
 
 
 @router.put("/tareas/{tarea_id}", response_model=TareaOut)
-def actualizar_tarea(tarea_id: int, body: TareaCreateUpdate) -> TareaOut:
+def actualizar_tarea(
+    tarea_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> TareaOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -59,6 +63,7 @@ def actualizar_tarea(tarea_id: int, body: TareaCreateUpdate) -> TareaOut:
             descripcion=body.descripcion,
             responsable_id=body.responsable_id,
             codigo_estatus_tarea=body.codigo_estatus_tarea,
+            actor=usuario_actual.usuario,
             fecha_inicio=body.fecha_inicio,
             fecha_fin=body.fecha_fin,
             horas_estimadas=body.horas_estimadas,
@@ -83,11 +88,11 @@ def actualizar_tarea(tarea_id: int, body: TareaCreateUpdate) -> TareaOut:
 
 
 @router.delete("/tareas/{tarea_id}", status_code=204)
-def borrar_tarea(tarea_id: int) -> None:
+def borrar_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas_afectadas = repository.delete_tarea(cursor, tarea_id)
+        filas_afectadas = repository.delete_tarea(cursor, tarea_id, actor=usuario_actual.usuario)
         if filas_afectadas == 0:
             db_conn.rollback()
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
@@ -103,7 +108,7 @@ def borrar_tarea(tarea_id: int) -> None:
 
 
 @router.get("/tareas/{tarea_id}/hito", response_model=HitoOut)
-def obtener_hito_tarea(tarea_id: int) -> HitoOut:
+def obtener_hito_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> HitoOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -116,7 +121,9 @@ def obtener_hito_tarea(tarea_id: int) -> HitoOut:
 
 
 @router.post("/tareas/{tarea_id}/hito", response_model=HitoOut, status_code=201)
-def crear_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
+def crear_hito_tarea(
+    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> HitoOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -133,6 +140,7 @@ def crear_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
             nombre=body.nombre,
             descripcion=body.descripcion,
             fecha_vencimiento=body.fecha_vencimiento,
+            actor=usuario_actual.usuario,
         )
         fila = repository.get_hito_by_tarea(cursor, tarea_id)
         db_conn.commit()
@@ -150,7 +158,9 @@ def crear_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
 
 
 @router.put("/tareas/{tarea_id}/hito", response_model=HitoOut)
-def actualizar_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
+def actualizar_hito_tarea(
+    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> HitoOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -164,6 +174,7 @@ def actualizar_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
             nombre=body.nombre,
             descripcion=body.descripcion,
             fecha_vencimiento=body.fecha_vencimiento,
+            actor=usuario_actual.usuario,
         )
         fila = repository.get_hito_by_tarea(cursor, tarea_id)
         db_conn.commit()
@@ -181,7 +192,7 @@ def actualizar_hito_tarea(tarea_id: int, body: HitoCreateUpdate) -> HitoOut:
 
 
 @router.delete("/tareas/{tarea_id}/hito", status_code=204)
-def borrar_hito_tarea(tarea_id: int) -> None:
+def borrar_hito_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -189,7 +200,7 @@ def borrar_hito_tarea(tarea_id: int) -> None:
         if hito_actual is None:
             raise HTTPException(status_code=404, detail="Esta tarea no tiene hito")
 
-        repository.delete_hito(cursor, hito_actual["id"])
+        repository.delete_hito(cursor, hito_actual["id"], actor=usuario_actual.usuario)
         db_conn.commit()
     except HTTPException:
         db_conn.rollback()
@@ -203,7 +214,7 @@ def borrar_hito_tarea(tarea_id: int) -> None:
 
 
 @router.get("/tareas/{tarea_id}/comentarios", response_model=list[ComentarioOut])
-def listar_comentarios_tarea(tarea_id: int) -> list[ComentarioOut]:
+def listar_comentarios_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[ComentarioOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -214,7 +225,9 @@ def listar_comentarios_tarea(tarea_id: int) -> list[ComentarioOut]:
 
 
 @router.post("/tareas/{tarea_id}/comentarios", response_model=ComentarioOut, status_code=201)
-def crear_comentario_tarea(tarea_id: int, body: ComentarioCreateUpdate) -> ComentarioOut:
+def crear_comentario_tarea(
+    tarea_id: int, body: ComentarioCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> ComentarioOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -223,7 +236,11 @@ def crear_comentario_tarea(tarea_id: int, body: ComentarioCreateUpdate) -> Comen
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
 
         comentario_id = repository.insert_comentario(
-            cursor, solicitud_id=tarea["solicitud_id"], tarea_id=tarea_id, texto=body.texto_comentario
+            cursor,
+            solicitud_id=tarea["solicitud_id"],
+            tarea_id=tarea_id,
+            texto=body.texto_comentario,
+            actor=usuario_actual.usuario,
         )
         fila = repository.get_comentario_by_id(cursor, comentario_id)
         db_conn.commit()

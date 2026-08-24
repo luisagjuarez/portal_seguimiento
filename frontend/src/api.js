@@ -12,6 +12,45 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+const TOKEN_STORAGE_KEY = "dovela_token";
+
+function leerTokenGuardado() {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // localStorage puede no estar disponible (modo privado, etc.)
+    return null;
+  }
+}
+
+let tokenActual = leerTokenGuardado();
+
+export function getToken() {
+  return tokenActual;
+}
+
+export function setToken(token) {
+  tokenActual = token;
+  try {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } catch {
+    // si no se puede persistir, la sesión solo dura mientras la pestaña esté abierta
+  }
+}
+
+export function clearToken() {
+  tokenActual = null;
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // nada que limpiar si nunca se pudo guardar
+  }
+}
+
+function authHeaders() {
+  return tokenActual ? { Authorization: `Bearer ${tokenActual}` } : {};
+}
+
 function extraerMensaje(detail, fallback) {
   if (!detail) return fallback;
   if (typeof detail === "string") return detail;
@@ -24,6 +63,10 @@ function extraerMensaje(detail, fallback) {
 }
 
 async function parseJsonOrThrow(response) {
+  if (response.status === 401) {
+    clearToken();
+    window.dispatchEvent(new Event("dovela:sesion-expirada"));
+  }
   if (!response.ok) {
     let detail = response.statusText;
     try {
@@ -35,6 +78,52 @@ async function parseJsonOrThrow(response) {
     throw new Error(detail);
   }
   return response.json();
+}
+
+export async function login(usuario, password) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario, password }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchMe() {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchRolesScrum() {
+  const response = await fetch(`${API_BASE_URL}/api/roles-scrum`);
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchUsuarios() {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios`, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function otorgarAcceso(miembroId, { password, codigoRolScrum }) {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios/${miembroId}/acceso`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ password, codigo_rol_scrum: codigoRolScrum }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarAcceso(miembroId, { codigoRolScrum, accesoActivo, password }) {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios/${miembroId}/acceso`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      codigo_rol_scrum: codigoRolScrum ?? null,
+      acceso_activo: accesoActivo ?? null,
+      password: password || null,
+    }),
+  });
+  return parseJsonOrThrow(response);
 }
 
 export async function fetchClientes(query) {
@@ -72,7 +161,7 @@ export async function fetchSolicitudes({ cliente, nombre, estatus } = {}) {
   if (cliente) url.searchParams.set("cliente", cliente);
   if (nombre) url.searchParams.set("nombre", nombre);
   if (estatus) url.searchParams.set("estatus", estatus);
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
 
@@ -80,7 +169,7 @@ export async function fetchTareasTablero({ cliente, responsableId } = {}) {
   const url = new URL(`${API_BASE_URL}/api/tareas`);
   if (cliente) url.searchParams.set("cliente", cliente);
   if (responsableId) url.searchParams.set("responsable_id", responsableId);
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
 
@@ -105,28 +194,33 @@ export async function fetchEstatusTarea() {
 }
 
 export async function fetchSolicitudDetalle(id) {
-  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`);
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
 
 export async function actualizarSolicitud(id, { nombre, descripcion, cliente, tipo, codigoEstatus }) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ nombre, descripcion, cliente, tipo, codigo_estatus: codigoEstatus }),
   });
   return parseJsonOrThrow(response);
 }
 
 export async function eliminarSolicitud(id) {
-  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, { method: "DELETE" });
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     await parseJsonOrThrow(response);
   }
 }
 
 export async function fetchTareas(solicitudId) {
-  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/tareas`);
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/tareas`, {
+    headers: authHeaders(),
+  });
   return parseJsonOrThrow(response);
 }
 
@@ -136,7 +230,7 @@ export async function crearTarea(
 ) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/tareas`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
       nombre,
       descripcion,
@@ -157,7 +251,7 @@ export async function actualizarTarea(
 ) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
       nombre,
       descripcion,
@@ -173,19 +267,22 @@ export async function actualizarTarea(
 }
 
 export async function eliminarTarea(tareaId) {
-  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, { method: "DELETE" });
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     await parseJsonOrThrow(response);
   }
 }
 
 export async function fetchTareaDetalle(id) {
-  const response = await fetch(`${API_BASE_URL}/api/tareas/${id}`);
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${id}`, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
 
 export async function fetchHitoDeTarea(tareaId) {
-  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`);
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, { headers: authHeaders() });
   if (response.status === 404) {
     return null;
   }
@@ -199,7 +296,7 @@ function datosHito({ nombre, descripcion, fechaVencimiento }) {
 export async function crearHitoTarea(tareaId, datos) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(datosHito(datos)),
   });
   return parseJsonOrThrow(response);
@@ -208,28 +305,33 @@ export async function crearHitoTarea(tareaId, datos) {
 export async function actualizarHitoTarea(tareaId, datos) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(datosHito(datos)),
   });
   return parseJsonOrThrow(response);
 }
 
 export async function eliminarHitoTarea(tareaId) {
-  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, { method: "DELETE" });
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     await parseJsonOrThrow(response);
   }
 }
 
 export async function fetchComentariosTarea(tareaId) {
-  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`);
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`, {
+    headers: authHeaders(),
+  });
   return parseJsonOrThrow(response);
 }
 
 export async function crearComentarioTarea(tareaId, texto) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ texto_comentario: texto }),
   });
   return parseJsonOrThrow(response);
@@ -238,14 +340,17 @@ export async function crearComentarioTarea(tareaId, texto) {
 export async function actualizarComentario(comentarioId, texto) {
   const response = await fetch(`${API_BASE_URL}/api/comentarios/${comentarioId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ texto_comentario: texto }),
   });
   return parseJsonOrThrow(response);
 }
 
 export async function eliminarComentario(comentarioId) {
-  const response = await fetch(`${API_BASE_URL}/api/comentarios/${comentarioId}`, { method: "DELETE" });
+  const response = await fetch(`${API_BASE_URL}/api/comentarios/${comentarioId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     await parseJsonOrThrow(response);
   }
@@ -273,6 +378,7 @@ export async function crearSolicitudFormulario({
 
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/formulario`, {
     method: "POST",
+    headers: authHeaders(),
     body: formData,
   });
   return parseJsonOrThrow(response);

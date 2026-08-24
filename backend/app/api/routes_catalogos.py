@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.schemas import EstatusOut, EstatusTareaOut, MiembroEquipoOut, TipoSolicitudOut
+from app.api.schemas import EstatusOut, EstatusTareaOut, MiembroEquipoOut, RolScrumOut, TipoSolicitudOut
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -51,3 +51,14 @@ def listar_estatus_tarea() -> list[EstatusTareaOut]:
     finally:
         release_connection(db_conn)
     return [EstatusTareaOut(**e) for e in estatus]
+
+
+@router.get("/roles-scrum", response_model=list[RolScrumOut])
+def listar_roles_scrum() -> list[RolScrumOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        roles = repository.list_roles_scrum(cursor)
+    finally:
+        release_connection(db_conn)
+    return [RolScrumOut(**r) for r in roles]
