@@ -569,8 +569,8 @@ def list_tareas(
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
                t.nombre, t.descripcion, t.responsable_id, m.nombre_completo AS responsable,
                t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
-               t.fecha_inicio, t.fecha_fin, t.horas_estimadas, t.horas_reales,
-               t.creado_en, t.actualizado_en
+               t.fecha_inicio, t.fecha_fin, t.fecha_inicio_real, t.fecha_fin_real,
+               t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id
         LEFT JOIN clientes c ON c.id = s.cliente
@@ -585,7 +585,8 @@ def list_tareas(
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
         "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
-        "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "fecha_inicio", "fecha_fin", "fecha_inicio_real", "fecha_fin_real",
+        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -595,8 +596,9 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
         """
         SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
                m.nombre_completo AS responsable, t.codigo_estatus_tarea,
-               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio,
-               t.fecha_fin, t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
+               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
+               t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
+               t.creado_en, t.actualizado_en
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
@@ -608,7 +610,8 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     columnas = [
         "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
         "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
-        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "fecha_inicio_real", "fecha_fin_real", "horas_estimadas", "horas_reales",
+        "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -623,21 +626,26 @@ def insert_tarea(
     actor: str,
     fecha_inicio: date | None = None,
     fecha_fin: date | None = None,
+    fecha_inicio_real: date | None = None,
+    fecha_fin_real: date | None = None,
     horas_estimadas: int | None = None,
     horas_reales: int | None = None,
 ) -> int:
-    """fecha_inicio/fecha_fin son NOT NULL: si el formulario no los captura, se
-    inicializan en el backend (hoy / hoy + 7 días)."""
+    """fecha_inicio/fecha_fin (planeadas) son NOT NULL: si el formulario no las captura, se
+    inicializan en el backend (hoy / hoy + 7 días). fecha_inicio_real/fecha_fin_real son
+    nullable: quedan en NULL hasta que se sepa cuándo arrancó/terminó de verdad la tarea."""
     cursor.execute(
         """
         INSERT INTO tareas
             (solicitud_id, nombre, descripcion, responsable_id, codigo_estatus_tarea,
-             fecha_inicio, fecha_fin, horas_estimadas, horas_reales,
+             fecha_inicio, fecha_fin, fecha_inicio_real, fecha_fin_real,
+             horas_estimadas, horas_reales,
              creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES
             (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(responsable_id)s, %(codigo_estatus_tarea)s,
              COALESCE(%(fecha_inicio)s, now()::date),
              COALESCE(%(fecha_fin)s, (now() + interval '7 days')::date),
+             %(fecha_inicio_real)s, %(fecha_fin_real)s,
              %(horas_estimadas)s, %(horas_reales)s, now(), %(actor)s, now(), %(actor)s)
         RETURNING id
         """,
@@ -649,6 +657,8 @@ def insert_tarea(
             "codigo_estatus_tarea": codigo_estatus_tarea,
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
+            "fecha_inicio_real": fecha_inicio_real,
+            "fecha_fin_real": fecha_fin_real,
             "horas_estimadas": horas_estimadas,
             "horas_reales": horas_reales,
             "actor": actor,
@@ -667,12 +677,15 @@ def update_tarea(
     actor: str,
     fecha_inicio: date | None = None,
     fecha_fin: date | None = None,
+    fecha_inicio_real: date | None = None,
+    fecha_fin_real: date | None = None,
     horas_estimadas: int | None = None,
     horas_reales: int | None = None,
 ) -> int:
-    """fecha_inicio/fecha_fin son NOT NULL: si no se envían, se conserva el valor actual
-    (COALESCE) en vez de fallar. horas_estimadas/horas_reales sí son nullable: se
-    sobrescriben tal cual, incluyendo a NULL si el formulario los deja vacíos."""
+    """fecha_inicio/fecha_fin (planeadas) son NOT NULL: si no se envían, se conserva el
+    valor actual (COALESCE) en vez de fallar. fecha_inicio_real/fecha_fin_real, igual que
+    horas_estimadas/horas_reales, sí son nullable: se sobrescriben tal cual, incluyendo a
+    NULL si el formulario las deja vacías (permite corregir una fecha real capturada de más)."""
     cursor.execute(
         """
         UPDATE tareas
@@ -680,6 +693,7 @@ def update_tarea(
             responsable_id = %(responsable_id)s, codigo_estatus_tarea = %(codigo_estatus_tarea)s,
             fecha_inicio = COALESCE(%(fecha_inicio)s, fecha_inicio),
             fecha_fin = COALESCE(%(fecha_fin)s, fecha_fin),
+            fecha_inicio_real = %(fecha_inicio_real)s, fecha_fin_real = %(fecha_fin_real)s,
             horas_estimadas = %(horas_estimadas)s, horas_reales = %(horas_reales)s,
             actualizado_en = now(), actualizado_por = %(actor)s
         WHERE id = %(id)s AND borrado_en IS NULL
@@ -691,6 +705,8 @@ def update_tarea(
             "codigo_estatus_tarea": codigo_estatus_tarea,
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
+            "fecha_inicio_real": fecha_inicio_real,
+            "fecha_fin_real": fecha_fin_real,
             "horas_estimadas": horas_estimadas,
             "horas_reales": horas_reales,
             "id": tarea_id,
@@ -706,8 +722,9 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
                t.nombre, t.descripcion, t.responsable_id,
                m.nombre_completo AS responsable, t.codigo_estatus_tarea,
-               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio,
-               t.fecha_fin, t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
+               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
+               t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
+               t.creado_en, t.actualizado_en
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id
         LEFT JOIN clientes c ON c.id = s.cliente
@@ -723,7 +740,8 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
         "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
-        "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "fecha_inicio", "fecha_fin", "fecha_inicio_real", "fecha_fin_real",
+        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return dict(zip(columnas, row))
 

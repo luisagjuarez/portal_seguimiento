@@ -123,6 +123,8 @@ class TareaOut(BaseModel):
     estatus_tarea_descripcion: str | None
     fecha_inicio: date
     fecha_fin: date
+    fecha_inicio_real: date | None
+    fecha_fin_real: date | None
     horas_estimadas: int | None
     horas_reales: int | None
     creado_en: datetime
@@ -141,6 +143,8 @@ class TareaCreateUpdate(BaseModel):
     codigo_estatus_tarea: str = Field(default="POR HACER", min_length=1, max_length=20)
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
+    fecha_inicio_real: date | None = None
+    fecha_fin_real: date | None = None
     horas_estimadas: int | None = None
     horas_reales: int | None = None
 

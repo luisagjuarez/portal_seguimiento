@@ -43,6 +43,8 @@ def _fake_tarea(tarea_id=1):
         "estatus_tarea_descripcion": "Completado",
         "fecha_inicio": date(2026, 8, 23),
         "fecha_fin": date(2026, 8, 30),
+        "fecha_inicio_real": None,
+        "fecha_fin_real": None,
         "horas_estimadas": None,
         "horas_reales": None,
         "creado_en": datetime(2026, 8, 23, tzinfo=timezone.utc),
@@ -147,6 +149,8 @@ def test_actualizar_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):
             "codigo_estatus_tarea": "EN PROGRESO",
             "fecha_inicio": "2026-08-24",
             "fecha_fin": "2026-08-28",
+            "fecha_inicio_real": "2026-08-25",
+            "fecha_fin_real": "2026-08-29",
             "horas_estimadas": 8,
             "horas_reales": 5,
         },
@@ -155,6 +159,8 @@ def test_actualizar_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):
     assert response.status_code == 200
     assert kwargs_recibidos["fecha_inicio"] == date(2026, 8, 24)
     assert kwargs_recibidos["fecha_fin"] == date(2026, 8, 28)
+    assert kwargs_recibidos["fecha_inicio_real"] == date(2026, 8, 25)
+    assert kwargs_recibidos["fecha_fin_real"] == date(2026, 8, 29)
     assert kwargs_recibidos["horas_estimadas"] == 8
     assert kwargs_recibidos["horas_reales"] == 5
 

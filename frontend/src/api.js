@@ -275,7 +275,18 @@ export async function fetchTareas(solicitudId) {
 
 export async function crearTarea(
   solicitudId,
-  { nombre, descripcion, responsableId, codigoEstatusTarea, fechaInicio, fechaFin, horasEstimadas, horasReales },
+  {
+    nombre,
+    descripcion,
+    responsableId,
+    codigoEstatusTarea,
+    fechaInicio,
+    fechaFin,
+    fechaInicioReal,
+    fechaFinReal,
+    horasEstimadas,
+    horasReales,
+  },
 ) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/tareas`, {
     method: "POST",
@@ -287,6 +298,8 @@ export async function crearTarea(
       codigo_estatus_tarea: codigoEstatusTarea,
       fecha_inicio: fechaInicio,
       fecha_fin: fechaFin,
+      fecha_inicio_real: fechaInicioReal,
+      fecha_fin_real: fechaFinReal,
       horas_estimadas: horasEstimadas,
       horas_reales: horasReales,
     }),
@@ -296,7 +309,18 @@ export async function crearTarea(
 
 export async function actualizarTarea(
   tareaId,
-  { nombre, descripcion, responsableId, codigoEstatusTarea, fechaInicio, fechaFin, horasEstimadas, horasReales },
+  {
+    nombre,
+    descripcion,
+    responsableId,
+    codigoEstatusTarea,
+    fechaInicio,
+    fechaFin,
+    fechaInicioReal,
+    fechaFinReal,
+    horasEstimadas,
+    horasReales,
+  },
 ) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, {
     method: "PUT",
@@ -308,6 +332,8 @@ export async function actualizarTarea(
       codigo_estatus_tarea: codigoEstatusTarea,
       fecha_inicio: fechaInicio,
       fecha_fin: fechaFin,
+      fecha_inicio_real: fechaInicioReal,
+      fecha_fin_real: fechaFinReal,
       horas_estimadas: horasEstimadas,
       horas_reales: horasReales,
     }),

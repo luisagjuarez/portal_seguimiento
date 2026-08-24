@@ -174,7 +174,10 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
           <strong>Responsable:</strong> {tarea.responsable || "Sin asignar"}
         </p>
         <p>
-          <strong>Fechas:</strong> {tarea.fecha_inicio} a {tarea.fecha_fin}
+          <strong>Fechas planeadas:</strong> {tarea.fecha_inicio} a {tarea.fecha_fin}
+        </p>
+        <p>
+          <strong>Fechas reales:</strong> {tarea.fecha_inicio_real ?? "—"} a {tarea.fecha_fin_real ?? "—"}
         </p>
         <p>
           <strong>Horas:</strong> estimadas {tarea.horas_estimadas ?? "—"} · reales {tarea.horas_reales ?? "—"}

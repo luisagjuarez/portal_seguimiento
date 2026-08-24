@@ -374,6 +374,8 @@ def crear_tarea(
             actor=usuario_actual.usuario,
             fecha_inicio=body.fecha_inicio,
             fecha_fin=body.fecha_fin,
+            fecha_inicio_real=body.fecha_inicio_real,
+            fecha_fin_real=body.fecha_fin_real,
             horas_estimadas=body.horas_estimadas,
             horas_reales=body.horas_reales,
         )

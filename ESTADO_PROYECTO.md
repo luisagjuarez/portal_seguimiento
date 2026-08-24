@@ -263,7 +263,10 @@ alcance del prompt de esta sesión).
     `GET/POST /api/tareas/{id}/enlaces` y `GET /api/solicitudes/{id}/comentarios|hitos|enlaces`
     (agregados de solo lectura, para ver todo lo de una solicitud sin entrar tarea por tarea).
     `GET /api/solicitudes/{id}/adjuntos` y `.../adjuntos/{adjunto_id}/descargar` permiten listar
-    y descargar los archivos ya guardados de una solicitud.
+    y descargar los archivos ya guardados de una solicitud. Las tareas ya distinguen fechas
+    planeadas (`fecha_inicio`/`fecha_fin`, existentes) de fechas reales (`fecha_inicio_real`/
+    `fecha_fin_real`, nuevas y nullable) en `POST /api/solicitudes/{id}/tareas` y
+    `PUT /api/tareas/{id}`.
 - **Frontend** (`frontend/`): SPA en React + Vite con menú lateral (Inicio, Solicitud por
   Chat, Solicitudes). "Solicitud por Chat" es el wizard original (correo → título →
   descripción → cliente → adjuntos opcionales → confirmar). "Solicitudes" lista las

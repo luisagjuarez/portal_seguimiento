@@ -20,6 +20,8 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
   );
   const [fechaInicio, setFechaInicio] = useState(tareaInicial?.fecha_inicio || "");
   const [fechaFin, setFechaFin] = useState(tareaInicial?.fecha_fin || "");
+  const [fechaInicioReal, setFechaInicioReal] = useState(tareaInicial?.fecha_inicio_real || "");
+  const [fechaFinReal, setFechaFinReal] = useState(tareaInicial?.fecha_fin_real || "");
   const [horasEstimadas, setHorasEstimadas] = useState(tareaInicial?.horas_estimadas ?? "");
   const [horasReales, setHorasReales] = useState(tareaInicial?.horas_reales ?? "");
   const [enviando, setEnviando] = useState(false);
@@ -52,6 +54,8 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
       codigoEstatusTarea,
       fechaInicio: fechaInicio || null,
       fechaFin: fechaFin || null,
+      fechaInicioReal: fechaInicioReal || null,
+      fechaFinReal: fechaFinReal || null,
       horasEstimadas: horasEstimadas !== "" ? Number(horasEstimadas) : null,
       horasReales: horasReales !== "" ? Number(horasReales) : null,
     };
@@ -102,12 +106,12 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
 
       <div className="tarea-form-fila">
         <label>
-          Fecha de inicio (opcional)
+          Fecha de inicio planeada (opcional)
           <input type="date" value={fechaInicio} onChange={(event) => setFechaInicio(event.target.value)} />
         </label>
 
         <label>
-          Fecha de fin (opcional)
+          Fecha de fin planeada (opcional)
           <input type="date" value={fechaFin} onChange={(event) => setFechaFin(event.target.value)} />
         </label>
       </div>
@@ -116,6 +120,25 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
           Si se dejan vacías, la tarea inicia hoy y vence en 7 días.
         </p>
       )}
+
+      <div className="tarea-form-fila">
+        <label>
+          Fecha de inicio real (opcional)
+          <input
+            type="date"
+            value={fechaInicioReal}
+            onChange={(event) => setFechaInicioReal(event.target.value)}
+          />
+        </label>
+
+        <label>
+          Fecha de fin real (opcional)
+          <input type="date" value={fechaFinReal} onChange={(event) => setFechaFinReal(event.target.value)} />
+        </label>
+      </div>
+      <p className="adjuntos-ayuda">
+        Cuándo se comenzó y terminó de verdad la tarea, para comparar contra lo planeado.
+      </p>
 
       <div className="tarea-form-fila">
         <label>
