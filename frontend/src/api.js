@@ -62,7 +62,7 @@ function extraerMensaje(detail, fallback) {
   return fallback;
 }
 
-async function parseJsonOrThrow(response) {
+async function lanzarSiError(response) {
   if (response.status === 401) {
     clearToken();
     window.dispatchEvent(new Event("dovela:sesion-expirada"));
@@ -77,6 +77,10 @@ async function parseJsonOrThrow(response) {
     }
     throw new Error(detail);
   }
+}
+
+async function parseJsonOrThrow(response) {
+  await lanzarSiError(response);
   return response.json();
 }
 
@@ -442,6 +446,31 @@ export async function fetchEnlacesSolicitud(solicitudId) {
     headers: authHeaders(),
   });
   return parseJsonOrThrow(response);
+}
+
+export async function fetchAdjuntosSolicitud(solicitudId) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/adjuntos`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function descargarAdjuntoSolicitud(solicitudId, adjuntoId, nombreArchivo) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/solicitudes/${solicitudId}/adjuntos/${adjuntoId}/descargar`,
+    { headers: authHeaders() },
+  );
+  await lanzarSiError(response);
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function crearSolicitudFormulario({

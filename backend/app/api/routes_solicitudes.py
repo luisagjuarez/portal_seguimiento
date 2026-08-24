@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import EmailStr
 
 from app.api.schemas import (
+    AdjuntoOut,
     ChatSolicitudRequest,
     ChatSolicitudResponse,
     ClienteSugerido,
@@ -311,6 +314,47 @@ def listar_enlaces_solicitud(
     finally:
         release_connection(db_conn)
     return [EnlaceTareaOut(**fila) for fila in filas]
+
+
+@router.get("/solicitudes/{solicitud_id}/adjuntos", response_model=list[AdjuntoOut])
+def listar_adjuntos_solicitud(
+    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+) -> list[AdjuntoOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_adjuntos_by_solicitud(cursor, solicitud_id)
+    finally:
+        release_connection(db_conn)
+    return [AdjuntoOut(**fila) for fila in filas]
+
+
+@router.get("/solicitudes/{solicitud_id}/adjuntos/{adjunto_id}/descargar")
+def descargar_adjunto_solicitud(
+    solicitud_id: int, adjunto_id: int, _: UsuarioActual = Depends(get_current_user)
+) -> FileResponse:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        adjunto = repository.get_adjunto_de_solicitud(cursor, solicitud_id, adjunto_id)
+    finally:
+        release_connection(db_conn)
+    if adjunto is None:
+        raise HTTPException(status_code=404, detail="Adjunto no encontrado para esta solicitud")
+    if not os.path.isfile(adjunto["ruta_almacenamiento"]):
+        logger.error(
+            "Adjunto %s de solicitud %s tiene fila en BD pero el archivo no existe en disco (%s)",
+            adjunto_id,
+            solicitud_id,
+            adjunto["ruta_almacenamiento"],
+        )
+        raise HTTPException(status_code=404, detail="El archivo ya no está disponible en el servidor")
+
+    return FileResponse(
+        adjunto["ruta_almacenamiento"],
+        media_type=adjunto["tipo_mime"] or "application/octet-stream",
+        filename=adjunto["nombre_archivo"],
+    )
 
 
 @router.post("/solicitudes/{solicitud_id}/tareas", response_model=TareaOut, status_code=201)

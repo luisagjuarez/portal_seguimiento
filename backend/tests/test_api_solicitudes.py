@@ -576,6 +576,85 @@ def test_listar_enlaces_solicitud(monkeypatch):
     assert body[0]["creado_por_nombre"] == "Luis Gómez"
 
 
+def test_listar_adjuntos_solicitud(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    fake_adjunto = {
+        "id": 1,
+        "nombre_archivo": "captura.png",
+        "tipo_mime": "image/png",
+        "tamano_bytes": 1234,
+        "fecha_carga": datetime(2026, 8, 24, tzinfo=timezone.utc),
+    }
+    monkeypatch.setattr(routes.repository, "list_adjuntos_by_solicitud", lambda cursor, id: [fake_adjunto])
+
+    response = client.get("/api/solicitudes/1/adjuntos")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["nombre_archivo"] == "captura.png"
+
+
+def test_descargar_adjunto_solicitud_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    archivo = tmp_path / "captura.png"
+    archivo.write_bytes(b"contenido-fake-png")
+
+    monkeypatch.setattr(
+        routes.repository,
+        "get_adjunto_de_solicitud",
+        lambda cursor, solicitud_id, adjunto_id: {
+            "id": adjunto_id,
+            "nombre_archivo": "captura.png",
+            "ruta_almacenamiento": str(archivo),
+            "tipo_mime": "image/png",
+            "tamano_bytes": 19,
+        },
+    )
+
+    response = client.get("/api/solicitudes/1/adjuntos/1/descargar")
+
+    assert response.status_code == 200
+    assert response.content == b"contenido-fake-png"
+    assert response.headers["content-type"] == "image/png"
+
+
+def test_descargar_adjunto_solicitud_404_si_no_pertenece(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(
+        routes.repository, "get_adjunto_de_solicitud", lambda cursor, solicitud_id, adjunto_id: None
+    )
+
+    response = client.get("/api/solicitudes/1/adjuntos/999/descargar")
+
+    assert response.status_code == 404
+
+
+def test_descargar_adjunto_solicitud_404_si_falta_en_disco(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    ruta_inexistente = str(tmp_path / "no-existe.png")
+    monkeypatch.setattr(
+        routes.repository,
+        "get_adjunto_de_solicitud",
+        lambda cursor, solicitud_id, adjunto_id: {
+            "id": adjunto_id,
+            "nombre_archivo": "no-existe.png",
+            "ruta_almacenamiento": ruta_inexistente,
+            "tipo_mime": "image/png",
+            "tamano_bytes": 10,
+        },
+    )
+
+    response = client.get("/api/solicitudes/1/adjuntos/1/descargar")
+
+    assert response.status_code == 404
+
+
 def test_crear_tarea_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)

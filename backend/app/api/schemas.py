@@ -27,6 +27,14 @@ class HealthResponse(BaseModel):
     status: str = "ok"
 
 
+class AdjuntoOut(BaseModel):
+    id: int
+    nombre_archivo: str
+    tipo_mime: str | None
+    tamano_bytes: int | None
+    fecha_carga: datetime
+
+
 class MiembroEquipoOut(BaseModel):
     id: int
     nombre_completo: str

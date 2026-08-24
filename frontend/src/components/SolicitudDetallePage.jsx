@@ -6,14 +6,23 @@ import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import TareaItem from "./TareaItem.jsx";
 import {
+  descargarAdjuntoSolicitud,
   eliminarSolicitud,
   eliminarTarea,
+  fetchAdjuntosSolicitud,
   fetchComentariosSolicitud,
   fetchEnlacesSolicitud,
   fetchHitosSolicitud,
   fetchSolicitudDetalle,
   fetchTareas,
 } from "../api.js";
+
+function formatearTamano(bytes) {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatearFecha(iso) {
   try {
@@ -40,6 +49,8 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
   const [comentarios, setComentarios] = useState([]);
   const [hitos, setHitos] = useState([]);
   const [enlaces, setEnlaces] = useState([]);
+  const [adjuntos, setAdjuntos] = useState([]);
+  const [descargandoId, setDescargandoId] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,16 +72,29 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
       fetchComentariosSolicitud(solicitudId),
       fetchHitosSolicitud(solicitudId),
       fetchEnlacesSolicitud(solicitudId),
+      fetchAdjuntosSolicitud(solicitudId),
     ])
-      .then(([detalle, listaTareas, listaComentarios, listaHitos, listaEnlaces]) => {
+      .then(([detalle, listaTareas, listaComentarios, listaHitos, listaEnlaces, listaAdjuntos]) => {
         setSolicitud(detalle);
         setTareas(listaTareas);
         setComentarios(listaComentarios);
         setHitos(listaHitos);
         setEnlaces(listaEnlaces);
+        setAdjuntos(listaAdjuntos);
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la solicitud."))
       .finally(() => setCargando(false));
+  };
+
+  const descargarAdjunto = async (adjunto) => {
+    setDescargandoId(adjunto.id);
+    try {
+      await descargarAdjuntoSolicitud(solicitudId, adjunto.id, adjunto.nombre_archivo);
+    } catch (err) {
+      setError(err.message || "No se pudo descargar el adjunto.");
+    } finally {
+      setDescargandoId(null);
+    }
   };
 
   useEffect(() => {
@@ -175,6 +199,30 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
           </button>
         </div>
       </div>
+
+      {adjuntos.length > 0 && (
+        <div className="solicitud-detalle-tareas">
+          <h3>Adjuntos</h3>
+          <ul className="adjuntos-lista">
+            {adjuntos.map((adjunto) => (
+              <li key={adjunto.id}>
+                <span>
+                  {adjunto.nombre_archivo}
+                  {adjunto.tamano_bytes != null && ` (${formatearTamano(adjunto.tamano_bytes)})`}
+                </span>
+                <button
+                  type="button"
+                  className="secundario"
+                  disabled={descargandoId === adjunto.id}
+                  onClick={() => descargarAdjunto(adjunto)}
+                >
+                  {descargandoId === adjunto.id ? "Descargando..." : "Descargar"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="solicitud-detalle-tareas">
         <div className="solicitudes-encabezado">

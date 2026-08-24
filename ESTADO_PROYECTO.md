@@ -262,6 +262,8 @@ alcance del prompt de esta sesión).
     enlaces de tarea con el nombre de autor resuelto (`creado_por_nombre`):
     `GET/POST /api/tareas/{id}/enlaces` y `GET /api/solicitudes/{id}/comentarios|hitos|enlaces`
     (agregados de solo lectura, para ver todo lo de una solicitud sin entrar tarea por tarea).
+    `GET /api/solicitudes/{id}/adjuntos` y `.../adjuntos/{adjunto_id}/descargar` permiten listar
+    y descargar los archivos ya guardados de una solicitud.
 - **Frontend** (`frontend/`): SPA en React + Vite con menú lateral (Inicio, Solicitud por
   Chat, Solicitudes). "Solicitud por Chat" es el wizard original (correo → título →
   descripción → cliente → adjuntos opcionales → confirmar). "Solicitudes" lista las
@@ -275,10 +277,10 @@ alcance del prompt de esta sesión).
 - **Docker**: `docker-compose.yml` con `backend`, `api`, `frontend`, y `mailserver` (greenmail,
   perfil `local-test`). La BD Postgres es externa, no gestionada por este compose. `backend` y
   `api` deben tener los mismos volúmenes de `data/nfs/` montados (ver fix arriba).
-- **Tests**: 101 tests unitarios en `backend/tests/` (parser, client_matcher,
-  title_synthesizer, auth, endpoints de solicitudes incl. adjuntos/formulario/orden_por,
-  comentarios/hitos/enlaces de tarea, endpoints de catálogos) — todos pasan. Frontend solo
-  verificado con `npm run build` (sin tests
+- **Tests**: 105 tests unitarios en `backend/tests/` (parser, client_matcher,
+  title_synthesizer, auth, endpoints de solicitudes incl. adjuntos/formulario/orden_por/
+  descarga, comentarios/hitos/enlaces de tarea, endpoints de catálogos) — todos pasan. Frontend
+  solo verificado con `npm run build` (sin tests
   automatizados todavía).
 
 Detalles de configuración y comandos: `README.md`. Detalle de diseño y decisiones de cada

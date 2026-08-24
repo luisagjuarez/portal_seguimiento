@@ -195,6 +195,41 @@ def insert_solicitud_md(cursor, id_solicitud: int, ruta_md: str) -> None:
     )
 
 
+def list_adjuntos_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
+    cursor.execute(
+        """
+        SELECT a.id, a.nombre_archivo, a.tipo_mime, a.tamano_bytes, a.fecha_carga
+        FROM adjuntos a
+        JOIN solicitudes_adjuntos sa ON sa.adjunto_id = a.id
+        WHERE sa.solicitud_id = %(solicitud_id)s
+        ORDER BY a.fecha_carga
+        """,
+        {"solicitud_id": solicitud_id},
+    )
+    columnas = ["id", "nombre_archivo", "tipo_mime", "tamano_bytes", "fecha_carga"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def get_adjunto_de_solicitud(cursor, solicitud_id: int, adjunto_id: int) -> dict | None:
+    """Trae ruta_almacenamiento (no expuesta por list_adjuntos_by_solicitud) para que el
+    endpoint de descarga pueda abrir el archivo en disco. El JOIN valida de paso que el
+    adjunto realmente pertenezca a esa solicitud, no solo que exista."""
+    cursor.execute(
+        """
+        SELECT a.id, a.nombre_archivo, a.ruta_almacenamiento, a.tipo_mime, a.tamano_bytes
+        FROM adjuntos a
+        JOIN solicitudes_adjuntos sa ON sa.adjunto_id = a.id
+        WHERE sa.solicitud_id = %(solicitud_id)s AND a.id = %(adjunto_id)s
+        """,
+        {"solicitud_id": solicitud_id, "adjunto_id": adjunto_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "nombre_archivo", "ruta_almacenamiento", "tipo_mime", "tamano_bytes"]
+    return dict(zip(columnas, row))
+
+
 def mark_email_processed(cursor, message_id: str, id_solicitud: int | None) -> None:
     cursor.execute(
         "INSERT INTO emails_procesados (email_message_id, solicitud_id) VALUES (%(message_id)s, %(id_solicitud)s)",
