@@ -1,11 +1,11 @@
-export default function InicioPage({ onIrA }) {
+export default function InicioPage({ usuarioActual, onIrA }) {
   return (
     <div className="inicio-page">
-      <h2>Bienvenido al Portal de Seguimiento DOVELA</h2>
+      <h2>Bienvenido, {usuarioActual?.nombre_completo}</h2>
       <p>
-        Desde aquí puedes registrar y consultar las solicitudes de los equipos de tecnología de
-        DOVELA (Fábrica de Software, Implementación, Mesa de Ayuda, Infraestructura, Sysadmins
-        &amp; DBAs).
+        Este es el Portal de Seguimiento DOVELA. Desde aquí puedes registrar y consultar las
+        solicitudes de los equipos de tecnología de DOVELA (Fábrica de Software, Implementación,
+        Mesa de Ayuda, Infraestructura, Sysadmins &amp; DBAs).
       </p>
       <div className="inicio-acciones">
         <button type="button" onClick={() => onIrA("chat")}>

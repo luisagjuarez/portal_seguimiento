@@ -31,9 +31,6 @@ export default function Sidebar({ paginaActual, onCambiarPagina, usuarioActual, 
         <div className="sidebar-usuario">
           <p className="sidebar-usuario-nombre">{usuarioActual.nombre_completo}</p>
           <p className="sidebar-usuario-rol">{usuarioActual.codigo_rol_scrum}</p>
-          <button type="button" className="secundario" onClick={() => onCambiarPagina("cambiar-password")}>
-            Cambiar contraseña
-          </button>
           <button type="button" className="secundario" onClick={onCerrarSesion}>
             Cerrar sesión
           </button>

@@ -172,16 +172,12 @@ header {
   margin-bottom: 1rem;
 }
 
-header h1 {
-  grid-column: 2;
-  margin: 0;
-  font-size: 1.4rem;
-  text-align: center;
-}
-
 .theme-toggle-wrap {
   grid-column: 3;
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sidebar-toggle-wrap {

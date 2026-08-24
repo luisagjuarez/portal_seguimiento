@@ -117,6 +117,7 @@ export default function App() {
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
   const puedeMostrarSidebar = usuarioActual && !debeCambiarPassword;
+  const pantallaCentrada = pantallaSinSidebar || pagina === "inicio" || pagina === "chat";
 
   return (
     <div className="app-layout">
@@ -144,12 +145,16 @@ export default function App() {
               </button>
             )}
           </div>
-          <h1>Portal de Seguimiento DOVELA</h1>
           <div className="theme-toggle-wrap">
+            {puedeMostrarSidebar && (
+              <button type="button" className="secundario" onClick={() => setPagina("cambiar-password")}>
+                Cambiar contraseña
+              </button>
+            )}
             <ThemeToggle />
           </div>
         </header>
-        <main className={pantallaSinSidebar ? "pantalla-centrada" : ""}>
+        <main className={pantallaCentrada ? "pantalla-centrada" : ""}>
           {resetToken && <ResetPasswordPage token={resetToken} onListo={limpiarResetToken} />}
           {!resetToken && restaurandoSesion && <p>Cargando...</p>}
           {!resetToken && !restaurandoSesion && requiereSesion && <LoginPage onIngreso={setUsuarioActual} />}
@@ -158,7 +163,7 @@ export default function App() {
           )}
           {!resetToken && !restaurandoSesion && !requiereSesion && !debeCambiarPassword && (
             <>
-              {pagina === "inicio" && <InicioPage onIrA={setPagina} />}
+              {pagina === "inicio" && <InicioPage usuarioActual={usuarioActual} onIrA={setPagina} />}
               {pagina === "chat" && <ChatWindow usuarioActual={usuarioActual} />}
               {pagina === "solicitudes" && <SolicitudesPage onVerDetalle={verDetalleSolicitud} />}
               {pagina === "solicitud-detalle" && (
