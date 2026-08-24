@@ -10,6 +10,7 @@ import UsuariosPage from "./components/UsuariosPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
 import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.jsx";
+import ThemeToggle from "./components/ThemeToggle.jsx";
 import { clearToken, fetchMe, getToken } from "./api.js";
 
 export default function App() {
@@ -106,6 +107,9 @@ export default function App() {
       <div className="main-content">
         <header>
           <h1>Portal de Seguimiento DOVELA</h1>
+          <div className="theme-toggle-wrap">
+            <ThemeToggle />
+          </div>
         </header>
         <main className={pantallaSinSidebar ? "pantalla-centrada" : ""}>
           {resetToken && <ResetPasswordPage token={resetToken} onListo={limpiarResetToken} />}

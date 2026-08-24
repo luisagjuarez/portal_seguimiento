@@ -262,7 +262,8 @@ alcance del prompt de esta sesión).
   existentes como tarjetas con filtros (cliente/nombre/estatus) y un botón "Crear solicitud"
   que abre un formulario tradicional de un solo paso (con adjuntos también). Se sirve con
   nginx en Docker; la URL de la API se inyecta en runtime vía `public/config.js` +
-  `docker-entrypoint.sh`.
+  `docker-entrypoint.sh`. Soporta modo oscuro/claro (toggle en el encabezado, persistido en
+  `localStorage`, ver `00_ARCHIVOS/BITACORAS/2026-08-24.md`).
 - **Base de datos**: PostgreSQL, esquema `solicitudes` (ver sección de migración arriba y
   `README.md` para el detalle completo del mapeo de columnas/catálogos).
 - **Docker**: `docker-compose.yml` con `backend`, `api`, `frontend`, y `mailserver` (greenmail,
