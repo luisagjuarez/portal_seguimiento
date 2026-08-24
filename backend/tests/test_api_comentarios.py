@@ -36,9 +36,11 @@ def _fake_comentario(comentario_id=1):
         "id": comentario_id,
         "solicitud_id": 1,
         "tarea_id": 1,
+        "tarea_nombre": "Levantar requerimientos",
         "texto_comentario": "Comentario editado.",
         "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
         "creado_por": "dovela_control",
+        "creado_por_nombre": "Ramon Rosales",
         "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
         "actualizado_por": "dovela_control",
     }

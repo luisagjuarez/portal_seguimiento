@@ -258,7 +258,10 @@ alcance del prompt de esta sesión).
     `orden_prioridad`), `PUT /api/solicitudes/{id}` (incluye canal/orden_prioridad/
     fecha_completado, esta última obligatoria si el estatus es Completado), y
     `routes_catalogos.py` (`GET /api/miembros-equipo`, `GET /api/tipos-solicitud`,
-    `GET /api/canales-solicitud`, `GET /api/estatus`).
+    `GET /api/canales-solicitud`, `GET /api/estatus`). También expone comentarios/hitos/
+    enlaces de tarea con el nombre de autor resuelto (`creado_por_nombre`):
+    `GET/POST /api/tareas/{id}/enlaces` y `GET /api/solicitudes/{id}/comentarios|hitos|enlaces`
+    (agregados de solo lectura, para ver todo lo de una solicitud sin entrar tarea por tarea).
 - **Frontend** (`frontend/`): SPA en React + Vite con menú lateral (Inicio, Solicitud por
   Chat, Solicitudes). "Solicitud por Chat" es el wizard original (correo → título →
   descripción → cliente → adjuntos opcionales → confirmar). "Solicitudes" lista las
@@ -272,9 +275,10 @@ alcance del prompt de esta sesión).
 - **Docker**: `docker-compose.yml` con `backend`, `api`, `frontend`, y `mailserver` (greenmail,
   perfil `local-test`). La BD Postgres es externa, no gestionada por este compose. `backend` y
   `api` deben tener los mismos volúmenes de `data/nfs/` montados (ver fix arriba).
-- **Tests**: 94 tests unitarios en `backend/tests/` (parser, client_matcher,
+- **Tests**: 101 tests unitarios en `backend/tests/` (parser, client_matcher,
   title_synthesizer, auth, endpoints de solicitudes incl. adjuntos/formulario/orden_por,
-  endpoints de catálogos) — todos pasan. Frontend solo verificado con `npm run build` (sin tests
+  comentarios/hitos/enlaces de tarea, endpoints de catálogos) — todos pasan. Frontend solo
+  verificado con `npm run build` (sin tests
   automatizados todavía).
 
 Detalles de configuración y comandos: `README.md`. Detalle de diseño y decisiones de cada

@@ -722,13 +722,21 @@ def delete_tarea(cursor, tarea_id: int, actor: str) -> int:
     return cursor.rowcount
 
 
+_COLUMNAS_HITO = [
+    "id", "solicitud_id", "tarea_id", "tarea_nombre", "nombre", "descripcion",
+    "fecha_vencimiento", "creado_en", "creado_por", "creado_por_nombre", "actualizado_en",
+]
+
+
 def get_hito_by_tarea(cursor, tarea_id: int) -> dict | None:
     cursor.execute(
         """
-        SELECT h.id, h.solicitud_id, h.nombre, h.descripcion, h.fecha_vencimiento,
-               h.creado_en, h.actualizado_en
+        SELECT h.id, h.solicitud_id, t.id AS tarea_id, t.nombre AS tarea_nombre, h.nombre,
+               h.descripcion, h.fecha_vencimiento, h.creado_en, h.creado_por,
+               COALESCE(autor.nombre_completo, h.creado_por) AS creado_por_nombre, h.actualizado_en
         FROM hitos h
         JOIN tareas t ON t.hito_id = h.id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = h.creado_por
         WHERE t.id = %(tarea_id)s AND h.borrado_en IS NULL
         """,
         {"tarea_id": tarea_id},
@@ -736,8 +744,27 @@ def get_hito_by_tarea(cursor, tarea_id: int) -> dict | None:
     row = cursor.fetchone()
     if row is None:
         return None
-    columnas = ["id", "solicitud_id", "nombre", "descripcion", "fecha_vencimiento", "creado_en", "actualizado_en"]
-    return dict(zip(columnas, row))
+    return dict(zip(_COLUMNAS_HITO, row))
+
+
+def list_hitos_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
+    """Para el detalle de solicitud (Fase 2 extra): todos los hitos de sus tareas, más
+    recientes primero, con el nombre de la tarea dueña y el nombre del creador (se muestra
+    como "responsable" del hito, ya que hitos no tiene columna de responsable propia)."""
+    cursor.execute(
+        """
+        SELECT h.id, h.solicitud_id, t.id AS tarea_id, t.nombre AS tarea_nombre, h.nombre,
+               h.descripcion, h.fecha_vencimiento, h.creado_en, h.creado_por,
+               COALESCE(autor.nombre_completo, h.creado_por) AS creado_por_nombre, h.actualizado_en
+        FROM hitos h
+        LEFT JOIN tareas t ON t.hito_id = h.id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = h.creado_por
+        WHERE h.solicitud_id = %(solicitud_id)s AND h.borrado_en IS NULL
+        ORDER BY h.creado_en DESC
+        """,
+        {"solicitud_id": solicitud_id},
+    )
+    return [dict(zip(_COLUMNAS_HITO, row)) for row in cursor.fetchall()]
 
 
 def insert_hito_para_tarea(
@@ -806,22 +833,48 @@ def delete_hito(cursor, hito_id: int, actor: str) -> int:
     return cursor.rowcount
 
 
+_COLUMNAS_COMENTARIO = [
+    "id", "solicitud_id", "tarea_id", "tarea_nombre", "texto_comentario", "creado_en",
+    "creado_por", "creado_por_nombre", "actualizado_en", "actualizado_por",
+]
+
+
 def list_comentarios_by_tarea(cursor, tarea_id: int) -> list[dict]:
     cursor.execute(
         """
-        SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
-               actualizado_en, actualizado_por
-        FROM comentarios
-        WHERE tarea_id = %(tarea_id)s AND borrado_en IS NULL
-        ORDER BY creado_en
+        SELECT c.id, c.solicitud_id, c.tarea_id, t.nombre AS tarea_nombre, c.texto_comentario,
+               c.creado_en, c.creado_por,
+               COALESCE(autor.nombre_completo, c.creado_por) AS creado_por_nombre,
+               c.actualizado_en, c.actualizado_por
+        FROM comentarios c
+        LEFT JOIN tareas t ON t.id = c.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = c.creado_por
+        WHERE c.tarea_id = %(tarea_id)s AND c.borrado_en IS NULL
+        ORDER BY c.creado_en
         """,
         {"tarea_id": tarea_id},
     )
-    columnas = [
-        "id", "solicitud_id", "tarea_id", "texto_comentario", "creado_en", "creado_por",
-        "actualizado_en", "actualizado_por",
-    ]
-    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+    return [dict(zip(_COLUMNAS_COMENTARIO, row)) for row in cursor.fetchall()]
+
+
+def list_comentarios_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
+    """Para el detalle de solicitud (Fase 2 extra): todos los comentarios de sus tareas,
+    más recientes primero, con el nombre de la tarea de origen y el nombre del autor."""
+    cursor.execute(
+        """
+        SELECT c.id, c.solicitud_id, c.tarea_id, t.nombre AS tarea_nombre, c.texto_comentario,
+               c.creado_en, c.creado_por,
+               COALESCE(autor.nombre_completo, c.creado_por) AS creado_por_nombre,
+               c.actualizado_en, c.actualizado_por
+        FROM comentarios c
+        LEFT JOIN tareas t ON t.id = c.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = c.creado_por
+        WHERE c.solicitud_id = %(solicitud_id)s AND c.borrado_en IS NULL
+        ORDER BY c.creado_en DESC
+        """,
+        {"solicitud_id": solicitud_id},
+    )
+    return [dict(zip(_COLUMNAS_COMENTARIO, row)) for row in cursor.fetchall()]
 
 
 def insert_comentario(cursor, solicitud_id: int, tarea_id: int | None, texto: str, actor: str) -> int:
@@ -840,21 +893,21 @@ def insert_comentario(cursor, solicitud_id: int, tarea_id: int | None, texto: st
 def get_comentario_by_id(cursor, comentario_id: int) -> dict | None:
     cursor.execute(
         """
-        SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
-               actualizado_en, actualizado_por
-        FROM comentarios
-        WHERE id = %(id)s AND borrado_en IS NULL
+        SELECT c.id, c.solicitud_id, c.tarea_id, t.nombre AS tarea_nombre, c.texto_comentario,
+               c.creado_en, c.creado_por,
+               COALESCE(autor.nombre_completo, c.creado_por) AS creado_por_nombre,
+               c.actualizado_en, c.actualizado_por
+        FROM comentarios c
+        LEFT JOIN tareas t ON t.id = c.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = c.creado_por
+        WHERE c.id = %(id)s AND c.borrado_en IS NULL
         """,
         {"id": comentario_id},
     )
     row = cursor.fetchone()
     if row is None:
         return None
-    columnas = [
-        "id", "solicitud_id", "tarea_id", "texto_comentario", "creado_en", "creado_por",
-        "actualizado_en", "actualizado_por",
-    ]
-    return dict(zip(columnas, row))
+    return dict(zip(_COLUMNAS_COMENTARIO, row))
 
 
 def update_comentario(cursor, comentario_id: int, texto: str, actor: str) -> int:
@@ -875,6 +928,109 @@ def delete_comentario(cursor, comentario_id: int, actor: str) -> int:
         {"actor": actor, "id": comentario_id},
     )
     return cursor.rowcount
+
+
+_COLUMNAS_ENLACE_TAREA = [
+    "id", "solicitud_id", "tarea_id", "tarea_nombre", "tipo_enlace", "url", "aplicacion_id",
+    "pagina_aplicacion", "descripcion", "creado_en", "creado_por", "creado_por_nombre",
+    "actualizado_en", "actualizado_por",
+]
+
+
+def insert_enlace_tarea(
+    cursor,
+    tarea_id: int,
+    solicitud_id: int,
+    tipo_enlace: str,
+    url: str | None,
+    aplicacion_id: int | None,
+    pagina_aplicacion: int | None,
+    descripcion: str | None,
+    actor: str,
+) -> int:
+    """enlaces_tarea no tiene borrado_en/borrado_por (a diferencia de comentarios/hitos):
+    no forma parte del conjunto de entidades con borrado lógico auditado, es detalle interno
+    de la tarea (mismo criterio ya aplicado en delete_tarea)."""
+    cursor.execute(
+        """
+        INSERT INTO enlaces_tarea
+            (solicitud_id, tarea_id, tipo_enlace, url, aplicacion_id, pagina_aplicacion,
+             descripcion, creado_en, creado_por, actualizado_en, actualizado_por)
+        VALUES
+            (%(solicitud_id)s, %(tarea_id)s, %(tipo_enlace)s, %(url)s, %(aplicacion_id)s,
+             %(pagina_aplicacion)s, %(descripcion)s, now(), %(actor)s, now(), %(actor)s)
+        RETURNING id
+        """,
+        {
+            "solicitud_id": solicitud_id,
+            "tarea_id": tarea_id,
+            "tipo_enlace": tipo_enlace,
+            "url": url,
+            "aplicacion_id": aplicacion_id,
+            "pagina_aplicacion": pagina_aplicacion,
+            "descripcion": descripcion,
+            "actor": actor,
+        },
+    )
+    return cursor.fetchone()[0]
+
+
+def get_enlace_tarea_by_id(cursor, enlace_id: int) -> dict | None:
+    cursor.execute(
+        """
+        SELECT e.id, e.solicitud_id, e.tarea_id, t.nombre AS tarea_nombre, e.tipo_enlace,
+               e.url, e.aplicacion_id, e.pagina_aplicacion, e.descripcion, e.creado_en,
+               e.creado_por, COALESCE(autor.nombre_completo, e.creado_por) AS creado_por_nombre,
+               e.actualizado_en, e.actualizado_por
+        FROM enlaces_tarea e
+        LEFT JOIN tareas t ON t.id = e.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = e.creado_por
+        WHERE e.id = %(id)s
+        """,
+        {"id": enlace_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return dict(zip(_COLUMNAS_ENLACE_TAREA, row))
+
+
+def list_enlaces_by_tarea(cursor, tarea_id: int) -> list[dict]:
+    cursor.execute(
+        """
+        SELECT e.id, e.solicitud_id, e.tarea_id, t.nombre AS tarea_nombre, e.tipo_enlace,
+               e.url, e.aplicacion_id, e.pagina_aplicacion, e.descripcion, e.creado_en,
+               e.creado_por, COALESCE(autor.nombre_completo, e.creado_por) AS creado_por_nombre,
+               e.actualizado_en, e.actualizado_por
+        FROM enlaces_tarea e
+        LEFT JOIN tareas t ON t.id = e.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = e.creado_por
+        WHERE e.tarea_id = %(tarea_id)s
+        ORDER BY e.creado_en
+        """,
+        {"tarea_id": tarea_id},
+    )
+    return [dict(zip(_COLUMNAS_ENLACE_TAREA, row)) for row in cursor.fetchall()]
+
+
+def list_enlaces_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
+    """Para el detalle de solicitud (Fase 2 extra): todos los enlaces de las tareas de esta
+    solicitud, más recientes primero, con el nombre de la tarea dueña y el nombre del autor."""
+    cursor.execute(
+        """
+        SELECT e.id, e.solicitud_id, e.tarea_id, t.nombre AS tarea_nombre, e.tipo_enlace,
+               e.url, e.aplicacion_id, e.pagina_aplicacion, e.descripcion, e.creado_en,
+               e.creado_por, COALESCE(autor.nombre_completo, e.creado_por) AS creado_por_nombre,
+               e.actualizado_en, e.actualizado_por
+        FROM enlaces_tarea e
+        LEFT JOIN tareas t ON t.id = e.tarea_id
+        LEFT JOIN miembros_equipo autor ON autor.usuario = e.creado_por
+        WHERE e.solicitud_id = %(solicitud_id)s
+        ORDER BY e.creado_en DESC
+        """,
+        {"solicitud_id": solicitud_id},
+    )
+    return [dict(zip(_COLUMNAS_ENLACE_TAREA, row)) for row in cursor.fetchall()]
 
 
 _ORDEN_SOLICITUDES = {

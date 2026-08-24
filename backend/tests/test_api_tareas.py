@@ -202,10 +202,14 @@ def _fake_hito(hito_id=1):
     return {
         "id": hito_id,
         "solicitud_id": 1,
+        "tarea_id": 1,
+        "tarea_nombre": "Levantar requerimientos",
         "nombre": "Entrega beta",
         "descripcion": "Primera entrega al cliente",
         "fecha_vencimiento": date(2026, 9, 15),
         "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
         "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
     }
 
@@ -342,9 +346,11 @@ def _fake_comentario(comentario_id=1, tarea_id=1):
         "id": comentario_id,
         "solicitud_id": 1,
         "tarea_id": tarea_id,
+        "tarea_nombre": "Levantar requerimientos",
         "texto_comentario": "Quedamos en revisar esto el viernes.",
         "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
         "creado_por": "dovela_control",
+        "creado_por_nombre": "Ramon Rosales",
         "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
         "actualizado_por": "dovela_control",
     }
@@ -384,3 +390,74 @@ def test_crear_comentario_tarea_404_si_tarea_no_existe(monkeypatch):
     response = client.post("/api/tareas/999/comentarios", json={"texto_comentario": "Comentario"})
 
     assert response.status_code == 404
+
+
+def _fake_enlace(enlace_id=1, tarea_id=1):
+    return {
+        "id": enlace_id,
+        "solicitud_id": 1,
+        "tarea_id": tarea_id,
+        "tarea_nombre": "Levantar requerimientos",
+        "tipo_enlace": "URL",
+        "url": "https://ejemplo.com/documento",
+        "aplicacion_id": None,
+        "pagina_aplicacion": None,
+        "descripcion": "Documento de referencia",
+        "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
+        "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "actualizado_por": "DOVELA_LG",
+    }
+
+
+def test_listar_enlaces_tarea(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "list_enlaces_by_tarea", lambda cursor, id: [_fake_enlace()])
+
+    response = client.get("/api/tareas/1/enlaces")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["tipo_enlace"] == "URL"
+    assert body[0]["creado_por_nombre"] == "Luis Gómez"
+
+
+def test_crear_enlace_tarea_success(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_enlace_tarea", lambda cursor, tarea_id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_enlace_tarea_by_id", lambda cursor, id: _fake_enlace(id))
+
+    response = client.post(
+        "/api/tareas/1/enlaces",
+        json={
+            "tipo_enlace": "URL",
+            "url": "https://ejemplo.com/documento",
+            "descripcion": "Documento de referencia",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tipo_enlace"] == "URL"
+    assert fake_conn.committed is True
+
+
+def test_crear_enlace_tarea_404_si_tarea_no_existe(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: None)
+
+    response = client.post("/api/tareas/999/enlaces", json={"tipo_enlace": "URL"})
+
+    assert response.status_code == 404
+
+
+def test_crear_enlace_tarea_requiere_tipo_enlace():
+    response = client.post("/api/tareas/1/enlaces", json={"url": "https://ejemplo.com"})
+
+    assert response.status_code == 422

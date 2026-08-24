@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
+import ComentarioItem from "./ComentarioItem.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import EditarSolicitudFormulario from "./EditarSolicitudFormulario.jsx";
+import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import TareaItem from "./TareaItem.jsx";
-import { eliminarSolicitud, eliminarTarea, fetchSolicitudDetalle, fetchTareas } from "../api.js";
+import {
+  eliminarSolicitud,
+  eliminarTarea,
+  fetchComentariosSolicitud,
+  fetchEnlacesSolicitud,
+  fetchHitosSolicitud,
+  fetchSolicitudDetalle,
+  fetchTareas,
+} from "../api.js";
 
 function formatearFecha(iso) {
   try {
@@ -27,6 +37,9 @@ function formatearFechaCorta(iso) {
 export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea, esScrumMaster }) {
   const [solicitud, setSolicitud] = useState(null);
   const [tareas, setTareas] = useState([]);
+  const [comentarios, setComentarios] = useState([]);
+  const [hitos, setHitos] = useState([]);
+  const [enlaces, setEnlaces] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -42,10 +55,19 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
   const cargarDetalle = () => {
     setCargando(true);
     setError(null);
-    Promise.all([fetchSolicitudDetalle(solicitudId), fetchTareas(solicitudId)])
-      .then(([detalle, listaTareas]) => {
+    Promise.all([
+      fetchSolicitudDetalle(solicitudId),
+      fetchTareas(solicitudId),
+      fetchComentariosSolicitud(solicitudId),
+      fetchHitosSolicitud(solicitudId),
+      fetchEnlacesSolicitud(solicitudId),
+    ])
+      .then(([detalle, listaTareas, listaComentarios, listaHitos, listaEnlaces]) => {
         setSolicitud(detalle);
         setTareas(listaTareas);
+        setComentarios(listaComentarios);
+        setHitos(listaHitos);
+        setEnlaces(listaEnlaces);
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la solicitud."))
       .finally(() => setCargando(false));
@@ -187,6 +209,42 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
               onBorrar={setTareaABorrar}
               onAbrirDetalle={onVerTarea}
             />
+          ))}
+        </div>
+      </div>
+
+      <div className="solicitud-detalle-tareas">
+        <h3>Comentarios</h3>
+        {comentarios.length === 0 && <p>Ninguna tarea de esta solicitud tiene comentarios todavía.</p>}
+        <div className="comentario-lista">
+          {comentarios.map((comentario) => (
+            <ComentarioItem key={comentario.id} comentario={comentario} mostrarTarea />
+          ))}
+        </div>
+      </div>
+
+      <div className="solicitud-detalle-tareas">
+        <h3>Hitos</h3>
+        {hitos.length === 0 && <p>Ninguna tarea de esta solicitud tiene hitos todavía.</p>}
+        <div className="tarea-lista">
+          {hitos.map((hito) => (
+            <div key={hito.id} className="hito-card">
+              <h4>{hito.nombre}</h4>
+              {hito.descripcion && <p>{hito.descripcion}</p>}
+              {hito.tarea_nombre && <p className="solicitud-fecha">Tarea: {hito.tarea_nombre}</p>}
+              <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
+              <p className="solicitud-fecha">Responsable: {hito.creado_por_nombre}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="solicitud-detalle-tareas">
+        <h3>Enlaces de tareas</h3>
+        {enlaces.length === 0 && <p>Ninguna tarea de esta solicitud tiene enlaces todavía.</p>}
+        <div className="tarea-lista">
+          {enlaces.map((enlace) => (
+            <EnlaceTareaItem key={enlace.id} enlace={enlace} mostrarTarea />
           ))}
         </div>
       </div>

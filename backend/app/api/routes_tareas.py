@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.schemas import (
     ComentarioCreateUpdate,
     ComentarioOut,
+    EnlaceTareaCreate,
+    EnlaceTareaOut,
     HitoCreateUpdate,
     HitoOut,
     TareaCreateUpdate,
@@ -255,3 +257,51 @@ def crear_comentario_tarea(
         release_connection(db_conn)
 
     return ComentarioOut(**fila)
+
+
+@router.get("/tareas/{tarea_id}/enlaces", response_model=list[EnlaceTareaOut])
+def listar_enlaces_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[EnlaceTareaOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_enlaces_by_tarea(cursor, tarea_id)
+    finally:
+        release_connection(db_conn)
+    return [EnlaceTareaOut(**fila) for fila in filas]
+
+
+@router.post("/tareas/{tarea_id}/enlaces", response_model=EnlaceTareaOut, status_code=201)
+def crear_enlace_tarea(
+    tarea_id: int, body: EnlaceTareaCreate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> EnlaceTareaOut:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        tarea = repository.get_tarea_by_id(cursor, tarea_id)
+        if tarea is None:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+        enlace_id = repository.insert_enlace_tarea(
+            cursor,
+            tarea_id,
+            solicitud_id=tarea["solicitud_id"],
+            tipo_enlace=body.tipo_enlace,
+            url=body.url,
+            aplicacion_id=body.aplicacion_id,
+            pagina_aplicacion=body.pagina_aplicacion,
+            descripcion=body.descripcion,
+            actor=usuario_actual.usuario,
+        )
+        fila = repository.get_enlace_tarea_by_id(cursor, enlace_id)
+        db_conn.commit()
+    except HTTPException:
+        db_conn.rollback()
+        raise
+    except Exception:
+        db_conn.rollback()
+        logger.exception("Error creando enlace para tarea %s", tarea_id)
+        raise HTTPException(status_code=500, detail="No se pudo crear el enlace") from None
+    finally:
+        release_connection(db_conn)
+
+    return EnlaceTareaOut(**fila)

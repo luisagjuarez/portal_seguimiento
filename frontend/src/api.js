@@ -401,6 +401,49 @@ export async function eliminarComentario(comentarioId) {
   }
 }
 
+export async function fetchEnlacesTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/enlaces`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function crearEnlaceTarea(tareaId, { tipoEnlace, url, aplicacionId, paginaAplicacion, descripcion }) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/enlaces`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      tipo_enlace: tipoEnlace,
+      url: url || null,
+      aplicacion_id: aplicacionId || null,
+      pagina_aplicacion: paginaAplicacion || null,
+      descripcion: descripcion || null,
+    }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchComentariosSolicitud(solicitudId) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/comentarios`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchHitosSolicitud(solicitudId) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/hitos`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchEnlacesSolicitud(solicitudId) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/enlaces`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
 export async function crearSolicitudFormulario({
   solicitanteEmail,
   titulo,

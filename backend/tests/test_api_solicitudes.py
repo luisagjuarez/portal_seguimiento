@@ -496,6 +496,86 @@ def test_listar_tareas(monkeypatch):
     assert len(response.json()) == 1
 
 
+def test_listar_comentarios_solicitud(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    fake_comentario = {
+        "id": 1,
+        "solicitud_id": 1,
+        "tarea_id": 1,
+        "tarea_nombre": "Levantar requerimientos",
+        "texto_comentario": "Quedamos en revisar esto el viernes.",
+        "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
+        "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "actualizado_por": "DOVELA_LG",
+    }
+    monkeypatch.setattr(routes.repository, "list_comentarios_by_solicitud", lambda cursor, id: [fake_comentario])
+
+    response = client.get("/api/solicitudes/1/comentarios")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["creado_por_nombre"] == "Luis Gómez"
+
+
+def test_listar_hitos_solicitud(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    fake_hito = {
+        "id": 1,
+        "solicitud_id": 1,
+        "tarea_id": 1,
+        "tarea_nombre": "Levantar requerimientos",
+        "nombre": "Entrega beta",
+        "descripcion": "Primera entrega al cliente",
+        "fecha_vencimiento": date(2026, 9, 15),
+        "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
+        "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+    }
+    monkeypatch.setattr(routes.repository, "list_hitos_by_solicitud", lambda cursor, id: [fake_hito])
+
+    response = client.get("/api/solicitudes/1/hitos")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["creado_por_nombre"] == "Luis Gómez"
+
+
+def test_listar_enlaces_solicitud(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    fake_enlace = {
+        "id": 1,
+        "solicitud_id": 1,
+        "tarea_id": 1,
+        "tarea_nombre": "Levantar requerimientos",
+        "tipo_enlace": "URL",
+        "url": "https://ejemplo.com/documento",
+        "aplicacion_id": None,
+        "pagina_aplicacion": None,
+        "descripcion": "Documento de referencia",
+        "creado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
+        "actualizado_en": datetime(2026, 8, 24, tzinfo=timezone.utc),
+        "actualizado_por": "DOVELA_LG",
+    }
+    monkeypatch.setattr(routes.repository, "list_enlaces_by_solicitud", lambda cursor, id: [fake_enlace])
+
+    response = client.get("/api/solicitudes/1/enlaces")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["creado_por_nombre"] == "Luis Gómez"
+
+
 def test_crear_tarea_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)

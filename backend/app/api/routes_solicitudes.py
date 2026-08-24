@@ -12,7 +12,10 @@ from app.api.schemas import (
     ChatSolicitudRequest,
     ChatSolicitudResponse,
     ClienteSugerido,
+    ComentarioOut,
+    EnlaceTareaOut,
     HealthResponse,
+    HitoOut,
     SolicitudDetalle,
     SolicitudResumen,
     SolicitudUpdate,
@@ -269,6 +272,45 @@ def listar_tareas(solicitud_id: int, _: UsuarioActual = Depends(get_current_user
     finally:
         release_connection(db_conn)
     return [TareaOut(**fila) for fila in filas]
+
+
+@router.get("/solicitudes/{solicitud_id}/comentarios", response_model=list[ComentarioOut])
+def listar_comentarios_solicitud(
+    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+) -> list[ComentarioOut]:
+    """Agrega los comentarios de todas las tareas de la solicitud, para verlos de un
+    vistazo desde el detalle de la solicitud (no solo entrando a cada tarea)."""
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_comentarios_by_solicitud(cursor, solicitud_id)
+    finally:
+        release_connection(db_conn)
+    return [ComentarioOut(**fila) for fila in filas]
+
+
+@router.get("/solicitudes/{solicitud_id}/hitos", response_model=list[HitoOut])
+def listar_hitos_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[HitoOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_hitos_by_solicitud(cursor, solicitud_id)
+    finally:
+        release_connection(db_conn)
+    return [HitoOut(**fila) for fila in filas]
+
+
+@router.get("/solicitudes/{solicitud_id}/enlaces", response_model=list[EnlaceTareaOut])
+def listar_enlaces_solicitud(
+    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+) -> list[EnlaceTareaOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_enlaces_by_solicitud(cursor, solicitud_id)
+    finally:
+        release_connection(db_conn)
+    return [EnlaceTareaOut(**fila) for fila in filas]
 
 
 @router.post("/solicitudes/{solicitud_id}/tareas", response_model=TareaOut, status_code=201)

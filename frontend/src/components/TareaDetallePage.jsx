@@ -3,11 +3,14 @@ import ConfirmModal from "./ConfirmModal.jsx";
 import HitoFormulario from "./HitoFormulario.jsx";
 import ComentarioFormulario from "./ComentarioFormulario.jsx";
 import ComentarioItem from "./ComentarioItem.jsx";
+import EnlaceTareaFormulario from "./EnlaceTareaFormulario.jsx";
+import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import {
   eliminarComentario,
   eliminarHitoTarea,
   fetchComentariosTarea,
+  fetchEnlacesTarea,
   fetchHitoDeTarea,
   fetchTareaDetalle,
 } from "../api.js";
@@ -31,6 +34,7 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
   const [tarea, setTarea] = useState(null);
   const [hito, setHito] = useState(null);
   const [comentarios, setComentarios] = useState([]);
+  const [enlaces, setEnlaces] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -45,14 +49,22 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
   const [comentarioABorrar, setComentarioABorrar] = useState(null);
   const [borrandoComentario, setBorrandoComentario] = useState(false);
 
+  const [mostrarFormularioEnlace, setMostrarFormularioEnlace] = useState(false);
+
   const cargarDetalle = () => {
     setCargando(true);
     setError(null);
-    Promise.all([fetchTareaDetalle(tareaId), fetchHitoDeTarea(tareaId), fetchComentariosTarea(tareaId)])
-      .then(([detalleTarea, hitoActual, listaComentarios]) => {
+    Promise.all([
+      fetchTareaDetalle(tareaId),
+      fetchHitoDeTarea(tareaId),
+      fetchComentariosTarea(tareaId),
+      fetchEnlacesTarea(tareaId),
+    ])
+      .then(([detalleTarea, hitoActual, listaComentarios, listaEnlaces]) => {
         setTarea(detalleTarea);
         setHito(hitoActual);
         setComentarios(listaComentarios);
+        setEnlaces(listaEnlaces);
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la tarea."))
       .finally(() => setCargando(false));
@@ -89,6 +101,11 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
   const alGuardarComentario = () => {
     setMostrarFormularioComentario(false);
     setComentarioEnEdicion(null);
+    cargarDetalle();
+  };
+
+  const alGuardarEnlace = () => {
+    setMostrarFormularioEnlace(false);
     cargarDetalle();
   };
 
@@ -224,6 +241,23 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
         </div>
       </div>
 
+      <div className="solicitud-detalle-tareas">
+        <div className="solicitudes-encabezado">
+          <h3>Enlaces</h3>
+          <button type="button" onClick={() => setMostrarFormularioEnlace(true)}>
+            Agregar enlace
+          </button>
+        </div>
+
+        {enlaces.length === 0 && <p>Esta tarea todavía no tiene enlaces.</p>}
+
+        <div className="tarea-lista">
+          {enlaces.map((enlace) => (
+            <EnlaceTareaItem key={enlace.id} enlace={enlace} />
+          ))}
+        </div>
+      </div>
+
       {mostrarFormularioTarea && (
         <div className="modal-overlay" onClick={() => setMostrarFormularioTarea(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
@@ -293,6 +327,19 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
           onConfirmar={confirmarBorrarComentario}
           onCancelar={() => setComentarioABorrar(null)}
         />
+      )}
+
+      {mostrarFormularioEnlace && (
+        <div className="modal-overlay" onClick={() => setMostrarFormularioEnlace(false)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <h3>Nuevo enlace</h3>
+            <EnlaceTareaFormulario
+              tareaId={tareaId}
+              onGuardado={alGuardarEnlace}
+              onCancelar={() => setMostrarFormularioEnlace(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

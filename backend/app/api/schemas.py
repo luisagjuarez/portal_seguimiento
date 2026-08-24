@@ -140,10 +140,14 @@ class TareaCreateUpdate(BaseModel):
 class HitoOut(BaseModel):
     id: int
     solicitud_id: int
+    tarea_id: int | None
+    tarea_nombre: str | None
     nombre: str
     descripcion: str | None
     fecha_vencimiento: date
     creado_en: datetime
+    creado_por: str
+    creado_por_nombre: str
     actualizado_en: datetime
 
 
@@ -153,13 +157,40 @@ class HitoCreateUpdate(BaseModel):
     fecha_vencimiento: date
 
 
+class EnlaceTareaOut(BaseModel):
+    id: int
+    solicitud_id: int
+    tarea_id: int
+    tarea_nombre: str | None
+    tipo_enlace: str
+    url: str | None
+    aplicacion_id: int | None
+    pagina_aplicacion: int | None
+    descripcion: str | None
+    creado_en: datetime
+    creado_por: str
+    creado_por_nombre: str
+    actualizado_en: datetime
+    actualizado_por: str
+
+
+class EnlaceTareaCreate(BaseModel):
+    tipo_enlace: str = Field(min_length=1, max_length=20)
+    url: str | None = Field(default=None, max_length=255)
+    aplicacion_id: int | None = None
+    pagina_aplicacion: int | None = None
+    descripcion: str | None = Field(default=None, max_length=4000)
+
+
 class ComentarioOut(BaseModel):
     id: int
     solicitud_id: int
     tarea_id: int | None
+    tarea_nombre: str | None
     texto_comentario: str
     creado_en: datetime
     creado_por: str
+    creado_por_nombre: str
     actualizado_en: datetime
     actualizado_por: str
 
