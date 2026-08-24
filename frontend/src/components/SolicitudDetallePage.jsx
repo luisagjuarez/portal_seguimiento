@@ -13,7 +13,7 @@ function formatearFecha(iso) {
   }
 }
 
-export default function SolicitudDetallePage({ solicitudId, onRegresar }) {
+export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea }) {
   const [solicitud, setSolicitud] = useState(null);
   const [tareas, setTareas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -158,6 +158,7 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar }) {
                 setMostrarFormularioTarea(true);
               }}
               onBorrar={setTareaABorrar}
+              onAbrirDetalle={onVerTarea}
             />
           ))}
         </div>

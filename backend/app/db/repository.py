@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from app.models import NuevaSolicitud
 
@@ -278,14 +279,21 @@ def delete_solicitud(cursor, solicitud_id: int) -> int:
     return cursor.rowcount
 
 
+def list_estatus_tarea(cursor) -> list[dict]:
+    cursor.execute("SELECT codigo, descripcion FROM estatus_tarea ORDER BY orden_visualizacion")
+    return [{"codigo": row[0], "descripcion": row[1]} for row in cursor.fetchall()]
+
+
 def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     cursor.execute(
         """
         SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
-               m.nombre_completo AS responsable, t.esta_completa, t.fecha_inicio,
+               m.nombre_completo AS responsable, t.codigo_estatus_tarea,
+               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio,
                t.fecha_fin, t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
         WHERE t.solicitud_id = %(id)s
         ORDER BY t.creado_en
         """,
@@ -293,8 +301,8 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     )
     columnas = [
         "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
-        "esta_completa", "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales",
-        "creado_en", "actualizado_en",
+        "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
+        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -305,18 +313,25 @@ def insert_tarea(
     nombre: str,
     descripcion: str | None,
     responsable_id: int | None,
-    esta_completa: str,
+    codigo_estatus_tarea: str,
+    fecha_inicio: date | None = None,
+    fecha_fin: date | None = None,
+    horas_estimadas: int | None = None,
+    horas_reales: int | None = None,
 ) -> int:
-    """fecha_inicio/fecha_fin son NOT NULL pero el formulario no los captura: se
+    """fecha_inicio/fecha_fin son NOT NULL: si el formulario no los captura, se
     inicializan en el backend (hoy / hoy + 7 días)."""
     cursor.execute(
         """
         INSERT INTO tareas
-            (solicitud_id, nombre, descripcion, responsable_id, esta_completa,
-             fecha_inicio, fecha_fin, creado_en, creado_por, actualizado_en, actualizado_por)
+            (solicitud_id, nombre, descripcion, responsable_id, codigo_estatus_tarea,
+             fecha_inicio, fecha_fin, horas_estimadas, horas_reales,
+             creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES
-            (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(responsable_id)s, %(esta_completa)s,
-             now()::date, (now() + interval '7 days')::date, now(), current_user, now(), current_user)
+            (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(responsable_id)s, %(codigo_estatus_tarea)s,
+             COALESCE(%(fecha_inicio)s, now()::date),
+             COALESCE(%(fecha_fin)s, (now() + interval '7 days')::date),
+             %(horas_estimadas)s, %(horas_reales)s, now(), current_user, now(), current_user)
         RETURNING id
         """,
         {
@@ -324,7 +339,11 @@ def insert_tarea(
             "nombre": nombre,
             "descripcion": descripcion,
             "responsable_id": responsable_id,
-            "esta_completa": esta_completa,
+            "codigo_estatus_tarea": codigo_estatus_tarea,
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "horas_estimadas": horas_estimadas,
+            "horas_reales": horas_reales,
         },
     )
     return cursor.fetchone()[0]
@@ -336,13 +355,23 @@ def update_tarea(
     nombre: str,
     descripcion: str | None,
     responsable_id: int | None,
-    esta_completa: str,
+    codigo_estatus_tarea: str,
+    fecha_inicio: date | None = None,
+    fecha_fin: date | None = None,
+    horas_estimadas: int | None = None,
+    horas_reales: int | None = None,
 ) -> int:
+    """fecha_inicio/fecha_fin son NOT NULL: si no se envían, se conserva el valor actual
+    (COALESCE) en vez de fallar. horas_estimadas/horas_reales sí son nullable: se
+    sobrescriben tal cual, incluyendo a NULL si el formulario los deja vacíos."""
     cursor.execute(
         """
         UPDATE tareas
         SET nombre = %(nombre)s, descripcion = %(descripcion)s,
-            responsable_id = %(responsable_id)s, esta_completa = %(esta_completa)s,
+            responsable_id = %(responsable_id)s, codigo_estatus_tarea = %(codigo_estatus_tarea)s,
+            fecha_inicio = COALESCE(%(fecha_inicio)s, fecha_inicio),
+            fecha_fin = COALESCE(%(fecha_fin)s, fecha_fin),
+            horas_estimadas = %(horas_estimadas)s, horas_reales = %(horas_reales)s,
             actualizado_en = now(), actualizado_por = current_user
         WHERE id = %(id)s
         """,
@@ -350,7 +379,11 @@ def update_tarea(
             "nombre": nombre,
             "descripcion": descripcion,
             "responsable_id": responsable_id,
-            "esta_completa": esta_completa,
+            "codigo_estatus_tarea": codigo_estatus_tarea,
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "horas_estimadas": horas_estimadas,
+            "horas_reales": horas_reales,
             "id": tarea_id,
         },
     )
@@ -361,10 +394,12 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     cursor.execute(
         """
         SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
-               m.nombre_completo AS responsable, t.esta_completa, t.fecha_inicio,
+               m.nombre_completo AS responsable, t.codigo_estatus_tarea,
+               et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio,
                t.fecha_fin, t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
         WHERE t.id = %(id)s
         """,
         {"id": tarea_id},
@@ -374,15 +409,164 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
         return None
     columnas = [
         "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
-        "esta_completa", "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales",
-        "creado_en", "actualizado_en",
+        "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
+        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return dict(zip(columnas, row))
 
 
 def delete_tarea(cursor, tarea_id: int) -> int:
-    """enlaces_tarea y tarea_por_hacer se borran solos vía ON DELETE CASCADE."""
+    """enlaces_tarea, tarea_por_hacer y comentarios (tarea_id) se borran solos vía
+    ON DELETE CASCADE. El hito propio de la tarea (tareas.hito_id) no tiene cascada hacia
+    ese lado: se borra a mano, ya que hoy no hay ninguna vista que lo muestre fuera del
+    detalle de esta tarea (dejarlo huérfano no serviría de nada)."""
+    cursor.execute("SELECT hito_id FROM tareas WHERE id = %(id)s", {"id": tarea_id})
+    row = cursor.fetchone()
+    hito_id = row[0] if row else None
+
     cursor.execute("DELETE FROM tareas WHERE id = %(id)s", {"id": tarea_id})
+    filas_afectadas = cursor.rowcount
+
+    if filas_afectadas and hito_id:
+        cursor.execute("DELETE FROM hitos WHERE id = %(hito_id)s", {"hito_id": hito_id})
+
+    return filas_afectadas
+
+
+def get_hito_by_tarea(cursor, tarea_id: int) -> dict | None:
+    cursor.execute(
+        """
+        SELECT h.id, h.solicitud_id, h.nombre, h.descripcion, h.fecha_vencimiento,
+               h.creado_en, h.actualizado_en
+        FROM hitos h
+        JOIN tareas t ON t.hito_id = h.id
+        WHERE t.id = %(tarea_id)s
+        """,
+        {"tarea_id": tarea_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "solicitud_id", "nombre", "descripcion", "fecha_vencimiento", "creado_en", "actualizado_en"]
+    return dict(zip(columnas, row))
+
+
+def insert_hito_para_tarea(
+    cursor,
+    tarea_id: int,
+    solicitud_id: int,
+    nombre: str,
+    descripcion: str | None,
+    fecha_vencimiento: date,
+) -> int:
+    cursor.execute(
+        """
+        INSERT INTO hitos (solicitud_id, nombre, descripcion, fecha_vencimiento,
+                            creado_en, creado_por, actualizado_en, actualizado_por)
+        VALUES (%(solicitud_id)s, %(nombre)s, %(descripcion)s, %(fecha_vencimiento)s,
+                now(), current_user, now(), current_user)
+        RETURNING id
+        """,
+        {
+            "solicitud_id": solicitud_id,
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "fecha_vencimiento": fecha_vencimiento,
+        },
+    )
+    hito_id = cursor.fetchone()[0]
+    cursor.execute(
+        "UPDATE tareas SET hito_id = %(hito_id)s WHERE id = %(tarea_id)s",
+        {"hito_id": hito_id, "tarea_id": tarea_id},
+    )
+    return hito_id
+
+
+def update_hito(cursor, hito_id: int, nombre: str, descripcion: str | None, fecha_vencimiento: date) -> int:
+    cursor.execute(
+        """
+        UPDATE hitos
+        SET nombre = %(nombre)s, descripcion = %(descripcion)s,
+            fecha_vencimiento = %(fecha_vencimiento)s,
+            actualizado_en = now(), actualizado_por = current_user
+        WHERE id = %(id)s
+        """,
+        {"nombre": nombre, "descripcion": descripcion, "fecha_vencimiento": fecha_vencimiento, "id": hito_id},
+    )
+    return cursor.rowcount
+
+
+def delete_hito(cursor, hito_id: int) -> int:
+    """tareas.hito_id vuelve a NULL solo, vía el ON DELETE SET NULL ya existente."""
+    cursor.execute("DELETE FROM hitos WHERE id = %(id)s", {"id": hito_id})
+    return cursor.rowcount
+
+
+def list_comentarios_by_tarea(cursor, tarea_id: int) -> list[dict]:
+    cursor.execute(
+        """
+        SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
+               actualizado_en, actualizado_por
+        FROM comentarios
+        WHERE tarea_id = %(tarea_id)s
+        ORDER BY creado_en
+        """,
+        {"tarea_id": tarea_id},
+    )
+    columnas = [
+        "id", "solicitud_id", "tarea_id", "texto_comentario", "creado_en", "creado_por",
+        "actualizado_en", "actualizado_por",
+    ]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def insert_comentario(cursor, solicitud_id: int, tarea_id: int | None, texto: str) -> int:
+    cursor.execute(
+        """
+        INSERT INTO comentarios (solicitud_id, tarea_id, texto_comentario,
+                                  creado_en, creado_por, actualizado_en, actualizado_por)
+        VALUES (%(solicitud_id)s, %(tarea_id)s, %(texto)s, now(), current_user, now(), current_user)
+        RETURNING id
+        """,
+        {"solicitud_id": solicitud_id, "tarea_id": tarea_id, "texto": texto},
+    )
+    return cursor.fetchone()[0]
+
+
+def get_comentario_by_id(cursor, comentario_id: int) -> dict | None:
+    cursor.execute(
+        """
+        SELECT id, solicitud_id, tarea_id, texto_comentario, creado_en, creado_por,
+               actualizado_en, actualizado_por
+        FROM comentarios
+        WHERE id = %(id)s
+        """,
+        {"id": comentario_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = [
+        "id", "solicitud_id", "tarea_id", "texto_comentario", "creado_en", "creado_por",
+        "actualizado_en", "actualizado_por",
+    ]
+    return dict(zip(columnas, row))
+
+
+def update_comentario(cursor, comentario_id: int, texto: str) -> int:
+    cursor.execute(
+        """
+        UPDATE comentarios
+        SET texto_comentario = %(texto)s, actualizado_en = now(), actualizado_por = current_user
+        WHERE id = %(id)s
+        """,
+        {"texto": texto, "id": comentario_id},
+    )
+    return cursor.rowcount
+
+
+def delete_comentario(cursor, comentario_id: int) -> int:
+    cursor.execute("DELETE FROM comentarios WHERE id = %(id)s", {"id": comentario_id})
     return cursor.rowcount
 
 

@@ -267,7 +267,11 @@ def crear_tarea(solicitud_id: int, body: TareaCreateUpdate) -> TareaOut:
             nombre=body.nombre,
             descripcion=body.descripcion,
             responsable_id=body.responsable_id,
-            esta_completa=body.esta_completa,
+            codigo_estatus_tarea=body.codigo_estatus_tarea,
+            fecha_inicio=body.fecha_inicio,
+            fecha_fin=body.fecha_fin,
+            horas_estimadas=body.horas_estimadas,
+            horas_reales=body.horas_reales,
         )
         fila = repository.get_tarea_by_id(cursor, tarea_id)
         db_conn.commit()

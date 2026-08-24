@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.schemas import EstatusOut, MiembroEquipoOut, TipoSolicitudOut
+from app.api.schemas import EstatusOut, EstatusTareaOut, MiembroEquipoOut, TipoSolicitudOut
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -40,3 +40,14 @@ def listar_estatus() -> list[EstatusOut]:
     finally:
         release_connection(db_conn)
     return [EstatusOut(**e) for e in estatus]
+
+
+@router.get("/estatus-tarea", response_model=list[EstatusTareaOut])
+def listar_estatus_tarea() -> list[EstatusTareaOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        estatus = repository.list_estatus_tarea(cursor)
+    finally:
+        release_connection(db_conn)
+    return [EstatusTareaOut(**e) for e in estatus]

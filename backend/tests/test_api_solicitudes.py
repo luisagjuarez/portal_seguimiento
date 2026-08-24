@@ -370,7 +370,8 @@ def _fake_tarea(tarea_id=1, solicitud_id=1):
         "descripcion": "Reunión con el cliente",
         "responsable_id": 6,
         "responsable": "Ramon Rosales",
-        "esta_completa": "N",
+        "codigo_estatus_tarea": "POR HACER",
+        "estatus_tarea_descripcion": "Por hacer",
         "fecha_inicio": date(2026, 8, 23),
         "fecha_fin": date(2026, 8, 30),
         "horas_estimadas": None,
@@ -406,3 +407,37 @@ def test_crear_tarea_success(monkeypatch):
     assert response.status_code == 201
     assert response.json()["nombre"] == "Levantar requerimientos"
     assert fake_conn.committed is True
+
+
+def test_crear_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+
+    kwargs_recibidos = {}
+
+    def _fake_insert_tarea(cursor, id, **kwargs):
+        kwargs_recibidos.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(routes.repository, "insert_tarea", _fake_insert_tarea)
+
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={
+            "nombre": "Levantar requerimientos",
+            "descripcion": "Reunión con el cliente",
+            "responsable_id": 6,
+            "fecha_inicio": "2026-08-24",
+            "fecha_fin": "2026-08-28",
+            "horas_estimadas": 8,
+            "horas_reales": 5,
+        },
+    )
+
+    assert response.status_code == 201
+    assert kwargs_recibidos["fecha_inicio"] == date(2026, 8, 24)
+    assert kwargs_recibidos["fecha_fin"] == date(2026, 8, 28)
+    assert kwargs_recibidos["horas_estimadas"] == 8
+    assert kwargs_recibidos["horas_reales"] == 5

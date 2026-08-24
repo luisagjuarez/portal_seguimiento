@@ -60,3 +60,18 @@ def test_listar_estatus(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == [{"codigo": "EN ESPERA", "descripcion": "En espera"}]
+
+
+def test_listar_estatus_tarea(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(
+        routes.repository,
+        "list_estatus_tarea",
+        lambda cursor: [{"codigo": "POR HACER", "descripcion": "Por hacer"}],
+    )
+
+    response = client.get("/api/estatus-tarea")
+
+    assert response.status_code == 200
+    assert response.json() == [{"codigo": "POR HACER", "descripcion": "Por hacer"}]

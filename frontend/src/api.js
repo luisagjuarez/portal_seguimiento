@@ -91,6 +91,11 @@ export async function fetchEstatus() {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchEstatusTarea() {
+  const response = await fetch(`${API_BASE_URL}/api/estatus-tarea`);
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchSolicitudDetalle(id) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`);
   return parseJsonOrThrow(response);
@@ -117,26 +122,122 @@ export async function fetchTareas(solicitudId) {
   return parseJsonOrThrow(response);
 }
 
-export async function crearTarea(solicitudId, { nombre, descripcion, responsableId, estaCompleta }) {
+export async function crearTarea(
+  solicitudId,
+  { nombre, descripcion, responsableId, codigoEstatusTarea, fechaInicio, fechaFin, horasEstimadas, horasReales },
+) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/tareas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nombre, descripcion, responsable_id: responsableId, esta_completa: estaCompleta }),
+    body: JSON.stringify({
+      nombre,
+      descripcion,
+      responsable_id: responsableId,
+      codigo_estatus_tarea: codigoEstatusTarea,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      horas_estimadas: horasEstimadas,
+      horas_reales: horasReales,
+    }),
   });
   return parseJsonOrThrow(response);
 }
 
-export async function actualizarTarea(tareaId, { nombre, descripcion, responsableId, estaCompleta }) {
+export async function actualizarTarea(
+  tareaId,
+  { nombre, descripcion, responsableId, codigoEstatusTarea, fechaInicio, fechaFin, horasEstimadas, horasReales },
+) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nombre, descripcion, responsable_id: responsableId, esta_completa: estaCompleta }),
+    body: JSON.stringify({
+      nombre,
+      descripcion,
+      responsable_id: responsableId,
+      codigo_estatus_tarea: codigoEstatusTarea,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      horas_estimadas: horasEstimadas,
+      horas_reales: horasReales,
+    }),
   });
   return parseJsonOrThrow(response);
 }
 
 export async function eliminarTarea(tareaId) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}`, { method: "DELETE" });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
+export async function fetchTareaDetalle(id) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${id}`);
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchHitoDeTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`);
+  if (response.status === 404) {
+    return null;
+  }
+  return parseJsonOrThrow(response);
+}
+
+function datosHito({ nombre, descripcion, fechaVencimiento }) {
+  return { nombre, descripcion, fecha_vencimiento: fechaVencimiento };
+}
+
+export async function crearHitoTarea(tareaId, datos) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datosHito(datos)),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarHitoTarea(tareaId, datos) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datosHito(datos)),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function eliminarHitoTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/hito`, { method: "DELETE" });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
+export async function fetchComentariosTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`);
+  return parseJsonOrThrow(response);
+}
+
+export async function crearComentarioTarea(tareaId, texto) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto_comentario: texto }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarComentario(comentarioId, texto) {
+  const response = await fetch(`${API_BASE_URL}/api/comentarios/${comentarioId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto_comentario: texto }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function eliminarComentario(comentarioId) {
+  const response = await fetch(`${API_BASE_URL}/api/comentarios/${comentarioId}`, { method: "DELETE" });
   if (!response.ok) {
     await parseJsonOrThrow(response);
   }

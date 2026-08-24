@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -80,6 +79,11 @@ class SolicitudUpdate(BaseModel):
     codigo_estatus: str = Field(min_length=1, max_length=15)
 
 
+class EstatusTareaOut(BaseModel):
+    codigo: str
+    descripcion: str
+
+
 class TareaOut(BaseModel):
     id: int
     solicitud_id: int
@@ -87,7 +91,8 @@ class TareaOut(BaseModel):
     descripcion: str | None
     responsable_id: int | None
     responsable: str | None
-    esta_completa: str | None
+    codigo_estatus_tarea: str
+    estatus_tarea_descripcion: str | None
     fecha_inicio: date
     fecha_fin: date
     horas_estimadas: int | None
@@ -100,4 +105,39 @@ class TareaCreateUpdate(BaseModel):
     nombre: str = Field(min_length=1, max_length=255)
     descripcion: str | None = Field(default=None, max_length=4000)
     responsable_id: int | None = None
-    esta_completa: Literal["Y", "N"] = "N"
+    codigo_estatus_tarea: str = Field(default="POR HACER", min_length=1, max_length=20)
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
+    horas_estimadas: int | None = None
+    horas_reales: int | None = None
+
+
+class HitoOut(BaseModel):
+    id: int
+    solicitud_id: int
+    nombre: str
+    descripcion: str | None
+    fecha_vencimiento: date
+    creado_en: datetime
+    actualizado_en: datetime
+
+
+class HitoCreateUpdate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    fecha_vencimiento: date
+
+
+class ComentarioOut(BaseModel):
+    id: int
+    solicitud_id: int
+    tarea_id: int | None
+    texto_comentario: str
+    creado_en: datetime
+    creado_por: str
+    actualizado_en: datetime
+    actualizado_por: str
+
+
+class ComentarioCreateUpdate(BaseModel):
+    texto_comentario: str = Field(min_length=1, max_length=4000)

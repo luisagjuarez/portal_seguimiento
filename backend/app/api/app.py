@@ -4,11 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes_catalogos import router as catalogos_router
+from app.api.routes_comentarios import router as comentarios_router
 from app.api.routes_solicitudes import router as solicitudes_router
 from app.api.routes_tareas import router as tareas_router
 from app.config import settings
 
-app = FastAPI(title="Portal DOVELA API", version="1.7.0")
+app = FastAPI(title="Portal DOVELA API", version="1.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,3 +21,4 @@ app.add_middleware(
 app.include_router(solicitudes_router)
 app.include_router(catalogos_router)
 app.include_router(tareas_router)
+app.include_router(comentarios_router)

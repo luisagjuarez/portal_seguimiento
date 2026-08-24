@@ -430,6 +430,17 @@ button:disabled {
   padding: 0.75rem 1rem;
 }
 
+.tarea-item-clicable {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.tarea-item-clicable:hover,
+.tarea-item-clicable:focus-visible {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  outline: none;
+}
+
 .tarea-item-info h4 {
   margin: 0 0 0.25rem;
 }
@@ -450,11 +461,26 @@ button:disabled {
 
 .tarea-estado {
   display: inline-block;
-  background: #fef3c7;
-  color: #92400e;
+  background: #e5e7eb;
+  color: #374151;
   border-radius: 999px;
   padding: 0.1rem 0.55rem;
   font-size: 0.75rem;
+}
+
+.tarea-estado-por-hacer {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.tarea-estado-en-progreso {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.tarea-estado-en-revision {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .tarea-estado-completa {
@@ -472,4 +498,59 @@ button:disabled {
   margin: 0;
   color: #6b7280;
   font-size: 0.8rem;
+}
+
+.tarea-form-fila {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.tarea-form-fila label {
+  flex: 1;
+}
+
+.hito-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.hito-card h4 {
+  margin: 0 0 0.25rem;
+}
+
+.hito-card p {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.comentario-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.comentario-item {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.comentario-item-texto {
+  margin: 0 0 0.4rem;
+  white-space: pre-wrap;
+}
+
+.comentario-item-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.comentario-item-acciones {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
 }
