@@ -1,0 +1,51 @@
+# Solicitud #{{ id_solicitud }} — {{ solicitud.titulo }}
+
+## Datos generales
+
+- **ID:** {{ id_solicitud }}
+- **Solicitante:** {{ solicitud.solicitante_email }}
+- **Cliente:** {{ solicitud.cliente or "Por definir (requiere revisión manual)" }}
+- **Tipo:** {{ solicitud.tipo }}
+- **Estatus:** {{ solicitud.status_cd }}
+- **Prioridad:** {{ solicitud.orden_prioridad or "Sin definir (la asigna Dirección)" }}
+- **Canal de origen:** Correo electrónico
+- **Fecha del correo:** {{ parsed_email.received_at.strftime("%Y-%m-%d %H:%M:%S %Z") }}
+- **Documento generado:** {{ generado_en.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+
+## Descripción
+
+{{ solicitud.descripcion }}
+
+## Cuerpo original del correo (historial)
+
+```
+{{ solicitud.descripcion_original }}
+```
+
+## Adjuntos
+
+{% if rutas_adjuntos %}
+{% for ruta in rutas_adjuntos %}
+- {{ ruta }}
+{% endfor %}
+{% else %}
+_Sin adjuntos._
+{% endif %}
+
+## Objetivos
+
+_Pendiente de definir._
+
+## Estimación de horas
+
+| Equipo | Horas estimadas | Comentarios |
+|---|---|---|
+|  |  |  |
+
+## Diseño de la solución
+
+_Pendiente de definir._
+
+## Requerimiento técnico para el equipo asignado
+
+_Pendiente de definir._

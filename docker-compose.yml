@@ -1,0 +1,58 @@
+services:
+  # La base de datos (PostgreSQL) corre fuera de este docker-compose, directo en el host
+  # (ver 00_ARCHIVOS/conexion_db.json). extra_hosts permite que backend/api la resuelvan
+  # como host.docker.internal en Linux (Docker Desktop ya lo resuelve nativo en Mac/Windows).
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data/nfs/adjuntos:/app/data/nfs/adjuntos
+      - ./data/nfs/archivos_md:/app/data/nfs/archivos_md
+    restart: unless-stopped
+
+  # API HTTP (Fase 1.2 — chat web). Misma imagen que "backend", distinto proceso.
+  api:
+    build: ./backend
+    command: ["uvicorn", "app.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - .env
+    environment:
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data/nfs/adjuntos:/app/data/nfs/adjuntos
+      - ./data/nfs/archivos_md:/app/data/nfs/archivos_md
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+  # Servidor de correo falso (IMAP + SMTP) para poder probar el flujo completo en
+  # local sin credenciales reales. Se levanta solo con --profile local-test.
+  mailserver:
+    image: greenmail/standalone:2.1.0
+    profiles: ["local-test"]
+    ports:
+      - "3025:3025" # SMTP
+      - "3143:3143" # IMAP
+    environment:
+      # auth.disabled=true: acepta cualquier usuario/password (mailserver de pruebas,
+      # sin autenticación real) — simplifica no depender del formato exacto que esa
+      # versión de greenmail espera para -Dgreenmail.users.
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.auth.disabled=true

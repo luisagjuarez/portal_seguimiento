@@ -1,0 +1,19 @@
+El siguiente requerimiento es mostrar los detalles de la Solicitud seleccionada.
+Desde la pagina de Solicitudes, al seleccionar una solicitud, se debe abrir una pagina que muestre:
+    - Detalles de la solicitud.
+    - Tareas asociadas a la solicitud.
+    - Botones de Editar y Borrar (Solicitud).
+
+Esta vista tiene que ser de tipo maestro detalle, pero no debe de ser una vista de edicion en si, sino una vista que muestre los detalles de la solicitud y permita editar y borrarla.
+Tambien se debera de poder agregar tareas a la solicitud. Al agregar una nueva tarea se debera de abrir un formulario con los datos de la tarea, la tarea sera agregada a la solicitud y se mostrara en la lista de tareas. Los campos de la tarea seran los siguientes: 
+    - Titulo.
+    - Descripcion.
+    - Responsable.
+    - Estado.
+    - Fecha de creacion.
+    - Fecha de modificacion.
+
+Al editar una tarea se debe abrir un formulario con los datos de la tarea, la tarea sera editada y se mostrara en la lista de tareas. Los campos de la tarea seran los mismos que al agregar una nueva tarea.
+
+Al borrar una tarea se debe abrir un modal que pida confirmacion para borrar la tarea. y un boton de cancelar para regresar a la pagina de solicitudes. 
+

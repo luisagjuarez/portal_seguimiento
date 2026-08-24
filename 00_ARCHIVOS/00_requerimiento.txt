@@ -1,0 +1,80 @@
+Portal de seguimiento.
+
+Objetivo del portal de seguimiento.
+
+El objetivo de este portal es la gestión de las tareas y/o requerimientos solicitados en el área de DOVELA.
+El área de DOVELA esta compuesta por:
+- Equipo de fabrica de software.
+- Equipo de implementación.
+- Equipo de mesa de ayuda.
+- Equipo de infraestructura.
+- Equipo de sysdaminy DBAs.
+
+Decripción de DOVEA.
+El área de dovela esta encargada de :
+1. Principalmente de ofrecer al publico portales relacionados con el timbrado de CFDIs, DOVELA cuenta con una solucón de timbrado que esta conectado al SAT. Somo un PAC certificado.
+2. Cuenta con una SUIT de portales que gestionan, operan e interactuan con datos fiscales, documentos CFDIS. Estos portales son.
+    Portal de Emisión. Emisión manual, cancelaciones y consuta de CFDIs.
+    Portal de Recepción o tambien llamado de Proveedores. Portal para que los proveedores (cfdi de recepción) suban, validen y envien los CFDIs al ERP.
+    Portal de Autofacura. Para que los clientes puedan emitir sus facturas de compras.
+    Portal de Gastos y anticipos. Para que los empleados puedan solicitar, justificar y comprobar los gastos y anticipos de viaje..
+    Portal de Inteligencia Fiscal. Portal de analiticos (Datasource CFDIs) y reporteo.
+3. Generación de software a la medida, independientemente si tiene que ver con CFDIs o no. 
+4. Mantenimiento, operación y migración de portales heredados (legados) que están hechos en tecnologías desactualizadas.
+
+Entre otras tareas.
+
+Este nuevo portal o solución , es para gestionar , dar seguimiento y control a cada una de las tareas del área de dovela.
+
+hoy en día ya tengo un portl que utilizo para gestionar estas tareas o reuqerimientos. Pero queriero que esto que lo hago por medio de formularios para crear un nuevo requerimiento, nueva tarea asociada a una solicitu, un nuevo comentario etc, se pueda realizar desde una chat o interfaz . 
+Quiero dividir en este portal en las siguientes funcionalidad:
+
+1. Generación de solicitudes:
+    1.1 Creación de solicitu por Correo electrónico.
+        Ejemplo 1. (por correo electrónico) El equipo de mesa de ayuda, me envia un correo electrónico, con un asunto que tiene el string "Nueva solicitud" y el cuerpo del correo dice: "Por fa necesito acceso a la base de datos de DOVELA para poder hacer un query".
+    "Se solicita un reporte de gastos personalizado para el cliente Chantilly, este reporte se anexa en este correo. Se espera primero la estimación de horas por el equipo de software. y posterior la implementación." 
+        En este caso, lo que espero es que este correo sea leido por esta nueva solución y generé directamente una nueva solicitud. De la siguiente manera:
+            - Nombre se la solicitud : "Creación de nuevo reporte gastos"
+            - Solicitante: el que envia el correo 
+            - Tipo: "Nuevo".
+            - Estatus: "En espera" (por default al registrar la solicitud).
+            - Descripción: El cuerpo del correo, con mejoras en la redacción.
+            - Cliente; Chantilly. En este caso se debera de buscar en la tabla Clientes, el nombre del cliente y colocarlos, si no esta en el catálogo de clientes, se deberá agregar el cliente y colocarlo.
+            Orden de prioridad: Vacio. Este valor se define por la dirección general, el director de dovela.
+        
+        Si el correo contiene un adjunto, se debera de guardar el adjunto en la carpeta de "adjuntos" y relacionarlo por medio de una tabla intermedia la relación de Solicitud-ArchivosAdjuntos. Esto en un NFS. (la ruta se debera de guardar en un archivo o tabla de variables).
+        Por cada solicitud se debera de generar un documento .md en el cual contenga esta nueva solicitud. Este .md debera de tener una estructura estandar para todos las solicitudes. Este documento tambien debera de guardarse en en NFS en un directorio "Archivos_MD" y un atabla que relacione Solicitu-ArchivoMD. El objetivo de este documento es que sea el punto de partida para:
+            - Estimar el costo de esta solicitud.
+            - Generar el analisis y diseño de la solución.
+            - Generar el dcumento de requerimiento para los equipos que corresponda.
+    1.2 Creación de solicitu por CHAT.
+        Que esta solicitud sea generado por un CHAT , desde un portal web. Con las caracteristicas o datos necesarios que describi en el escenario de correo electrónico.
+    1.3. Creación de solicitu por ERP. 
+        En este caso la solución se debera de conectar la BAse de datos Oracle del ERP. Donde el equpo de mesa de ayuda gestiona los tickets de los diferentes clientes que tenemos. Esta conección y regla para identificar los ticket te los definiré despues.
+    1.4 Creación de Solicitud por API. 
+        En este caso la solución debera de tener un servicio web que permita la creación de solicitudes. 
+    1.5 Creación de solicitu a partir de un archivo txt, md , word o PDF.
+
+2. Actualización de tareas por parte del recurso responsable.
+    Una vez que se realiza el plan y se generan tareas de cada solicitu, y se asiga reponsable por tarea, y fecha de compromiso. El recurso responsable debera de poder actualizar las tareas.
+    2.1. POr correo . 
+    2.2 Por CHAT. 
+    2.3 Por API. 
+    2.4 Desde el portal de requerimientos.
+
+Este proyecto debera de tener un front, un back y un modulo de persistencia. 
+La base datos principal esta en una base de datos ORACLA y la aplicaición actual y que funciona hoy en dia esta hecha con Oracle APEX.  
+La capa de persistencia de este nuevo proyecto será una base de datos ORACLE. Estos datos te los proporcionare en un archivo.
+Necesito que el back y el fron esten en directorios distintos, para que al momento de migrarlos a los ambientes de TEST y PRODUCCIÓN, puedan estar en dos servidores cada uno.
+Ambos (backend y frontend) requiero que esten en un docker, con compose.
+Los datos de persietencia yo te los dare en un archivo o como l veas mśa conveniente, de tal forma que si en algun momento debermos de cambiar de instancia de bd, se pueda realizar sin mayores conflictos.
+
+Ayudame a modular este proyecto, genera la estructura que veas conveniente. De tal forma que lo trabajemos por pasos. Es decir quiero que me ayudes con la primer parte 1.1 primero . Una vez que este este tema seguimos con lo siguiente.
+
+
+
+
+
+    
+
+    

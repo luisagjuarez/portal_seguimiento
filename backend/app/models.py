@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+
+
+@dataclass
+class ParsedAttachment:
+    filename: str
+    content: bytes
+    content_type: str | None = None
+
+
+@dataclass
+class ParsedEmail:
+    message_id: str
+    sender_email: str
+    subject: str
+    body_text: str
+    body_html: str | None
+    received_at: datetime
+    attachments: list[ParsedAttachment] = field(default_factory=list)
+
+
+@dataclass
+class NuevaSolicitud:
+    """Datos listos para insertarse en EBA_DEMO_MD_PROJECTS (tabla ya existente)."""
+
+    titulo: str
+    descripcion: str
+    descripcion_original: str
+    solicitante_email: str
+    cliente: str | None
+    tipo: str
+    status_cd: str
+    canal_origen: str = "EMAIL"
+    orden_prioridad: str | None = None
