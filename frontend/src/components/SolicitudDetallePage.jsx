@@ -63,6 +63,8 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
   const [tareaABorrar, setTareaABorrar] = useState(null);
   const [borrandoTarea, setBorrandoTarea] = useState(false);
 
+  const [pestanaActiva, setPestanaActiva] = useState("tareas");
+
   const cargarDetalle = () => {
     setCargando(true);
     setError(null);
@@ -200,101 +202,123 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
         </div>
       </div>
 
-      {adjuntos.length > 0 && (
-        <div className="solicitud-detalle-tareas">
-          <h3>Adjuntos</h3>
-          <ul className="adjuntos-lista">
-            {adjuntos.map((adjunto) => (
-              <li key={adjunto.id}>
-                <span>
-                  {adjunto.nombre_archivo}
-                  {adjunto.tamano_bytes != null && ` (${formatearTamano(adjunto.tamano_bytes)})`}
-                </span>
+      <div className="solicitud-detalle-tareas">
+        <div className="tabs-nav">
+          {[
+            { key: "adjuntos", label: "Adjuntos", total: adjuntos.length },
+            { key: "tareas", label: "Tareas", total: tareas.length },
+            { key: "comentarios", label: "Comentarios", total: comentarios.length },
+            { key: "hitos", label: "Hitos", total: hitos.length },
+            { key: "enlaces", label: "Enlaces de tareas", total: enlaces.length },
+          ].map((pestana) => (
+            <button
+              key={pestana.key}
+              type="button"
+              className={pestanaActiva === pestana.key ? "tab-activo" : ""}
+              onClick={() => setPestanaActiva(pestana.key)}
+            >
+              {pestana.label} ({pestana.total})
+            </button>
+          ))}
+        </div>
+
+        {pestanaActiva === "adjuntos" && (
+          <>
+            {adjuntos.length === 0 && <p>Esta solicitud todavía no tiene adjuntos.</p>}
+            <ul className="adjuntos-lista">
+              {adjuntos.map((adjunto) => (
+                <li key={adjunto.id}>
+                  <span>
+                    {adjunto.nombre_archivo}
+                    {adjunto.tamano_bytes != null && ` (${formatearTamano(adjunto.tamano_bytes)})`}
+                  </span>
+                  <button
+                    type="button"
+                    className="secundario"
+                    disabled={descargandoId === adjunto.id}
+                    onClick={() => descargarAdjunto(adjunto)}
+                  >
+                    {descargandoId === adjunto.id ? "Descargando..." : "Descargar"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {pestanaActiva === "tareas" && (
+          <>
+            {esScrumMaster ? (
+              <div className="resumen-acciones">
                 <button
                   type="button"
-                  className="secundario"
-                  disabled={descargandoId === adjunto.id}
-                  onClick={() => descargarAdjunto(adjunto)}
+                  onClick={() => {
+                    setTareaEnEdicion(null);
+                    setMostrarFormularioTarea(true);
+                  }}
                 >
-                  {descargandoId === adjunto.id ? "Descargando..." : "Descargar"}
+                  Agregar Tarea
                 </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="solicitud-detalle-tareas">
-        <div className="solicitudes-encabezado">
-          <h3>Tareas</h3>
-          {esScrumMaster && (
-            <button
-              type="button"
-              onClick={() => {
-                setTareaEnEdicion(null);
-                setMostrarFormularioTarea(true);
-              }}
-            >
-              Agregar Tarea
-            </button>
-          )}
-        </div>
-
-        {!esScrumMaster && (
-          <p className="adjuntos-ayuda">Solo el Scrum Master puede agregar tareas.</p>
-        )}
-        {tareas.length === 0 && <p>Esta solicitud todavía no tiene tareas.</p>}
-
-        <div className="tarea-lista">
-          {tareas.map((tarea) => (
-            <TareaItem
-              key={tarea.id}
-              tarea={tarea}
-              onEditar={(t) => {
-                setTareaEnEdicion(t);
-                setMostrarFormularioTarea(true);
-              }}
-              onBorrar={setTareaABorrar}
-              onAbrirDetalle={onVerTarea}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="solicitud-detalle-tareas">
-        <h3>Comentarios</h3>
-        {comentarios.length === 0 && <p>Ninguna tarea de esta solicitud tiene comentarios todavía.</p>}
-        <div className="comentario-lista">
-          {comentarios.map((comentario) => (
-            <ComentarioItem key={comentario.id} comentario={comentario} mostrarTarea />
-          ))}
-        </div>
-      </div>
-
-      <div className="solicitud-detalle-tareas">
-        <h3>Hitos</h3>
-        {hitos.length === 0 && <p>Ninguna tarea de esta solicitud tiene hitos todavía.</p>}
-        <div className="tarea-lista">
-          {hitos.map((hito) => (
-            <div key={hito.id} className="hito-card">
-              <h4>{hito.nombre}</h4>
-              {hito.descripcion && <p>{hito.descripcion}</p>}
-              {hito.tarea_nombre && <p className="solicitud-fecha">Tarea: {hito.tarea_nombre}</p>}
-              <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
-              <p className="solicitud-fecha">Responsable: {hito.creado_por_nombre}</p>
+              </div>
+            ) : (
+              <p className="adjuntos-ayuda">Solo el Scrum Master puede agregar tareas.</p>
+            )}
+            {tareas.length === 0 && <p>Esta solicitud todavía no tiene tareas.</p>}
+            <div className="tarea-lista">
+              {tareas.map((tarea) => (
+                <TareaItem
+                  key={tarea.id}
+                  tarea={tarea}
+                  onEditar={(t) => {
+                    setTareaEnEdicion(t);
+                    setMostrarFormularioTarea(true);
+                  }}
+                  onBorrar={setTareaABorrar}
+                  onAbrirDetalle={onVerTarea}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </>
+        )}
 
-      <div className="solicitud-detalle-tareas">
-        <h3>Enlaces de tareas</h3>
-        {enlaces.length === 0 && <p>Ninguna tarea de esta solicitud tiene enlaces todavía.</p>}
-        <div className="tarea-lista">
-          {enlaces.map((enlace) => (
-            <EnlaceTareaItem key={enlace.id} enlace={enlace} mostrarTarea />
-          ))}
-        </div>
+        {pestanaActiva === "comentarios" && (
+          <>
+            {comentarios.length === 0 && <p>Ninguna tarea de esta solicitud tiene comentarios todavía.</p>}
+            <div className="comentario-lista">
+              {comentarios.map((comentario) => (
+                <ComentarioItem key={comentario.id} comentario={comentario} mostrarTarea />
+              ))}
+            </div>
+          </>
+        )}
+
+        {pestanaActiva === "hitos" && (
+          <>
+            {hitos.length === 0 && <p>Ninguna tarea de esta solicitud tiene hitos todavía.</p>}
+            <div className="tarea-lista">
+              {hitos.map((hito) => (
+                <div key={hito.id} className="hito-card">
+                  <h4>{hito.nombre}</h4>
+                  {hito.descripcion && <p>{hito.descripcion}</p>}
+                  {hito.tarea_nombre && <p className="solicitud-fecha">Tarea: {hito.tarea_nombre}</p>}
+                  <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
+                  <p className="solicitud-fecha">Responsable: {hito.creado_por_nombre}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {pestanaActiva === "enlaces" && (
+          <>
+            {enlaces.length === 0 && <p>Ninguna tarea de esta solicitud tiene enlaces todavía.</p>}
+            <div className="tarea-lista">
+              {enlaces.map((enlace) => (
+                <EnlaceTareaItem key={enlace.id} enlace={enlace} mostrarTarea />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {mostrarEditar && (

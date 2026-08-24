@@ -561,6 +561,33 @@ button:disabled {
   margin: 0.3rem 0;
 }
 
+.tabs-nav {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border-2);
+  margin: -1.25rem -1.25rem 1.25rem;
+  padding: 0 1.25rem;
+  overflow-x: auto;
+}
+
+.tabs-nav button {
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+  white-space: nowrap;
+}
+
+.tabs-nav button:hover {
+  color: var(--text);
+}
+
+.tabs-nav button.tab-activo {
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .tarea-lista {
   display: flex;
   flex-direction: column;
