@@ -258,20 +258,26 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
-1. Resolver la conexión IMAP real de M365 (ver bloqueo de autenticación básica arriba) —
+1. **⭐ Otorgar acceso al resto del equipo.** Solo `DOVELA_LG` (Scrum Master), `DOVELA_WA`
+   (Team, contraseña de prueba) y `DOVELA_JC` (Product Owner, contraseña de prueba) tienen
+   acceso activo hoy. Los otros 9 miembros siguen con `acceso_activo=false`. `DOVELA_LG`
+   puede otorgárselo desde la página "Usuarios" del portal. Ver también la nota de
+   contraseñas de prueba más abajo — conviene cambiarlas o rotarlas.
+2. Confirmar con el usuario si la única regla de permisos actual (crear tarea → solo Scrum
+   Master) es suficiente, o si se quieren reglas más finas por rol para otras acciones
+   (editar/borrar solicitud o tarea, hitos, comentarios) — hoy cualquier usuario logueado
+   puede hacer todo lo demás.
+3. Resolver la conexión IMAP real de M365 (ver bloqueo de autenticación básica arriba) —
    decidir entre pedir el cambio de política al admin o implementar OAuth2.
-2. Decidir si seguimos con **Fase 1.3 (conexión al ERP Oracle de Mesa de Ayuda)**, **Fase 1.4
+4. Decidir si seguimos con **Fase 1.3 (conexión al ERP Oracle de Mesa de Ayuda)**, **Fase 1.4
    (API pública)** — parte ya construida con `GET /api/solicitudes` y ahora también
    `GET/PUT/DELETE /api/solicitudes/{id}` — o **Fase 1.5** del roadmap.
-3. Confirmar con el usuario si a la **Fase 2 (Actualización de tareas)** le falta algo más
-   allá del CRUD básico ya implementado en la Fase 1.7 (ver esa sección arriba) — p. ej.
-   horas estimadas/reales, hitos, enlaces entre tareas.
-4. Considerar tests automatizados de frontend (hoy solo se verifica con `npm run build` +
+5. Considerar tests automatizados de frontend (hoy solo se verifica con `npm run build` +
    verificación manual en navegador).
-5. Deuda técnica menor: `miembros_equipo` conserva las columnas basura `usurio` y
+6. Deuda técnica menor: `miembros_equipo` conserva las columnas basura `usurio` y
    `correo_electrónico` (con tilde) de la importación CSV original — limpieza cosmética, no
    bloqueante.
-6. Revisar si otras tablas con carga inicial masiva (además de `tareas`, ya corregida en la
+7. Revisar si otras tablas con carga inicial masiva (además de `tareas`, ya corregida en la
    Fase 1.7) tienen la secuencia `IDENTITY` desincronizada antes de que alguien intente
    insertar en ellas por primera vez desde la app.
 
