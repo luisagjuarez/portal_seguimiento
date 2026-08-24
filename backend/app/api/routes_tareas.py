@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.schemas import (
     ComentarioCreateUpdate,
@@ -11,12 +11,27 @@ from app.api.schemas import (
     HitoOut,
     TareaCreateUpdate,
     TareaOut,
+    TareaTableroOut,
 )
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+
+@router.get("/tareas", response_model=list[TareaTableroOut])
+def listar_tareas(
+    cliente: str = Query(default="", max_length=200),
+    responsable_id: int | None = Query(default=None),
+) -> list[TareaTableroOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_tareas(cursor, cliente=cliente or None, responsable_id=responsable_id)
+    finally:
+        release_connection(db_conn)
+    return [TareaTableroOut(**fila) for fila in filas]
 
 
 @router.get("/tareas/{tarea_id}", response_model=TareaOut)

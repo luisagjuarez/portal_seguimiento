@@ -101,6 +101,11 @@ class TareaOut(BaseModel):
     actualizado_en: datetime
 
 
+class TareaTableroOut(TareaOut):
+    solicitud_nombre: str
+    cliente: str | None
+
+
 class TareaCreateUpdate(BaseModel):
     nombre: str = Field(min_length=1, max_length=255)
     descripcion: str | None = Field(default=None, max_length=4000)

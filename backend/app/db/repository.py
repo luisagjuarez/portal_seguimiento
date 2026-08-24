@@ -284,6 +284,51 @@ def list_estatus_tarea(cursor) -> list[dict]:
     return [{"codigo": row[0], "descripcion": row[1]} for row in cursor.fetchall()]
 
 
+def list_tareas(
+    cursor,
+    cliente: str | None = None,
+    responsable_id: int | None = None,
+    limit: int = 200,
+) -> list[dict]:
+    """Listado global para el Tablero Scrum: todas las tareas de todas las solicitudes,
+    con el mismo shape que get_tarea_by_id (necesario para que el PUT de drag-and-drop no
+    borre campos que no vienen en la tarjeta) más solicitud_nombre/cliente de referencia."""
+    condiciones = []
+    parametros: dict = {"max_rows": limit}
+    if cliente:
+        condiciones.append("c.nombre ILIKE %(cliente)s")
+        parametros["cliente"] = f"%{cliente}%"
+    if responsable_id:
+        condiciones.append("t.responsable_id = %(responsable_id)s")
+        parametros["responsable_id"] = responsable_id
+
+    where = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
+    cursor.execute(
+        f"""
+        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
+               t.nombre, t.descripcion, t.responsable_id, m.nombre_completo AS responsable,
+               t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
+               t.fecha_inicio, t.fecha_fin, t.horas_estimadas, t.horas_reales,
+               t.creado_en, t.actualizado_en
+        FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
+        LEFT JOIN clientes c ON c.id = s.cliente
+        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
+        {where}
+        ORDER BY t.creado_en
+        LIMIT %(max_rows)s
+        """,
+        parametros,
+    )
+    columnas = [
+        "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
+        "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
+        "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+    ]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
 def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     cursor.execute(
         """

@@ -76,6 +76,14 @@ export async function fetchSolicitudes({ cliente, nombre, estatus } = {}) {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchTareasTablero({ cliente, responsableId } = {}) {
+  const url = new URL(`${API_BASE_URL}/api/tareas`);
+  if (cliente) url.searchParams.set("cliente", cliente);
+  if (responsableId) url.searchParams.set("responsable_id", responsableId);
+  const response = await fetch(url);
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchMiembrosEquipo() {
   const response = await fetch(`${API_BASE_URL}/api/miembros-equipo`);
   return parseJsonOrThrow(response);

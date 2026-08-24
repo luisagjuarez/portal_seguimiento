@@ -3,6 +3,7 @@ import ConfirmModal from "./ConfirmModal.jsx";
 import HitoFormulario from "./HitoFormulario.jsx";
 import ComentarioFormulario from "./ComentarioFormulario.jsx";
 import ComentarioItem from "./ComentarioItem.jsx";
+import TareaFormulario from "./TareaFormulario.jsx";
 import {
   eliminarComentario,
   eliminarHitoTarea,
@@ -33,6 +34,8 @@ export default function TareaDetallePage({ tareaId, onRegresar }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
+  const [mostrarFormularioTarea, setMostrarFormularioTarea] = useState(false);
+
   const [mostrarFormularioHito, setMostrarFormularioHito] = useState(false);
   const [mostrarConfirmarBorrarHito, setMostrarConfirmarBorrarHito] = useState(false);
   const [borrandoHito, setBorrandoHito] = useState(false);
@@ -59,6 +62,11 @@ export default function TareaDetallePage({ tareaId, onRegresar }) {
     cargarDetalle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tareaId]);
+
+  const alGuardarTarea = () => {
+    setMostrarFormularioTarea(false);
+    cargarDetalle();
+  };
 
   const alGuardarHito = (hitoActualizado) => {
     setHito(hitoActualizado);
@@ -139,6 +147,12 @@ export default function TareaDetallePage({ tareaId, onRegresar }) {
         <p>
           <strong>Horas:</strong> estimadas {tarea.horas_estimadas ?? "—"} · reales {tarea.horas_reales ?? "—"}
         </p>
+
+        <div className="resumen-acciones">
+          <button type="button" onClick={() => setMostrarFormularioTarea(true)}>
+            Editar Tarea
+          </button>
+        </div>
       </div>
 
       <div className="solicitud-detalle-tareas">
@@ -196,6 +210,20 @@ export default function TareaDetallePage({ tareaId, onRegresar }) {
           ))}
         </div>
       </div>
+
+      {mostrarFormularioTarea && (
+        <div className="modal-overlay" onClick={() => setMostrarFormularioTarea(false)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <h3>Editar tarea</h3>
+            <TareaFormulario
+              solicitudId={tarea.solicitud_id}
+              tareaInicial={tarea}
+              onGuardada={alGuardarTarea}
+              onCancelar={() => setMostrarFormularioTarea(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {mostrarFormularioHito && (
         <div className="modal-overlay" onClick={() => setMostrarFormularioHito(false)}>

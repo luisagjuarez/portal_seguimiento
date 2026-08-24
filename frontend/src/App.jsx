@@ -5,11 +5,13 @@ import ChatWindow from "./components/ChatWindow.jsx";
 import SolicitudesPage from "./components/SolicitudesPage.jsx";
 import SolicitudDetallePage from "./components/SolicitudDetallePage.jsx";
 import TareaDetallePage from "./components/TareaDetallePage.jsx";
+import TableroPage from "./components/TableroPage.jsx";
 
 export default function App() {
   const [pagina, setPagina] = useState("inicio");
   const [solicitudSeleccionadaId, setSolicitudSeleccionadaId] = useState(null);
   const [tareaSeleccionadaId, setTareaSeleccionadaId] = useState(null);
+  const [origenTarea, setOrigenTarea] = useState("solicitud");
 
   const verDetalleSolicitud = (id) => {
     setSolicitudSeleccionadaId(id);
@@ -21,14 +23,21 @@ export default function App() {
     setPagina("solicitudes");
   };
 
-  const verDetalleTarea = (id) => {
+  const verDetalleTareaDesdeSolicitud = (id) => {
     setTareaSeleccionadaId(id);
+    setOrigenTarea("solicitud");
     setPagina("tarea-detalle");
   };
 
-  const regresarASolicitudDetalle = () => {
+  const verDetalleTareaDesdeTablero = (id) => {
+    setTareaSeleccionadaId(id);
+    setOrigenTarea("tablero");
+    setPagina("tarea-detalle");
+  };
+
+  const regresarDeTareaDetalle = () => {
     setTareaSeleccionadaId(null);
-    setPagina("solicitud-detalle");
+    setPagina(origenTarea === "tablero" ? "tablero" : "solicitud-detalle");
   };
 
   return (
@@ -46,11 +55,12 @@ export default function App() {
             <SolicitudDetallePage
               solicitudId={solicitudSeleccionadaId}
               onRegresar={regresarASolicitudes}
-              onVerTarea={verDetalleTarea}
+              onVerTarea={verDetalleTareaDesdeSolicitud}
             />
           )}
+          {pagina === "tablero" && <TableroPage onVerTarea={verDetalleTareaDesdeTablero} />}
           {pagina === "tarea-detalle" && (
-            <TareaDetallePage tareaId={tareaSeleccionadaId} onRegresar={regresarASolicitudDetalle} />
+            <TareaDetallePage tareaId={tareaSeleccionadaId} onRegresar={regresarDeTareaDetalle} />
           )}
         </main>
       </div>

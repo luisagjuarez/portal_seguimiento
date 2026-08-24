@@ -50,6 +50,35 @@ def _fake_tarea(tarea_id=1):
     }
 
 
+def _fake_tarea_tablero(tarea_id=1):
+    fila = _fake_tarea(tarea_id)
+    fila["solicitud_nombre"] = "Reporte de gastos"
+    fila["cliente"] = "Chantilly"
+    return fila
+
+
+def test_listar_tareas(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    filtros_recibidos = {}
+
+    def _fake_list_tareas(cursor, cliente=None, responsable_id=None):
+        filtros_recibidos.update({"cliente": cliente, "responsable_id": responsable_id})
+        return [_fake_tarea_tablero()]
+
+    monkeypatch.setattr(routes.repository, "list_tareas", _fake_list_tareas)
+
+    response = client.get("/api/tareas", params={"cliente": "chan", "responsable_id": 6})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["solicitud_nombre"] == "Reporte de gastos"
+    assert body[0]["cliente"] == "Chantilly"
+    assert filtros_recibidos == {"cliente": "chan", "responsable_id": 6}
+
+
 def test_obtener_tarea_success(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())

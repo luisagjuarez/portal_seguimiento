@@ -2,6 +2,7 @@ const OPCIONES = [
   { id: "inicio", etiqueta: "Inicio" },
   { id: "chat", etiqueta: "Solicitud por Chat" },
   { id: "solicitudes", etiqueta: "Solicitudes" },
+  { id: "tablero", etiqueta: "Tablero" },
 ];
 
 export default function Sidebar({ paginaActual, onCambiarPagina }) {
