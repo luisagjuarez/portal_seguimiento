@@ -51,6 +51,8 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
 
   const [mostrarFormularioEnlace, setMostrarFormularioEnlace] = useState(false);
 
+  const [pestanaActiva, setPestanaActiva] = useState("comentarios");
+
   const cargarDetalle = () => {
     setCargando(true);
     setError(null);
@@ -186,76 +188,101 @@ export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }
       </div>
 
       <div className="solicitud-detalle-tareas">
-        <div className="solicitudes-encabezado">
-          <h3>Hito</h3>
-          {!hito && <button type="button" onClick={() => setMostrarFormularioHito(true)}>Agregar Hito</button>}
+        <div className="tabs-nav">
+          {[
+            { key: "hito", label: "Hito", total: hito ? 1 : 0 },
+            { key: "comentarios", label: "Comentarios", total: comentarios.length },
+            { key: "enlaces", label: "Enlaces", total: enlaces.length },
+          ].map((pestana) => (
+            <button
+              key={pestana.key}
+              type="button"
+              className={pestanaActiva === pestana.key ? "tab-activo" : ""}
+              onClick={() => setPestanaActiva(pestana.key)}
+            >
+              {pestana.label} ({pestana.total})
+            </button>
+          ))}
         </div>
 
-        {hito ? (
-          <div className="hito-card">
-            <h4>{hito.nombre}</h4>
-            {hito.descripcion && <p>{hito.descripcion}</p>}
-            <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
+        {pestanaActiva === "hito" && (
+          <>
+            {!hito && (
+              <div className="resumen-acciones">
+                <button type="button" onClick={() => setMostrarFormularioHito(true)}>
+                  Agregar Hito
+                </button>
+              </div>
+            )}
+            {hito ? (
+              <div className="hito-card">
+                <h4>{hito.nombre}</h4>
+                {hito.descripcion && <p>{hito.descripcion}</p>}
+                <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
+                <div className="resumen-acciones">
+                  <button type="button" className="secundario" onClick={() => setMostrarFormularioHito(true)}>
+                    Editar
+                  </button>
+                  <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarHito(true)}>
+                    Borrar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p>Esta tarea todavía no tiene un hito asignado.</p>
+            )}
+          </>
+        )}
+
+        {pestanaActiva === "comentarios" && (
+          <>
             <div className="resumen-acciones">
-              <button type="button" className="secundario" onClick={() => setMostrarFormularioHito(true)}>
-                Editar
-              </button>
-              <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarHito(true)}>
-                Borrar
+              <button
+                type="button"
+                onClick={() => {
+                  setComentarioEnEdicion(null);
+                  setMostrarFormularioComentario(true);
+                }}
+              >
+                Agregar comentario
               </button>
             </div>
-          </div>
-        ) : (
-          <p>Esta tarea todavía no tiene un hito asignado.</p>
+
+            {comentarios.length === 0 && <p>Esta tarea todavía no tiene comentarios.</p>}
+
+            <div className="comentario-lista">
+              {comentarios.map((comentario) => (
+                <ComentarioItem
+                  key={comentario.id}
+                  comentario={comentario}
+                  onEditar={(c) => {
+                    setComentarioEnEdicion(c);
+                    setMostrarFormularioComentario(true);
+                  }}
+                  onBorrar={setComentarioABorrar}
+                />
+              ))}
+            </div>
+          </>
         )}
-      </div>
 
-      <div className="solicitud-detalle-tareas">
-        <div className="solicitudes-encabezado">
-          <h3>Comentarios</h3>
-          <button
-            type="button"
-            onClick={() => {
-              setComentarioEnEdicion(null);
-              setMostrarFormularioComentario(true);
-            }}
-          >
-            Agregar comentario
-          </button>
-        </div>
+        {pestanaActiva === "enlaces" && (
+          <>
+            <div className="resumen-acciones">
+              <button type="button" onClick={() => setMostrarFormularioEnlace(true)}>
+                Agregar enlace
+              </button>
+            </div>
 
-        {comentarios.length === 0 && <p>Esta tarea todavía no tiene comentarios.</p>}
+            {enlaces.length === 0 && <p>Esta tarea todavía no tiene enlaces.</p>}
 
-        <div className="comentario-lista">
-          {comentarios.map((comentario) => (
-            <ComentarioItem
-              key={comentario.id}
-              comentario={comentario}
-              onEditar={(c) => {
-                setComentarioEnEdicion(c);
-                setMostrarFormularioComentario(true);
-              }}
-              onBorrar={setComentarioABorrar}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="solicitud-detalle-tareas">
-        <div className="solicitudes-encabezado">
-          <h3>Enlaces</h3>
-          <button type="button" onClick={() => setMostrarFormularioEnlace(true)}>
-            Agregar enlace
-          </button>
-        </div>
-
-        {enlaces.length === 0 && <p>Esta tarea todavía no tiene enlaces.</p>}
-
-        <div className="tarea-lista">
-          {enlaces.map((enlace) => (
-            <EnlaceTareaItem key={enlace.id} enlace={enlace} />
-          ))}
-        </div>
+            <div className="tarea-lista">
+              {enlaces.map((enlace) => (
+                <EnlaceTareaItem key={enlace.id} enlace={enlace} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {mostrarFormularioTarea && (
