@@ -547,11 +547,14 @@ def update_tarea(
 def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     cursor.execute(
         """
-        SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
+        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
+               t.nombre, t.descripcion, t.responsable_id,
                m.nombre_completo AS responsable, t.codigo_estatus_tarea,
                et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio,
                t.fecha_fin, t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
         FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
+        LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
         WHERE t.id = %(id)s AND t.borrado_en IS NULL
@@ -562,9 +565,9 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     if row is None:
         return None
     columnas = [
-        "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
-        "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
-        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
+        "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
+        "fecha_inicio", "fecha_fin", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return dict(zip(columnas, row))
 

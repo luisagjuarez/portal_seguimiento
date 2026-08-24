@@ -36,8 +36,8 @@ def listar_tareas(
     return [TareaTableroOut(**fila) for fila in filas]
 
 
-@router.get("/tareas/{tarea_id}", response_model=TareaOut)
-def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> TareaOut:
+@router.get("/tareas/{tarea_id}", response_model=TareaTableroOut)
+def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> TareaTableroOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -46,7 +46,7 @@ def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -
         release_connection(db_conn)
     if fila is None:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    return TareaOut(**fila)
+    return TareaTableroOut(**fila)
 
 
 @router.put("/tareas/{tarea_id}", response_model=TareaOut)

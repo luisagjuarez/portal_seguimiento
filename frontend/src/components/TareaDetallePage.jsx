@@ -27,7 +27,7 @@ function formatearFecha(iso) {
   }
 }
 
-export default function TareaDetallePage({ tareaId, onRegresar }) {
+export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }) {
   const [tarea, setTarea] = useState(null);
   const [hito, setHito] = useState(null);
   const [comentarios, setComentarios] = useState([]);
@@ -138,6 +138,19 @@ export default function TareaDetallePage({ tareaId, onRegresar }) {
           </span>
         </div>
         {tarea.descripcion && <p>{tarea.descripcion}</p>}
+        <p>
+          <strong>Solicitud:</strong>{" "}
+          {onVerSolicitud ? (
+            <button type="button" className="enlace" onClick={() => onVerSolicitud(tarea.solicitud_id)}>
+              {tarea.solicitud_nombre}
+            </button>
+          ) : (
+            tarea.solicitud_nombre
+          )}
+        </p>
+        <p>
+          <strong>Cliente:</strong> {tarea.cliente || "Sin definir"}
+        </p>
         <p>
           <strong>Responsable:</strong> {tarea.responsable || "Sin asignar"}
         </p>

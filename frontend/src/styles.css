@@ -81,7 +81,7 @@ body {
 .main-content {
   flex: 1;
   padding: 1.5rem 2rem;
-  max-width: 1100px;
+  min-width: 0;
 }
 
 header h1 {
@@ -157,6 +157,15 @@ button.secundario {
 button.peligro {
   background: #dc2626;
   color: #fff;
+}
+
+button.enlace {
+  background: transparent;
+  color: #2563eb;
+  padding: 0;
+  border-radius: 0;
+  text-decoration: underline;
+  font: inherit;
 }
 
 button:disabled {
@@ -422,7 +431,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 720px;
+  max-width: 1100px;
 }
 
 .solicitud-detalle-info,

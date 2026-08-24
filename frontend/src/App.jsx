@@ -110,7 +110,11 @@ export default function App() {
               )}
               {pagina === "tablero" && <TableroPage onVerTarea={verDetalleTareaDesdeTablero} />}
               {pagina === "tarea-detalle" && (
-                <TareaDetallePage tareaId={tareaSeleccionadaId} onRegresar={regresarDeTareaDetalle} />
+                <TareaDetallePage
+                  tareaId={tareaSeleccionadaId}
+                  onRegresar={regresarDeTareaDetalle}
+                  onVerSolicitud={verDetalleSolicitud}
+                />
               )}
               {pagina === "usuarios" && esScrumMaster && <UsuariosPage />}
             </>

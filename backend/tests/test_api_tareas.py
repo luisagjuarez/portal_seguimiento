@@ -82,12 +82,14 @@ def test_listar_tareas(monkeypatch):
 def test_obtener_tarea_success(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
-    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea_tablero(id))
 
     response = client.get("/api/tareas/1")
 
     assert response.status_code == 200
     assert response.json()["id"] == 1
+    assert response.json()["solicitud_nombre"] == "Reporte de gastos"
+    assert response.json()["cliente"] == "Chantilly"
 
 
 def test_obtener_tarea_404(monkeypatch):
