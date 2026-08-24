@@ -26,6 +26,8 @@
   --tag-gray-bg: #e5e7eb;
   --tag-gray-text: #374151;
   --overlay: rgba(17, 24, 39, 0.5);
+  --bg-image: url("./assets/fondo-dia.jpg");
+  --bg-image-tint: rgba(242, 244, 247, 0.6);
 }
 
 :root[data-theme="dark"] {
@@ -55,11 +57,18 @@
   --tag-gray-bg: #334155;
   --tag-gray-text: #cbd5e1;
   --overlay: rgba(0, 0, 0, 0.65);
+  --bg-image: url("./assets/fondo-noche.jpg");
+  --bg-image-tint: rgba(15, 23, 42, 0.65);
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--bg-image-tint), var(--bg-image-tint)), var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
