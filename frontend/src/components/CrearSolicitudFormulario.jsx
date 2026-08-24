@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
 import ClienteAutocomplete from "./ClienteAutocomplete.jsx";
 import AdjuntosInput from "./AdjuntosInput.jsx";
-import { crearSolicitudFormulario, fetchMiembrosEquipo, fetchTiposSolicitud } from "../api.js";
+import {
+  crearSolicitudFormulario,
+  fetchCanalesSolicitud,
+  fetchMiembrosEquipo,
+  fetchTiposSolicitud,
+} from "../api.js";
 
 export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
   const [miembros, setMiembros] = useState([]);
   const [tipos, setTipos] = useState([]);
+  const [canales, setCanales] = useState([]);
   const [solicitanteEmail, setSolicitanteEmail] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [tipo, setTipo] = useState("");
+  const [canal, setCanal] = useState("");
+  const [ordenPrioridad, setOrdenPrioridad] = useState("");
   const [cliente, setCliente] = useState(null);
   const [adjuntos, setAdjuntos] = useState([]);
   const [enviando, setEnviando] = useState(false);
@@ -22,12 +30,22 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
     fetchTiposSolicitud()
       .then(setTipos)
       .catch(() => setError("No se pudo cargar el catálogo de tipos de solicitud."));
+    fetchCanalesSolicitud()
+      .then((lista) => {
+        setCanales(lista);
+        // Al crear desde esta página, el canal real siempre es "Formulario"; se deja
+        // editable por si el usuario está registrando una solicitud que en realidad
+        // llegó por otro medio (p. ej. una llamada) y quiere reflejarlo así.
+        const formulario = lista.find((c) => c.canal === "Formulario");
+        setCanal(formulario ? formulario.canal : lista[0]?.canal || "");
+      })
+      .catch(() => setError("No se pudo cargar el catálogo de canales."));
   }, []);
 
   const enviar = async (event) => {
     event.preventDefault();
-    if (!solicitanteEmail || !titulo.trim() || !descripcion.trim() || !tipo) {
-      setError("Completa solicitante, título, descripción y tipo antes de crear la solicitud.");
+    if (!solicitanteEmail || !titulo.trim() || !descripcion.trim() || !tipo || !canal) {
+      setError("Completa solicitante, título, descripción, tipo y canal antes de crear la solicitud.");
       return;
     }
 
@@ -39,6 +57,8 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
         tipo,
+        canal,
+        ordenPrioridad: ordenPrioridad || null,
         cliente,
         adjuntos,
       });
@@ -101,6 +121,32 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
           ))}
         </select>
       </label>
+
+      <div className="tarea-form-fila">
+        <label>
+          Canal
+          <select value={canal} onChange={(event) => setCanal(event.target.value)} required>
+            <option value="" disabled>
+              Selecciona un canal...
+            </option>
+            {canales.map((c) => (
+              <option key={c.id} value={c.canal}>
+                {c.canal}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Orden de prioridad (opcional)
+          <input
+            type="number"
+            min="1"
+            value={ordenPrioridad}
+            onChange={(event) => setOrdenPrioridad(event.target.value)}
+          />
+        </label>
+      </div>
 
       <div>
         <p className="crear-solicitud-etiqueta">Cliente (opcional)</p>

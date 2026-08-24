@@ -183,11 +183,12 @@ export async function crearSolicitudChat({ solicitanteEmail, titulo, descripcion
   return parseJsonOrThrow(response);
 }
 
-export async function fetchSolicitudes({ cliente, nombre, estatus } = {}) {
+export async function fetchSolicitudes({ cliente, nombre, estatus, ordenPor } = {}) {
   const url = new URL(`${API_BASE_URL}/api/solicitudes`);
   if (cliente) url.searchParams.set("cliente", cliente);
   if (nombre) url.searchParams.set("nombre", nombre);
   if (estatus) url.searchParams.set("estatus", estatus);
+  if (ordenPor) url.searchParams.set("orden_por", ordenPor);
   const response = await fetch(url, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
@@ -215,6 +216,11 @@ export async function fetchEstatus() {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchCanalesSolicitud() {
+  const response = await fetch(`${API_BASE_URL}/api/canales-solicitud`);
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchEstatusTarea() {
   const response = await fetch(`${API_BASE_URL}/api/estatus-tarea`);
   return parseJsonOrThrow(response);
@@ -225,11 +231,23 @@ export async function fetchSolicitudDetalle(id) {
   return parseJsonOrThrow(response);
 }
 
-export async function actualizarSolicitud(id, { nombre, descripcion, cliente, tipo, codigoEstatus }) {
+export async function actualizarSolicitud(
+  id,
+  { nombre, descripcion, cliente, tipo, canal, codigoEstatus, ordenPrioridad, fechaCompletado },
+) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ nombre, descripcion, cliente, tipo, codigo_estatus: codigoEstatus }),
+    body: JSON.stringify({
+      nombre,
+      descripcion,
+      cliente,
+      tipo,
+      canal,
+      codigo_estatus: codigoEstatus,
+      orden_prioridad: ordenPrioridad || null,
+      fecha_completado: fechaCompletado || null,
+    }),
   });
   return parseJsonOrThrow(response);
 }
@@ -388,6 +406,8 @@ export async function crearSolicitudFormulario({
   titulo,
   descripcion,
   tipo,
+  canal,
+  ordenPrioridad,
   cliente,
   adjuntos,
 }) {
@@ -396,6 +416,10 @@ export async function crearSolicitudFormulario({
   formData.append("titulo", titulo);
   formData.append("descripcion", descripcion);
   formData.append("tipo", tipo);
+  formData.append("canal", canal);
+  if (ordenPrioridad) {
+    formData.append("orden_prioridad", ordenPrioridad);
+  }
   if (cliente) {
     formData.append("cliente", cliente);
   }

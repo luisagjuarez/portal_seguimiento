@@ -92,6 +92,22 @@ def find_tipo_id(cursor, tipo: str | None) -> int | None:
     return row[0] if row else None
 
 
+def find_canal_id_by_name(cursor, canal: str | None) -> int | None:
+    """A diferencia de find_canal_id (que resuelve a partir del código interno de origen
+    EMAIL/CHAT/FORMULARIO), esta resuelve directo por el nombre de catálogo que elige el
+    usuario en el <select> de canal del formulario de Solicitudes."""
+    if not canal:
+        return None
+    cursor.execute("SELECT id FROM canales_solicitud WHERE canal ILIKE %(canal)s", {"canal": canal})
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
+def list_canales_solicitud(cursor) -> list[dict]:
+    cursor.execute("SELECT id, canal FROM canales_solicitud ORDER BY id")
+    return [{"id": row[0], "canal": row[1]} for row in cursor.fetchall()]
+
+
 def is_message_processed(cursor, message_id: str) -> bool:
     cursor.execute(
         "SELECT 1 FROM emails_procesados WHERE email_message_id = %(message_id)s",
@@ -111,7 +127,11 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") 
     solicitante_id = find_miembro_id_by_email(cursor, solicitud.solicitante_email)
     cliente_id = find_cliente_id_by_name(cursor, solicitud.cliente) if solicitud.cliente else None
     tipo_id = find_tipo_id(cursor, solicitud.tipo)
-    canal_id = find_canal_id(cursor, solicitud.canal_origen)
+    canal_id = (
+        find_canal_id_by_name(cursor, solicitud.canal_nombre)
+        if solicitud.canal_nombre
+        else find_canal_id(cursor, solicitud.canal_origen)
+    )
 
     cursor.execute(
         """
@@ -396,12 +416,14 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
         SELECT s.id, s.nombre, s.descripcion, c.nombre AS cliente, s.cliente AS cliente_id,
                t.tipo AS tipo, s.tipo AS tipo_id, s.codigo_estatus,
                e.descripcion AS estatus_descripcion, m.nombre_completo AS solicitante,
-               s.orden_prioridad, s.creado_en, s.actualizado_en, s.actualizado_por
+               s.orden_prioridad, cs.canal AS canal, s.canal AS canal_id,
+               s.fecha_completado, s.creado_en, s.actualizado_en, s.actualizado_por
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
         LEFT JOIN estatus e ON e.codigo = s.codigo_estatus
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
+        LEFT JOIN canales_solicitud cs ON cs.id = s.canal
         WHERE s.id = %(id)s AND s.borrado_en IS NULL
         """,
         {"id": solicitud_id},
@@ -412,7 +434,7 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
     columnas = [
         "id", "nombre", "descripcion", "cliente", "cliente_id", "tipo", "tipo_id",
         "codigo_estatus", "estatus_descripcion", "solicitante", "orden_prioridad",
-        "creado_en", "actualizado_en", "actualizado_por",
+        "canal", "canal_id", "fecha_completado", "creado_en", "actualizado_en", "actualizado_por",
     ]
     return dict(zip(columnas, row))
 
@@ -424,14 +446,21 @@ def update_solicitud(
     descripcion: str,
     cliente_id: int | None,
     tipo_id: int | None,
+    canal_id: int | None,
     codigo_estatus: str,
+    orden_prioridad: str | None,
+    fecha_completado,
     actor: str,
 ) -> int:
+    # fecha_completado solo tiene sentido si el estatus es Completado: si se cambia a
+    # cualquier otro estatus, se limpia sin importar qué haya llegado en el body.
+    fecha_completado_final = fecha_completado if codigo_estatus == "COMPLETADO" else None
     cursor.execute(
         """
         UPDATE solicitudes
         SET nombre = %(nombre)s, descripcion = %(descripcion)s, cliente = %(cliente)s,
-            tipo = %(tipo)s, codigo_estatus = %(codigo_estatus)s,
+            tipo = %(tipo)s, canal = %(canal)s, codigo_estatus = %(codigo_estatus)s,
+            orden_prioridad = %(orden_prioridad)s, fecha_completado = %(fecha_completado)s,
             actualizado_en = now(), actualizado_por = %(actor)s
         WHERE id = %(id)s AND borrado_en IS NULL
         """,
@@ -440,7 +469,10 @@ def update_solicitud(
             "descripcion": descripcion,
             "cliente": cliente_id,
             "tipo": tipo_id,
+            "canal": canal_id,
             "codigo_estatus": codigo_estatus,
+            "orden_prioridad": orden_prioridad,
+            "fecha_completado": fecha_completado_final,
             "id": solicitud_id,
             "actor": actor,
         },
@@ -845,15 +877,34 @@ def delete_comentario(cursor, comentario_id: int, actor: str) -> int:
     return cursor.rowcount
 
 
+_ORDEN_SOLICITUDES = {
+    # orden_visualizacion/orden ya existen en los catálogos para reflejar el flujo de
+    # negocio (p. ej. estatus va En espera → Planeado → ... → Completado/Cancelado), no
+    # el alfabético — se reutilizan aquí en vez de ordenar por texto.
+    "estatus": "e.orden_visualizacion NULLS LAST, s.creado_en DESC",
+    "tipo": "t.orden NULLS LAST, t.tipo NULLS LAST, s.creado_en DESC",
+    "cliente": "c.nombre NULLS LAST, s.creado_en DESC",
+    # orden_prioridad es un varchar libre (no un catálogo); se castea a entero solo cuando
+    # el valor es puramente numérico para poder ordenar 1 < 2 < 10 en vez de alfabético
+    # ("1" < "10" < "2"), sin que un valor no numérico futuro rompa la consulta.
+    "prioridad": (
+        "CASE WHEN s.orden_prioridad ~ '^[0-9]+$' THEN s.orden_prioridad::int END NULLS LAST, "
+        "s.creado_en DESC"
+    ),
+}
+
+
 def list_solicitudes(
     cursor,
     cliente: str | None = None,
     nombre: str | None = None,
     estatus: str | None = None,
+    orden_por: str | None = None,
     limit: int = 100,
 ) -> list[dict]:
     """Listado para la página de Solicitudes (Fase 1.6). Trae nombres legibles de los
-    catálogos (no solo ids) vía LEFT JOIN, más recientes primero."""
+    catálogos (no solo ids) vía LEFT JOIN. Por default, más recientes primero; `orden_por`
+    permite ordenar por estatus/tipo/cliente/prioridad (ver _ORDEN_SOLICITUDES)."""
     condiciones = ["s.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
@@ -867,24 +918,25 @@ def list_solicitudes(
         parametros["estatus"] = estatus
 
     where = f"WHERE {' AND '.join(condiciones)}"
+    order_by = _ORDEN_SOLICITUDES.get(orden_por or "", "s.creado_en DESC")
     cursor.execute(
         f"""
         SELECT s.id, s.nombre, c.nombre AS cliente, t.tipo AS tipo,
                s.codigo_estatus, e.descripcion AS estatus_descripcion,
-               m.nombre_completo AS solicitante, s.creado_en
+               m.nombre_completo AS solicitante, s.orden_prioridad, s.creado_en
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
         LEFT JOIN estatus e ON e.codigo = s.codigo_estatus
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
         {where}
-        ORDER BY s.creado_en DESC
+        ORDER BY {order_by}
         LIMIT %(max_rows)s
         """,
         parametros,
     )
     columnas = [
         "id", "nombre", "cliente", "tipo", "codigo_estatus", "estatus_descripcion",
-        "solicitante", "creado_en",
+        "solicitante", "orden_prioridad", "creado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]

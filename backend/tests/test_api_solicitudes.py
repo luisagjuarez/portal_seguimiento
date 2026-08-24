@@ -187,8 +187,10 @@ def test_listar_solicitudes(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None):
-        filtros_recibidos.update({"cliente": cliente, "nombre": nombre, "estatus": estatus})
+    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None):
+        filtros_recibidos.update(
+            {"cliente": cliente, "nombre": nombre, "estatus": estatus, "orden_por": orden_por}
+        )
         return [
             {
                 "id": 1,
@@ -198,6 +200,7 @@ def test_listar_solicitudes(monkeypatch):
                 "codigo_estatus": "EN ESPERA",
                 "estatus_descripcion": "En espera",
                 "solicitante": "Ramon Rosales",
+                "orden_prioridad": None,
                 "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
             }
         ]
@@ -210,7 +213,30 @@ def test_listar_solicitudes(monkeypatch):
     body = response.json()
     assert len(body) == 1
     assert body[0]["nombre"] == "Reporte de gastos"
-    assert filtros_recibidos == {"cliente": "chan", "nombre": None, "estatus": "EN ESPERA"}
+    assert filtros_recibidos == {
+        "cliente": "chan",
+        "nombre": None,
+        "estatus": "EN ESPERA",
+        "orden_por": None,
+    }
+
+
+def test_listar_solicitudes_ordenadas(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    filtros_recibidos = {}
+
+    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None):
+        filtros_recibidos.update({"orden_por": orden_por})
+        return []
+
+    monkeypatch.setattr(routes.repository, "list_solicitudes", _fake_list_solicitudes)
+
+    response = client.get("/api/solicitudes", params={"orden_por": "prioridad"})
+
+    assert response.status_code == 200
+    assert filtros_recibidos == {"orden_por": "prioridad"}
 
 
 def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
@@ -228,6 +254,8 @@ def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
             "titulo": "Nueva integración",
             "descripcion": "Detalle de la solicitud capturada por formulario.",
             "tipo": "Nuevo",
+            "canal": "Formulario",
+            "orden_prioridad": "2",
             "cliente": "Chantilly",
         },
     )
@@ -245,6 +273,21 @@ def test_crear_solicitud_formulario_requiere_tipo():
             "solicitante_email": "ramon_rosales@stoconsulting.com",
             "titulo": "Nueva integración",
             "descripcion": "Detalle de la solicitud.",
+            "canal": "Formulario",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_crear_solicitud_formulario_requiere_canal():
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud.",
+            "tipo": "Nuevo",
         },
     )
 
@@ -264,6 +307,9 @@ def _fake_solicitud_detalle(solicitud_id=1):
         "estatus_descripcion": "En espera",
         "solicitante": "Ramon Rosales",
         "orden_prioridad": None,
+        "canal": "Formulario",
+        "canal_id": 3,
+        "fecha_completado": None,
         "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_por": "dovela_control",
@@ -298,6 +344,7 @@ def test_actualizar_solicitud_success(monkeypatch):
     monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
     monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
     monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
     monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 1)
     monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
 
@@ -308,6 +355,8 @@ def test_actualizar_solicitud_success(monkeypatch):
             "descripcion": "Detalle actualizado",
             "cliente": "Chantilly",
             "tipo": "Nuevo",
+            "canal": "Formulario",
+            "orden_prioridad": "1",
             "codigo_estatus": "EN PROCESO",
         },
     )
@@ -323,6 +372,7 @@ def test_actualizar_solicitud_404(monkeypatch):
     monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
     monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
     monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
     monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 0)
 
     response = client.put(
@@ -332,12 +382,64 @@ def test_actualizar_solicitud_404(monkeypatch):
             "descripcion": "Detalle",
             "cliente": None,
             "tipo": "Nuevo",
+            "canal": "Formulario",
             "codigo_estatus": "EN PROCESO",
         },
     )
 
     assert response.status_code == 404
     assert fake_conn.rolled_back is True
+
+
+def test_actualizar_solicitud_completado_requiere_fecha():
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": None,
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "COMPLETADO",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_actualizar_solicitud_completado_con_fecha(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+
+    kwargs_recibidos = {}
+
+    def _fake_update_solicitud(cursor, id, **kwargs):
+        kwargs_recibidos.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(routes.repository, "update_solicitud", _fake_update_solicitud)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": None,
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "COMPLETADO",
+            "fecha_completado": "2026-08-24",
+        },
+    )
+
+    assert response.status_code == 200
+    assert kwargs_recibidos["fecha_completado"] == date(2026, 8, 24)
 
 
 def test_borrar_solicitud_success(monkeypatch):

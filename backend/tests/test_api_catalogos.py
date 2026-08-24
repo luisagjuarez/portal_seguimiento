@@ -47,6 +47,21 @@ def test_listar_tipos_solicitud(monkeypatch):
     assert response.json() == [{"id": 3, "tipo": "Nuevo"}]
 
 
+def test_listar_canales_solicitud(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(
+        routes.repository,
+        "list_canales_solicitud",
+        lambda cursor: [{"id": 3, "canal": "Formulario"}],
+    )
+
+    response = client.get("/api/canales-solicitud")
+
+    assert response.status_code == 200
+    assert response.json() == [{"id": 3, "canal": "Formulario"}]
+
+
 def test_listar_estatus(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())

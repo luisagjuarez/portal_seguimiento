@@ -13,6 +13,17 @@ function formatearFecha(iso) {
   }
 }
 
+function formatearFechaCorta(iso) {
+  try {
+    // new Date("2026-08-24") se interpreta en UTC; se arma en horario local para que no
+    // se muestre un día antes según el huso horario del navegador.
+    const [anio, mes, dia] = iso.split("-").map(Number);
+    return new Date(anio, mes - 1, dia).toLocaleDateString("es-MX", { dateStyle: "medium" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea, esScrumMaster }) {
   const [solicitud, setSolicitud] = useState(null);
   const [tareas, setTareas] = useState([]);
@@ -120,6 +131,17 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
         <p>
           <strong>Solicitante:</strong> {solicitud.solicitante || "Sin identificar"}
         </p>
+        <p>
+          <strong>Canal:</strong> {solicitud.canal || "Sin definir"}
+        </p>
+        <p>
+          <strong>Orden de prioridad:</strong> {solicitud.orden_prioridad || "Sin definir"}
+        </p>
+        {solicitud.codigo_estatus === "COMPLETADO" && solicitud.fecha_completado && (
+          <p>
+            <strong>Fecha Completado:</strong> {formatearFechaCorta(solicitud.fecha_completado)}
+          </p>
+        )}
         <p className="solicitud-fecha">Creada: {formatearFecha(solicitud.creado_en)}</p>
 
         <div className="resumen-acciones">

@@ -9,6 +9,7 @@ export default function SolicitudesPage({ onVerDetalle }) {
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstatus, setFiltroEstatus] = useState("");
+  const [ordenPor, setOrdenPor] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -17,7 +18,7 @@ export default function SolicitudesPage({ onVerDetalle }) {
   const cargarSolicitudes = () => {
     setCargando(true);
     setError(null);
-    fetchSolicitudes({ cliente: filtroCliente, nombre: filtroNombre, estatus: filtroEstatus })
+    fetchSolicitudes({ cliente: filtroCliente, nombre: filtroNombre, estatus: filtroEstatus, ordenPor })
       .then(setSolicitudes)
       .catch((err) => setError(err.message || "No se pudieron cargar las solicitudes."))
       .finally(() => setCargando(false));
@@ -35,7 +36,7 @@ export default function SolicitudesPage({ onVerDetalle }) {
     const timeoutId = setTimeout(cargarSolicitudes, 300);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroCliente, filtroNombre, filtroEstatus]);
+  }, [filtroCliente, filtroNombre, filtroEstatus, ordenPor]);
 
   const alCrearSolicitud = (respuesta) => {
     setMostrarFormulario(false);
@@ -74,6 +75,13 @@ export default function SolicitudesPage({ onVerDetalle }) {
               {estatus.descripcion}
             </option>
           ))}
+        </select>
+        <select value={ordenPor} onChange={(event) => setOrdenPor(event.target.value)}>
+          <option value="">Ordenar por: Más recientes</option>
+          <option value="estatus">Ordenar por: Estatus</option>
+          <option value="tipo">Ordenar por: Tipo</option>
+          <option value="cliente">Ordenar por: Cliente</option>
+          <option value="prioridad">Ordenar por: Orden de prioridad</option>
         </select>
       </div>
 

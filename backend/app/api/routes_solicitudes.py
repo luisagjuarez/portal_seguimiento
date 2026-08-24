@@ -109,13 +109,18 @@ def listar_solicitudes(
     cliente: str = Query(default="", max_length=200),
     nombre: str = Query(default="", max_length=200),
     estatus: str = Query(default="", max_length=15),
+    orden_por: str = Query(default="", max_length=20),
     _: UsuarioActual = Depends(get_current_user),
 ) -> list[SolicitudResumen]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
         filas = repository.list_solicitudes(
-            cursor, cliente=cliente or None, nombre=nombre or None, estatus=estatus or None
+            cursor,
+            cliente=cliente or None,
+            nombre=nombre or None,
+            estatus=estatus or None,
+            orden_por=orden_por or None,
         )
     finally:
         release_connection(db_conn)
@@ -202,6 +207,7 @@ def actualizar_solicitud(
         cliente_resuelto = repository.get_or_create_cliente(cursor, body.cliente)
         cliente_id = repository.find_cliente_id_by_name(cursor, cliente_resuelto) if cliente_resuelto else None
         tipo_id = repository.find_tipo_id(cursor, body.tipo)
+        canal_id = repository.find_canal_id_by_name(cursor, body.canal)
 
         filas_afectadas = repository.update_solicitud(
             cursor,
@@ -210,7 +216,10 @@ def actualizar_solicitud(
             descripcion=body.descripcion,
             cliente_id=cliente_id,
             tipo_id=tipo_id,
+            canal_id=canal_id,
             codigo_estatus=body.codigo_estatus,
+            orden_prioridad=body.orden_prioridad,
+            fecha_completado=body.fecha_completado,
             actor=usuario_actual.usuario,
         )
         if filas_afectadas == 0:
@@ -300,12 +309,16 @@ async def crear_solicitud_formulario(
     titulo: Annotated[str, Form(min_length=1, max_length=500)],
     descripcion: Annotated[str, Form(min_length=1)],
     tipo: Annotated[str, Form(min_length=1, max_length=100)],
+    canal: Annotated[str, Form(min_length=1, max_length=100)],
     cliente: Annotated[str | None, Form(max_length=100)] = None,
+    orden_prioridad: Annotated[str | None, Form(max_length=20)] = None,
     files: Annotated[list[UploadFile], File()] = [],
     usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> ChatSolicitudResponse:
     """Fase 1.6 — página de Solicitudes: formulario tradicional (un solo paso), con
-    solicitante y tipo elegidos de catálogo en vez de resueltos/asumidos como en chat/correo."""
+    solicitante y tipo elegidos de catálogo en vez de resueltos/asumidos como en chat/correo.
+    A diferencia de chat/correo, aquí el canal también lo elige el usuario (por defecto
+    "Formulario" en el frontend, pero editable) en vez de asumirse fijo por el origen."""
     contenidos = await _leer_y_validar_adjuntos(files)
 
     now = datetime.now(timezone.utc)
@@ -326,6 +339,8 @@ async def crear_solicitud_formulario(
             tipo=tipo,
             status_cd=settings.status_cd_nueva,
             canal_origen="FORMULARIO",
+            canal_nombre=canal,
+            orden_prioridad=orden_prioridad,
         )
 
         id_solicitud = _crear_solicitud_con_adjuntos(

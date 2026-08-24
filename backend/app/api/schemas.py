@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class ChatSolicitudRequest(BaseModel):
@@ -43,6 +43,11 @@ class EstatusOut(BaseModel):
     descripcion: str
 
 
+class CanalSolicitudOut(BaseModel):
+    id: int
+    canal: str
+
+
 class SolicitudResumen(BaseModel):
     id: int
     nombre: str
@@ -51,6 +56,7 @@ class SolicitudResumen(BaseModel):
     codigo_estatus: str
     estatus_descripcion: str | None
     solicitante: str | None
+    orden_prioridad: str | None
     creado_en: datetime
 
 
@@ -66,6 +72,9 @@ class SolicitudDetalle(BaseModel):
     estatus_descripcion: str | None
     solicitante: str | None
     orden_prioridad: str | None
+    canal: str | None
+    canal_id: int | None
+    fecha_completado: date | None
     creado_en: datetime
     actualizado_en: datetime
     actualizado_por: str
@@ -76,7 +85,18 @@ class SolicitudUpdate(BaseModel):
     descripcion: str = Field(min_length=1)
     cliente: str | None = Field(default=None, max_length=100)
     tipo: str = Field(min_length=1, max_length=100)
+    canal: str = Field(min_length=1, max_length=100)
     codigo_estatus: str = Field(min_length=1, max_length=15)
+    orden_prioridad: str | None = Field(default=None, max_length=20)
+    fecha_completado: date | None = None
+
+    @model_validator(mode="after")
+    def _fecha_completado_obligatoria_si_completado(self) -> "SolicitudUpdate":
+        if self.codigo_estatus == "COMPLETADO" and self.fecha_completado is None:
+            raise ValueError(
+                "fecha_completado es obligatoria cuando el estatus es Completado"
+            )
+        return self
 
 
 class EstatusTareaOut(BaseModel):

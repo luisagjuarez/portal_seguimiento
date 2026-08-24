@@ -30,6 +30,11 @@ export default function SolicitudCard({ solicitud, onSeleccionar }) {
       <p>
         <strong>Solicitante:</strong> {solicitud.solicitante || "Sin identificar"}
       </p>
+      {solicitud.orden_prioridad && (
+        <p>
+          <strong>Prioridad:</strong> {solicitud.orden_prioridad}
+        </p>
+      )}
       <p>
         <span className="solicitud-estatus">{solicitud.estatus_descripcion || solicitud.codigo_estatus}</span>
       </p>

@@ -252,10 +252,13 @@ alcance del prompt de esta sesión).
   (`app/config.py`, `app/models.py`, `app/db/`, `app/md_generator/`, `app/storage.py`):
   - `main.py` → `app/email_ingest/` — worker de polling IMAP (Fase 1.1).
   - `api_main.py` → `app/api/` — API FastAPI (Fase 1.2 + 1.6):
-    `GET /api/health`, `GET /api/clientes?q=`, `GET /api/solicitudes` (listado con filtros),
-    `POST /api/solicitudes/chat` y `POST /api/solicitudes/formulario` (ambos multipart, con
-    adjuntos opcionales), y `routes_catalogos.py` (`GET /api/miembros-equipo`,
-    `GET /api/tipos-solicitud`, `GET /api/estatus`).
+    `GET /api/health`, `GET /api/clientes?q=`, `GET /api/solicitudes` (listado con filtros y
+    `orden_por`), `POST /api/solicitudes/chat` y `POST /api/solicitudes/formulario` (ambos
+    multipart, con adjuntos opcionales; el de formulario también pide `canal` y admite
+    `orden_prioridad`), `PUT /api/solicitudes/{id}` (incluye canal/orden_prioridad/
+    fecha_completado, esta última obligatoria si el estatus es Completado), y
+    `routes_catalogos.py` (`GET /api/miembros-equipo`, `GET /api/tipos-solicitud`,
+    `GET /api/canales-solicitud`, `GET /api/estatus`).
 - **Frontend** (`frontend/`): SPA en React + Vite con menú lateral (Inicio, Solicitud por
   Chat, Solicitudes). "Solicitud por Chat" es el wizard original (correo → título →
   descripción → cliente → adjuntos opcionales → confirmar). "Solicitudes" lista las
@@ -269,9 +272,9 @@ alcance del prompt de esta sesión).
 - **Docker**: `docker-compose.yml` con `backend`, `api`, `frontend`, y `mailserver` (greenmail,
   perfil `local-test`). La BD Postgres es externa, no gestionada por este compose. `backend` y
   `api` deben tener los mismos volúmenes de `data/nfs/` montados (ver fix arriba).
-- **Tests**: 30 tests unitarios en `backend/tests/` (parser, client_matcher,
-  title_synthesizer, endpoints de solicitudes incl. adjuntos y formulario, endpoints de
-  catálogos) — todos pasan. Frontend solo verificado con `npm run build` (sin tests
+- **Tests**: 94 tests unitarios en `backend/tests/` (parser, client_matcher,
+  title_synthesizer, auth, endpoints de solicitudes incl. adjuntos/formulario/orden_por,
+  endpoints de catálogos) — todos pasan. Frontend solo verificado con `npm run build` (sin tests
   automatizados todavía).
 
 Detalles de configuración y comandos: `README.md`. Detalle de diseño y decisiones de cada
