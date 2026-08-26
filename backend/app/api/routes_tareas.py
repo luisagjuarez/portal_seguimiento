@@ -11,6 +11,8 @@ from app.api.schemas import (
     EnlaceTareaOut,
     HitoCreateUpdate,
     HitoOut,
+    PorHacerCreate,
+    PorHacerOut,
     TareaCreateUpdate,
     TareaOut,
     TareaTableroOut,
@@ -307,3 +309,51 @@ def crear_enlace_tarea(
         release_connection(db_conn)
 
     return EnlaceTareaOut(**fila)
+
+
+@router.get("/tareas/{tarea_id}/por-hacer", response_model=list[PorHacerOut])
+def listar_por_hacer_tarea(
+    tarea_id: int, _: UsuarioActual = Depends(get_current_user)
+) -> list[PorHacerOut]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        filas = repository.list_por_hacer_by_tarea(cursor, tarea_id)
+    finally:
+        release_connection(db_conn)
+    return [PorHacerOut(**fila) for fila in filas]
+
+
+@router.post("/tareas/{tarea_id}/por-hacer", response_model=PorHacerOut, status_code=201)
+def crear_por_hacer_tarea(
+    tarea_id: int, body: PorHacerCreate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> PorHacerOut:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        tarea = repository.get_tarea_by_id(cursor, tarea_id)
+        if tarea is None:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+        item_id = repository.insert_por_hacer(
+            cursor,
+            tarea_id,
+            solicitud_id=tarea["solicitud_id"],
+            nombre=body.nombre,
+            descripcion=body.descripcion,
+            responsable_id=body.responsable_id,
+            actor=usuario_actual.usuario,
+        )
+        fila = repository.get_por_hacer_by_id(cursor, item_id)
+        db_conn.commit()
+    except HTTPException:
+        db_conn.rollback()
+        raise
+    except Exception:
+        db_conn.rollback()
+        logger.exception("Error creando ítem por hacer para tarea %s", tarea_id)
+        raise HTTPException(status_code=500, detail="No se pudo crear el ítem") from None
+    finally:
+        release_connection(db_conn)
+
+    return PorHacerOut(**fila)

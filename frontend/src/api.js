@@ -460,6 +460,50 @@ export async function eliminarComentario(comentarioId) {
   }
 }
 
+export async function fetchPorHacerTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/por-hacer`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function crearPorHacer(tareaId, { nombre, descripcion, responsableId }) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/por-hacer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      nombre,
+      descripcion: descripcion || null,
+      responsable_id: responsableId || null,
+    }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarPorHacer(itemId, { nombre, descripcion, responsableId, estaCompleta }) {
+  const response = await fetch(`${API_BASE_URL}/api/tarea-por-hacer/${itemId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      nombre,
+      descripcion: descripcion || null,
+      responsable_id: responsableId || null,
+      esta_completa: estaCompleta,
+    }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function eliminarPorHacer(itemId) {
+  const response = await fetch(`${API_BASE_URL}/api/tarea-por-hacer/${itemId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
 export async function fetchEnlacesTarea(tareaId) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/enlaces`, {
     headers: authHeaders(),

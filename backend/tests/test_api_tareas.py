@@ -467,3 +467,74 @@ def test_crear_enlace_tarea_requiere_tipo_enlace():
     response = client.post("/api/tareas/1/enlaces", json={"url": "https://ejemplo.com"})
 
     assert response.status_code == 422
+
+
+def _fake_por_hacer(item_id=1, tarea_id=1, esta_completa=False):
+    return {
+        "id": item_id,
+        "solicitud_id": 1,
+        "tarea_id": tarea_id,
+        "tarea_nombre": "Levantar requerimientos",
+        "responsable_id": 6,
+        "responsable": "Ramon Rosales",
+        "nombre": "Revisar checklist de despliegue",
+        "descripcion": "Confirmar variables de entorno",
+        "esta_completa": esta_completa,
+        "creado_en": datetime(2026, 8, 26, tzinfo=timezone.utc),
+        "creado_por": "DOVELA_LG",
+        "creado_por_nombre": "Luis Gómez",
+        "actualizado_en": datetime(2026, 8, 26, tzinfo=timezone.utc),
+        "actualizado_por": "DOVELA_LG",
+    }
+
+
+def test_listar_por_hacer_tarea(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(
+        routes.repository, "list_por_hacer_by_tarea", lambda cursor, id: [_fake_por_hacer(esta_completa=True)]
+    )
+
+    response = client.get("/api/tareas/1/por-hacer")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["esta_completa"] is True
+
+
+def test_crear_por_hacer_tarea_success(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+
+    llamada = {}
+
+    def _insert_por_hacer(cursor, tarea_id, **kwargs):
+        llamada.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(routes.repository, "insert_por_hacer", _insert_por_hacer)
+    monkeypatch.setattr(routes.repository, "get_por_hacer_by_id", lambda cursor, id: _fake_por_hacer(id))
+
+    response = client.post(
+        "/api/tareas/1/por-hacer",
+        json={"nombre": "Revisar checklist de despliegue", "descripcion": "Confirmar variables de entorno"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["nombre"] == "Revisar checklist de despliegue"
+    assert response.json()["esta_completa"] is False
+    assert llamada["solicitud_id"] == 1
+    assert fake_conn.committed is True
+
+
+def test_crear_por_hacer_tarea_404_si_tarea_no_existe(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: None)
+
+    response = client.post("/api/tareas/999/por-hacer", json={"nombre": "Ítem"})
+
+    assert response.status_code == 404

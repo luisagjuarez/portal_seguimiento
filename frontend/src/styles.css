@@ -746,6 +746,20 @@ button:disabled {
   flex-shrink: 0;
 }
 
+.por-hacer-item-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  cursor: pointer;
+}
+
+.por-hacer-item-completo {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 .tablero-page {
   display: flex;
   flex-direction: column;

@@ -6,13 +6,18 @@ import ComentarioFormulario from "./ComentarioFormulario.jsx";
 import ComentarioItem from "./ComentarioItem.jsx";
 import EnlaceTareaFormulario from "./EnlaceTareaFormulario.jsx";
 import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
+import PorHacerFormulario from "./PorHacerFormulario.jsx";
+import PorHacerItem from "./PorHacerItem.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import {
+  actualizarPorHacer,
   eliminarComentario,
   eliminarHitoTarea,
+  eliminarPorHacer,
   fetchComentariosTarea,
   fetchEnlacesTarea,
   fetchHitoDeTarea,
+  fetchPorHacerTarea,
   fetchTareaDetalle,
 } from "../api.js";
 
@@ -42,6 +47,7 @@ export default function TareaDetallePage() {
   const [hito, setHito] = useState(null);
   const [comentarios, setComentarios] = useState([]);
   const [enlaces, setEnlaces] = useState([]);
+  const [porHacer, setPorHacer] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -58,6 +64,11 @@ export default function TareaDetallePage() {
 
   const [mostrarFormularioEnlace, setMostrarFormularioEnlace] = useState(false);
 
+  const [itemPorHacerEnEdicion, setItemPorHacerEnEdicion] = useState(null);
+  const [mostrarFormularioPorHacer, setMostrarFormularioPorHacer] = useState(false);
+  const [itemPorHacerABorrar, setItemPorHacerABorrar] = useState(null);
+  const [borrandoItemPorHacer, setBorrandoItemPorHacer] = useState(false);
+
   const [pestanaActiva, setPestanaActiva] = useState("comentarios");
 
   const cargarDetalle = () => {
@@ -68,12 +79,14 @@ export default function TareaDetallePage() {
       fetchHitoDeTarea(tareaId),
       fetchComentariosTarea(tareaId),
       fetchEnlacesTarea(tareaId),
+      fetchPorHacerTarea(tareaId),
     ])
-      .then(([detalleTarea, hitoActual, listaComentarios, listaEnlaces]) => {
+      .then(([detalleTarea, hitoActual, listaComentarios, listaEnlaces, listaPorHacer]) => {
         setTarea(detalleTarea);
         setHito(hitoActual);
         setComentarios(listaComentarios);
         setEnlaces(listaEnlaces);
+        setPorHacer(listaPorHacer);
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la tarea."))
       .finally(() => setCargando(false));
@@ -128,6 +141,39 @@ export default function TareaDetallePage() {
       setError(err.message || "No se pudo borrar el comentario.");
     } finally {
       setBorrandoComentario(false);
+    }
+  };
+
+  const alGuardarPorHacer = () => {
+    setMostrarFormularioPorHacer(false);
+    setItemPorHacerEnEdicion(null);
+    cargarDetalle();
+  };
+
+  const alTogglePorHacer = async (item) => {
+    try {
+      const actualizado = await actualizarPorHacer(item.id, {
+        nombre: item.nombre,
+        descripcion: item.descripcion,
+        responsableId: item.responsable_id,
+        estaCompleta: !item.esta_completa,
+      });
+      setPorHacer((actual) => actual.map((i) => (i.id === actualizado.id ? actualizado : i)));
+    } catch (err) {
+      setError(err.message || "No se pudo actualizar el ítem.");
+    }
+  };
+
+  const confirmarBorrarPorHacer = async () => {
+    setBorrandoItemPorHacer(true);
+    try {
+      await eliminarPorHacer(itemPorHacerABorrar.id);
+      setItemPorHacerABorrar(null);
+      cargarDetalle();
+    } catch (err) {
+      setError(err.message || "No se pudo borrar el ítem.");
+    } finally {
+      setBorrandoItemPorHacer(false);
     }
   };
 
@@ -200,6 +246,7 @@ export default function TareaDetallePage() {
       <div className="solicitud-detalle-tareas">
         <div className="tabs-nav">
           {[
+            { key: "por-hacer", label: "Por hacer", total: porHacer.length },
             { key: "hito", label: "Hito", total: hito ? 1 : 0 },
             { key: "comentarios", label: "Comentarios", total: comentarios.length },
             { key: "enlaces", label: "Enlaces", total: enlaces.length },
@@ -214,6 +261,39 @@ export default function TareaDetallePage() {
             </button>
           ))}
         </div>
+
+        {pestanaActiva === "por-hacer" && (
+          <>
+            <div className="resumen-acciones">
+              <button
+                type="button"
+                onClick={() => {
+                  setItemPorHacerEnEdicion(null);
+                  setMostrarFormularioPorHacer(true);
+                }}
+              >
+                Agregar ítem
+              </button>
+            </div>
+
+            {porHacer.length === 0 && <p>Esta tarea todavía no tiene ítems por hacer.</p>}
+
+            <div className="comentario-lista">
+              {porHacer.map((item) => (
+                <PorHacerItem
+                  key={item.id}
+                  item={item}
+                  onToggle={alTogglePorHacer}
+                  onEditar={(i) => {
+                    setItemPorHacerEnEdicion(i);
+                    setMostrarFormularioPorHacer(true);
+                  }}
+                  onBorrar={setItemPorHacerABorrar}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {pestanaActiva === "hito" && (
           <>
@@ -363,6 +443,39 @@ export default function TareaDetallePage() {
           confirmando={borrandoComentario}
           onConfirmar={confirmarBorrarComentario}
           onCancelar={() => setComentarioABorrar(null)}
+        />
+      )}
+
+      {mostrarFormularioPorHacer && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setMostrarFormularioPorHacer(false);
+            setItemPorHacerEnEdicion(null);
+          }}
+        >
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <h3>{itemPorHacerEnEdicion ? "Editar ítem" : "Nuevo ítem"}</h3>
+            <PorHacerFormulario
+              tareaId={tareaId}
+              itemInicial={itemPorHacerEnEdicion}
+              onGuardado={alGuardarPorHacer}
+              onCancelar={() => {
+                setMostrarFormularioPorHacer(false);
+                setItemPorHacerEnEdicion(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {itemPorHacerABorrar && (
+        <ConfirmModal
+          titulo="Borrar ítem"
+          mensaje={`¿Seguro que quieres borrar el ítem "${itemPorHacerABorrar.nombre}"?`}
+          confirmando={borrandoItemPorHacer}
+          onConfirmar={confirmarBorrarPorHacer}
+          onCancelar={() => setItemPorHacerABorrar(null)}
         />
       )}
 

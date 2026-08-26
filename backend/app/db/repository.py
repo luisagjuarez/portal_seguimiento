@@ -1148,6 +1148,116 @@ def list_enlaces_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     return [dict(zip(_COLUMNAS_ENLACE_TAREA, row)) for row in cursor.fetchall()]
 
 
+_COLUMNAS_POR_HACER = [
+    "id", "solicitud_id", "tarea_id", "tarea_nombre", "responsable_id", "responsable",
+    "nombre", "descripcion", "esta_completa",
+    "creado_en", "creado_por", "creado_por_nombre", "actualizado_en", "actualizado_por",
+]
+
+_SELECT_POR_HACER = """
+    SELECT p.id, p.solicitud_id, p.tarea_id, t.nombre AS tarea_nombre,
+           p.responsable_id, resp.nombre_completo AS responsable,
+           p.nombre, p.descripcion,
+           CASE WHEN p.esta_completa = 'Y' THEN true ELSE false END AS esta_completa,
+           p.creado_en, p.creado_por,
+           COALESCE(autor.nombre_completo, p.creado_por) AS creado_por_nombre,
+           p.actualizado_en, p.actualizado_por
+    FROM tarea_por_hacer p
+    LEFT JOIN tareas t ON t.id = p.tarea_id
+    LEFT JOIN miembros_equipo resp ON resp.id = p.responsable_id
+    LEFT JOIN miembros_equipo autor ON autor.usuario = p.creado_por
+"""
+
+
+def list_por_hacer_by_tarea(cursor, tarea_id: int) -> list[dict]:
+    """tarea_por_hacer no tiene borrado_en/borrado_por (mismo criterio que enlaces_tarea:
+    detalle interno de la tarea, sin borrado lógico auditado; ver delete_tarea)."""
+    cursor.execute(
+        _SELECT_POR_HACER + " WHERE p.tarea_id = %(tarea_id)s ORDER BY p.creado_en",
+        {"tarea_id": tarea_id},
+    )
+    return [dict(zip(_COLUMNAS_POR_HACER, row)) for row in cursor.fetchall()]
+
+
+def insert_por_hacer(
+    cursor,
+    tarea_id: int,
+    solicitud_id: int,
+    nombre: str,
+    descripcion: str | None,
+    responsable_id: int | None,
+    actor: str,
+) -> int:
+    """Un ítem nuevo siempre arranca incompleto ('N') — esta_completa no es un campo de
+    creación, se marca después con el PUT."""
+    cursor.execute(
+        """
+        INSERT INTO tarea_por_hacer
+            (solicitud_id, tarea_id, responsable_id, nombre, descripcion, esta_completa,
+             creado_en, creado_por, actualizado_en, actualizado_por)
+        VALUES
+            (%(solicitud_id)s, %(tarea_id)s, %(responsable_id)s, %(nombre)s, %(descripcion)s, 'N',
+             now(), %(actor)s, now(), %(actor)s)
+        RETURNING id
+        """,
+        {
+            "solicitud_id": solicitud_id,
+            "tarea_id": tarea_id,
+            "responsable_id": responsable_id,
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "actor": actor,
+        },
+    )
+    return cursor.fetchone()[0]
+
+
+def get_por_hacer_by_id(cursor, item_id: int) -> dict | None:
+    cursor.execute(_SELECT_POR_HACER + " WHERE p.id = %(id)s", {"id": item_id})
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return dict(zip(_COLUMNAS_POR_HACER, row))
+
+
+def update_por_hacer(
+    cursor,
+    item_id: int,
+    nombre: str,
+    descripcion: str | None,
+    responsable_id: int | None,
+    esta_completa: bool,
+    actor: str,
+) -> int:
+    """Reemplazo total (igual que update_comentario/update_hito, no COALESCE): el
+    formulario de edición y el toggle rápido de completado usan este mismo UPDATE,
+    siempre enviando el ítem completo."""
+    cursor.execute(
+        """
+        UPDATE tarea_por_hacer
+        SET nombre = %(nombre)s, descripcion = %(descripcion)s,
+            responsable_id = %(responsable_id)s, esta_completa = %(esta_completa)s,
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s
+        """,
+        {
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "responsable_id": responsable_id,
+            "esta_completa": "Y" if esta_completa else "N",
+            "id": item_id,
+            "actor": actor,
+        },
+    )
+    return cursor.rowcount
+
+
+def delete_por_hacer(cursor, item_id: int) -> int:
+    """Borrado físico real: tarea_por_hacer no tiene columnas de auditoría de borrado."""
+    cursor.execute("DELETE FROM tarea_por_hacer WHERE id = %(id)s", {"id": item_id})
+    return cursor.rowcount
+
+
 _ORDEN_SOLICITUDES = {
     # orden_visualizacion/orden ya existen en los catálogos para reflejar el flujo de
     # negocio (p. ej. estatus va En espera → Planeado → ... → Completado/Cancelado), no

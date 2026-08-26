@@ -211,6 +211,36 @@ class ComentarioCreateUpdate(BaseModel):
     texto_comentario: str = Field(min_length=1, max_length=4000)
 
 
+class PorHacerOut(BaseModel):
+    id: int
+    solicitud_id: int
+    tarea_id: int
+    tarea_nombre: str | None
+    responsable_id: int | None
+    responsable: str | None
+    nombre: str
+    descripcion: str | None
+    esta_completa: bool
+    creado_en: datetime
+    creado_por: str
+    creado_por_nombre: str
+    actualizado_en: datetime
+    actualizado_por: str
+
+
+class PorHacerCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    responsable_id: int | None = None
+
+
+class PorHacerUpdate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    responsable_id: int | None = None
+    esta_completa: bool = False
+
+
 class LoginRequest(BaseModel):
     usuario: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1, max_length=255)

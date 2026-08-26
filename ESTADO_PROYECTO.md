@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-26 (Fase 1.10 cerrada)
+Última actualización: 2026-08-26 (Fase 1.11 cerrada)
 
 ## Dónde vamos en el roadmap
 
@@ -12,9 +12,40 @@
 [x] Fase 1.8 (extraoficial) — Autenticación, roles Scrum y borrado lógico ✅ implementado y verificado end-to-end (2026-08-23)
 [x] Fase 1.9 (extraoficial) — Login obligatorio total, cambio forzado/autoservicio y recuperación de contraseña ✅ implementado y verificado end-to-end (2026-08-24)
 [x] Fase 1.10 (extraoficial) — Módulo de gestión de usuarios (alta/baja/actualización) ✅ implementado y verificado end-to-end (2026-08-26)
-[ ] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ⬜ no iniciado
+[x] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ✅ implementado y verificado end-to-end (2026-08-26)
 [ ] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ⬜ no iniciado
 ```
+
+**2026-08-26 — Fase 1.11, checklist "Por hacer" en tareas:** la tabla
+`solicitudes.tarea_por_hacer` ya existía en la BD real (esquema heredado, sin migración
+versionada del repo) pero no tenía backend ni frontend. Se agregó CRUD completo como nueva
+pestaña "Por hacer" en el detalle de tarea:
+
+- Backend: `GET`/`POST /api/tareas/{id}/por-hacer` (colección) y `PUT`/`DELETE
+  /api/tarea-por-hacer/{id}` (rutas planas, igual patrón que comentarios). `esta_completa`
+  se guarda como `'Y'`/`'N'` en la columna real (única convención documentada en el repo,
+  `004_estatus_tarea.sql`) pero se traduce a `bool` en `repository.py` — el schema y el
+  frontend nunca ven el detalle de almacenamiento.
+- Borrado físico real (`DELETE FROM`, no borrado lógico) — la tabla no tiene
+  `borrado_en`/`borrado_por`, mismo criterio ya usado en `enlaces_tarea` (documentado en el
+  docstring de `delete_tarea`).
+- **Hallazgo durante la verificación**: el docstring de `delete_tarea` decía que
+  `enlaces_tarea`/`tarea_por_hacer` "se borran físicos solos vía ON DELETE CASCADE" al borrar
+  la tarea/solicitud padre — pero `delete_tarea`/`delete_solicitud` hacen **borrado lógico**
+  (`UPDATE borrado_en`, nunca `DELETE FROM`), así que ese `ON DELETE CASCADE` en realidad
+  **nunca se dispara** por el flujo normal de la app. Verificado en la BD real: al borrar una
+  solicitud/tarea de prueba, la fila de `tarea_por_hacer` quedó huérfana (no se borró sola).
+  Este comportamiento ya era así de antes para `enlaces_tarea` (mismo diseño de FK) — no es
+  una regresión de esta fase, solo quedó documentado con precisión ahora. No se tocó código
+  para "corregirlo" (cambiaría el comportamiento ya existente de `enlaces_tarea` también,
+  fuera de alcance de esta fase).
+- Toggle rápido de completado (checkbox inline) reutiliza el mismo `PUT` de edición completa,
+  con actualización optimista en el frontend (sin recargar todo el detalle de la tarea).
+- 6 tests nuevos (`test_api_tareas.py` + nuevo `test_api_tarea_por_hacer.py`), 119 tests de
+  backend en verde. Verificado end-to-end en navegador: crear ítem, toggle de completado con
+  persistencia confirmada tras F5 (mapeo `'Y'/'N'` ↔ `bool` correcto), edición preservando
+  `esta_completa`, borrado individual, y el hallazgo de la cascada arriba. Datos de prueba
+  limpiados de la BD real al terminar (solicitud/tarea/ítem físicamente borrados).
 
 **2026-08-26 — Fase 1.10, módulo de gestión de usuarios:** hasta ahora `miembros_equipo`
 solo se poblaba por seed externo; la página Usuarios solo permitía otorgar/editar *acceso*
