@@ -1,35 +1,26 @@
 import { useState } from "react";
-import { actualizarAcceso, otorgarAcceso } from "../api.js";
+import { otorgarAcceso } from "../api.js";
 
 export default function AccesoFormulario({ miembro, roles, onGuardado, onCancelar }) {
-  const esEdicion = miembro.acceso_activo;
-
-  const [codigoRolScrum, setCodigoRolScrum] = useState(miembro.codigo_rol_scrum || roles[0]?.codigo || "");
-  const [accesoActivo, setAccesoActivo] = useState(miembro.acceso_activo);
+  const [codigoRolScrum, setCodigoRolScrum] = useState(roles[0]?.codigo || "");
   const [password, setPassword] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
 
   const enviar = async (event) => {
     event.preventDefault();
-    if (!esEdicion && (!password || password.length < 8)) {
+    if (!password || password.length < 8) {
       setError("La contraseña inicial debe tener al menos 8 caracteres.");
-      return;
-    }
-    if (password && password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
 
     setEnviando(true);
     setError(null);
     try {
-      const actualizado = esEdicion
-        ? await actualizarAcceso(miembro.id, { codigoRolScrum, accesoActivo, password: password || null })
-        : await otorgarAcceso(miembro.id, { password, codigoRolScrum });
+      const actualizado = await otorgarAcceso(miembro.id, { password, codigoRolScrum });
       onGuardado(actualizado);
     } catch (err) {
-      setError(err.message || "No se pudo guardar el acceso. Intenta de nuevo.");
+      setError(err.message || "No se pudo otorgar el acceso. Intenta de nuevo.");
     } finally {
       setEnviando(false);
     }
@@ -50,24 +41,13 @@ export default function AccesoFormulario({ miembro, roles, onGuardado, onCancela
         </select>
       </label>
 
-      {esEdicion && (
-        <label>
-          Acceso
-          <select value={accesoActivo ? "activo" : "inactivo"} onChange={(event) => setAccesoActivo(event.target.value === "activo")}>
-            <option value="activo">Activo</option>
-            <option value="inactivo">Desactivado</option>
-          </select>
-        </label>
-      )}
-
       <label>
-        {esEdicion ? "Nueva contraseña (opcional)" : "Contraseña inicial"}
+        Contraseña inicial
         <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder={esEdicion ? "Dejar vacío para no cambiarla" : ""}
-          required={!esEdicion}
+          required
         />
       </label>
 
@@ -75,7 +55,7 @@ export default function AccesoFormulario({ miembro, roles, onGuardado, onCancela
 
       <div className="resumen-acciones">
         <button type="submit" disabled={enviando}>
-          {enviando ? "Guardando..." : esEdicion ? "Guardar cambios" : "Otorgar acceso"}
+          {enviando ? "Guardando..." : "Otorgar acceso"}
         </button>
         <button type="button" className="secundario" disabled={enviando} onClick={onCancelar}>
           Cancelar

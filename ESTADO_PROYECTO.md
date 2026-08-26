@@ -1,21 +1,71 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-26
+Última actualización: 2026-08-26 (Fase 1.10 cerrada)
 
 ## Dónde vamos en el roadmap
 
 ```
 [x] Fase 1.1 — Ingestión por Correo         ✅ implementado y verificado end-to-end (Postgres)
 [x] Fase 1.2 — Chat Web                     ✅ implementado y verificado end-to-end (Postgres)
-[ ] Fase 1.3 — Conexión ERP Oracle          ⬜ no iniciado (bloqueado además por auth IMAP M365, ver abajo)
-[ ] Fase 1.4 — API pública de Solicitudes   ⬜ no iniciado (GET /api/solicitudes ya existe, ver Fase 1.6)
-[ ] Fase 1.5 — Ingesta de archivos (txt/md/docx/pdf) ⬜ no iniciado
 [x] Fase 1.6 — Página de Solicitudes (listado + formulario) ✅ implementado, verificado por API/tests
 [x] Fase 1.7 (extraoficial) — Vista maestro-detalle, editar/borrar solicitud, CRUD de tareas ✅ implementado y verificado end-to-end (2026-08-23)
-[ ] Fase 2   — Actualización de tareas      ⬜ no iniciado (parcialmente cubierto por el CRUD de tareas de la Fase 1.7, ver abajo)
 [x] Fase 1.8 (extraoficial) — Autenticación, roles Scrum y borrado lógico ✅ implementado y verificado end-to-end (2026-08-23)
 [x] Fase 1.9 (extraoficial) — Login obligatorio total, cambio forzado/autoservicio y recuperación de contraseña ✅ implementado y verificado end-to-end (2026-08-24)
+[x] Fase 1.10 (extraoficial) — Módulo de gestión de usuarios (alta/baja/actualización) ✅ implementado y verificado end-to-end (2026-08-26)
+[ ] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ⬜ no iniciado
+[ ] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ⬜ no iniciado
 ```
+
+**2026-08-26 — Fase 1.10, módulo de gestión de usuarios:** hasta ahora `miembros_equipo`
+solo se poblaba por seed externo; la página Usuarios solo permitía otorgar/editar *acceso*
+(rol + contraseña) a un miembro que ya existía como fila. Se agregó el CRUD completo:
+
+- **Alta en dos pasos** (decisión de diseño ya acordada): `POST /api/usuarios` crea solo la
+  identidad (usuario, nombre, correo) con `acceso_activo=false`; el flujo ya existente
+  "Otorgar acceso" se reusa sin cambios para el segundo paso (rol + contraseña).
+- **Baja lógica real**: nuevas columnas `borrado_en`/`borrado_por` en `miembros_equipo`
+  (migración `backend/sql/009_baja_logica_miembros.sql`, corrida contra la BD real), mismo
+  patrón que `solicitudes`/`tareas`/`comentarios`/`hitos`. `DELETE /api/usuarios/{id}` oculta
+  al miembro de `list_miembros`/`list_miembros_con_acceso` (selects de solicitante/
+  responsable y página Usuarios) y le revoca el acceso — pero **no** toca ningún JOIN
+  histórico: una solicitud/tarea ya atribuida a un miembro dado de baja sigue mostrando su
+  nombre con normalidad (verificado creando un miembro de prueba, asignándolo como
+  solicitante de una solicitud, dándolo de baja, y confirmando que la solicitud siguió
+  mostrando su nombre).
+- **Actualización unificada**: `PUT /api/usuarios/{id}` reemplaza el viejo
+  `PUT /{id}/acceso` — edita identidad y acceso (rol/activo/contraseña) en un solo formulario
+  (`EditarUsuarioFormulario.jsx`), reemplazando el uso de `AccesoFormulario` para edición
+  (que ahora solo cubre "otorgar acceso" la primera vez).
+- Nuevos índices únicos parciales (case-insensitive, solo entre miembros activos) en
+  `usuario`/`correo_electronico` — antes no había ningún constraint de unicidad; un
+  `usuario`/correo dado de baja puede reutilizarse en una alta nueva.
+- 9 tests nuevos en `backend/tests/test_api_usuarios.py` (23 en total en ese archivo), 112
+  tests de backend en verde. Verificado end-to-end en navegador: alta con 409 por duplicado,
+  otorgar acceso, edición unificada, aparición/desaparición en selectores de solicitante, baja
+  lógica, y persistencia del nombre en histórico. Datos de prueba limpiados de la BD real al
+  terminar (borrado físico, sin asociaciones reales). Detalle completo en
+  `00_ARCHIVOS/BITACORAS/2026-08-26.md` y plan `/home/lg/.claude/plans/sleepy-exploring-octopus.md`.
+
+**Cambio de alcance (2026-08-26):** se quitaron del roadmap las Fases 1.3 (Conexión ERP
+Oracle), 1.4 (API pública de Solicitudes), 1.5 (Ingesta de archivos) y 2 (Actualización de
+tareas, ya cubierta en la práctica por el CRUD de tareas de la Fase 1.7) — dejaron de ser
+prioridad. Se agregaron tres fases nuevas a pedido del usuario:
+
+- **Fase 1.10 — Módulo de gestión de usuarios:** hoy `UsuariosPage.jsx` solo permite
+  otorgar/editar el *acceso* (rol Scrum + contraseña) de miembros que ya existen como fila en
+  `miembros_equipo` — no hay alta de un miembro nuevo, ni baja (eliminar/desactivar al miembro
+  como persona, distinto de solo quitarle acceso de login), ni edición de sus datos propios
+  (nombre, correo). Falta diseñar e implementar el CRUD completo.
+- **Fase 1.11 — "Por hacer" en tareas:** la tabla `solicitudes.tarea_por_hacer` ya existe en
+  la base de datos real (`solicitud_id`, `tarea_id`, `responsable_id`, `nombre`, `descripcion`,
+  `esta_completa`, auditoría `creado_por`/`actualizado_por`) — viene del esquema original que
+  ya estaba poblado, pero hoy solo se menciona en un comentario de `repository.py` sobre
+  borrado en cascada; no tiene backend (endpoints) ni frontend. Es una lista de subtareas o
+  checklist asociada directamente a una tarea (`tareas`), no a la solicitud.
+- **Fase 1.12 — Monitor de tareas:** panel de indicadores clave (KPIs) para Scrum Master y
+  Product Owner, distinto del Tablero (kanban) que ya existe. Sin diseño todavía — falta
+  definir con el usuario qué indicadores exactamente (¿tareas vencidas, carga por responsable,
+  tiempo promedio de ciclo, cumplimiento de fechas planeadas vs. reales?).
 
 **Cambio importante de arquitectura (2026-08-23, ampliado 2026-08-24):** el portal ya no es
 de acceso libre. Hay login real (usuario/contraseña) sobre `miembros_equipo`, con 3 roles

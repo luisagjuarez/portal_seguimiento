@@ -1,4 +1,12 @@
-export default function ConfirmModal({ titulo, mensaje, onConfirmar, onCancelar, confirmando }) {
+export default function ConfirmModal({
+  titulo,
+  mensaje,
+  onConfirmar,
+  onCancelar,
+  confirmando,
+  textoConfirmar = "Sí, borrar",
+  textoConfirmando = "Borrando...",
+}) {
   return (
     <div className="modal-overlay" onClick={onCancelar}>
       <div className="modal-content" onClick={(event) => event.stopPropagation()}>
@@ -6,7 +14,7 @@ export default function ConfirmModal({ titulo, mensaje, onConfirmar, onCancelar,
         <p>{mensaje}</p>
         <div className="resumen-acciones">
           <button type="button" className="peligro" disabled={confirmando} onClick={onConfirmar}>
-            {confirmando ? "Borrando..." : "Sí, borrar"}
+            {confirmando ? textoConfirmando : textoConfirmar}
           </button>
           <button type="button" className="secundario" disabled={confirmando} onClick={onCancelar}>
             Cancelar

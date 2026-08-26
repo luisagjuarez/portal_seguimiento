@@ -239,6 +239,7 @@ class MiembroAccesoOut(BaseModel):
     id: int
     usuario: str
     nombre_completo: str
+    correo_electronico: str | None
     codigo_rol_scrum: str | None
     rol_scrum_descripcion: str | None
     acceso_activo: bool
@@ -249,7 +250,16 @@ class OtorgarAccesoRequest(BaseModel):
     codigo_rol_scrum: str = Field(min_length=1, max_length=20)
 
 
-class ActualizarAccesoRequest(BaseModel):
+class CrearMiembroRequest(BaseModel):
+    usuario: str = Field(min_length=1, max_length=255)
+    nombre_completo: str = Field(min_length=1, max_length=255)
+    correo_electronico: EmailStr | None = None
+
+
+class ActualizarMiembroRequest(BaseModel):
+    usuario: str | None = Field(default=None, min_length=1, max_length=255)
+    nombre_completo: str | None = Field(default=None, min_length=1, max_length=255)
+    correo_electronico: EmailStr | None = None
     codigo_rol_scrum: str | None = Field(default=None, min_length=1, max_length=20)
     acceso_activo: bool | None = None
     password: str | None = Field(default=None, min_length=8, max_length=255)

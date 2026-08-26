@@ -144,17 +144,46 @@ export async function otorgarAcceso(miembroId, { password, codigoRolScrum }) {
   return parseJsonOrThrow(response);
 }
 
-export async function actualizarAcceso(miembroId, { codigoRolScrum, accesoActivo, password }) {
-  const response = await fetch(`${API_BASE_URL}/api/usuarios/${miembroId}/acceso`, {
+export async function crearUsuario({ usuario, nombreCompleto, correoElectronico }) {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      usuario,
+      nombre_completo: nombreCompleto,
+      correo_electronico: correoElectronico || null,
+    }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarUsuario(
+  miembroId,
+  { usuario, nombreCompleto, correoElectronico, codigoRolScrum, accesoActivo, password },
+) {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios/${miembroId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
+      usuario: usuario || null,
+      nombre_completo: nombreCompleto || null,
+      correo_electronico: correoElectronico || null,
       codigo_rol_scrum: codigoRolScrum ?? null,
       acceso_activo: accesoActivo ?? null,
       password: password || null,
     }),
   });
   return parseJsonOrThrow(response);
+}
+
+export async function darDeBajaUsuario(miembroId) {
+  const response = await fetch(`${API_BASE_URL}/api/usuarios/${miembroId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
 }
 
 export async function fetchClientes(query) {

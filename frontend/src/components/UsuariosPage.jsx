@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import AccesoFormulario from "./AccesoFormulario.jsx";
-import { fetchRolesScrum, fetchUsuarios } from "../api.js";
+import EditarUsuarioFormulario from "./EditarUsuarioFormulario.jsx";
+import CrearUsuarioFormulario from "./CrearUsuarioFormulario.jsx";
+import ConfirmModal from "./ConfirmModal.jsx";
+import { darDeBajaUsuario, fetchRolesScrum, fetchUsuarios } from "../api.js";
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [mostrarCrear, setMostrarCrear] = useState(false);
   const [miembroEnEdicion, setMiembroEnEdicion] = useState(null);
+  const [miembroABajar, setMiembroABajar] = useState(null);
+  const [bajando, setBajando] = useState(false);
 
   const cargar = () => {
     setCargando(true);
@@ -25,9 +31,27 @@ export default function UsuariosPage() {
     cargar();
   }, []);
 
+  const alCrearUsuario = () => {
+    setMostrarCrear(false);
+    cargar();
+  };
+
   const alGuardarAcceso = () => {
     setMiembroEnEdicion(null);
     cargar();
+  };
+
+  const confirmarBaja = async () => {
+    setBajando(true);
+    try {
+      await darDeBajaUsuario(miembroABajar.id);
+      setMiembroABajar(null);
+      cargar();
+    } catch (err) {
+      setError(err.message || "No se pudo dar de baja al usuario.");
+    } finally {
+      setBajando(false);
+    }
   };
 
   if (cargando) {
@@ -38,6 +62,9 @@ export default function UsuariosPage() {
     <div className="solicitudes-page">
       <div className="solicitudes-encabezado">
         <h2>Usuarios</h2>
+        <button type="button" onClick={() => setMostrarCrear(true)}>
+          Crear usuario
+        </button>
       </div>
 
       {error && <p className="error-text">{error}</p>}
@@ -66,7 +93,10 @@ export default function UsuariosPage() {
                 </td>
                 <td>
                   <button type="button" className="secundario" onClick={() => setMiembroEnEdicion(usuario)}>
-                    {usuario.acceso_activo ? "Editar acceso" : "Otorgar acceso"}
+                    {usuario.acceso_activo ? "Editar usuario" : "Otorgar acceso"}
+                  </button>
+                  <button type="button" className="peligro" onClick={() => setMiembroABajar(usuario)}>
+                    Dar de baja
                   </button>
                 </td>
               </tr>
@@ -75,18 +105,48 @@ export default function UsuariosPage() {
         </table>
       </div>
 
+      {mostrarCrear && (
+        <div className="modal-overlay" onClick={() => setMostrarCrear(false)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <h3>Crear usuario</h3>
+            <CrearUsuarioFormulario onCreado={alCrearUsuario} onCancelar={() => setMostrarCrear(false)} />
+          </div>
+        </div>
+      )}
+
       {miembroEnEdicion && (
         <div className="modal-overlay" onClick={() => setMiembroEnEdicion(null)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-            <h3>{miembroEnEdicion.acceso_activo ? "Editar acceso" : "Otorgar acceso"}</h3>
-            <AccesoFormulario
-              miembro={miembroEnEdicion}
-              roles={roles}
-              onGuardado={alGuardarAcceso}
-              onCancelar={() => setMiembroEnEdicion(null)}
-            />
+            <h3>{miembroEnEdicion.acceso_activo ? "Editar usuario" : "Otorgar acceso"}</h3>
+            {miembroEnEdicion.acceso_activo ? (
+              <EditarUsuarioFormulario
+                miembro={miembroEnEdicion}
+                roles={roles}
+                onGuardado={alGuardarAcceso}
+                onCancelar={() => setMiembroEnEdicion(null)}
+              />
+            ) : (
+              <AccesoFormulario
+                miembro={miembroEnEdicion}
+                roles={roles}
+                onGuardado={alGuardarAcceso}
+                onCancelar={() => setMiembroEnEdicion(null)}
+              />
+            )}
           </div>
         </div>
+      )}
+
+      {miembroABajar && (
+        <ConfirmModal
+          titulo="Dar de baja"
+          mensaje={`¿Seguro que quieres dar de baja a ${miembroABajar.nombre_completo}? Dejará de aparecer en Usuarios y en los selectores de solicitante/responsable, y perderá el acceso al portal.`}
+          confirmando={bajando}
+          textoConfirmar="Sí, dar de baja"
+          textoConfirmando="Procesando..."
+          onConfirmar={confirmarBaja}
+          onCancelar={() => setMiembroABajar(null)}
+        />
       )}
     </div>
   );

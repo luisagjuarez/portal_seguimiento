@@ -239,7 +239,8 @@ def mark_email_processed(cursor, message_id: str, id_solicitud: int | None) -> N
 
 def list_miembros(cursor) -> list[dict]:
     cursor.execute(
-        "SELECT id, nombre_completo, correo_electronico FROM miembros_equipo ORDER BY nombre_completo"
+        "SELECT id, nombre_completo, correo_electronico FROM miembros_equipo "
+        "WHERE borrado_en IS NULL ORDER BY nombre_completo"
     )
     return [
         {"id": row[0], "nombre_completo": row[1], "correo_electronico": row[2]}
@@ -316,14 +317,18 @@ def get_miembro_by_email(cursor, correo: str) -> dict | None:
 def list_miembros_con_acceso(cursor) -> list[dict]:
     cursor.execute(
         """
-        SELECT m.id, m.usuario, m.nombre_completo, m.codigo_rol_scrum,
+        SELECT m.id, m.usuario, m.nombre_completo, m.correo_electronico, m.codigo_rol_scrum,
                r.descripcion AS rol_scrum_descripcion, m.acceso_activo
         FROM miembros_equipo m
         LEFT JOIN roles_scrum r ON r.codigo = m.codigo_rol_scrum
+        WHERE m.borrado_en IS NULL
         ORDER BY m.nombre_completo
         """
     )
-    columnas = ["id", "usuario", "nombre_completo", "codigo_rol_scrum", "rol_scrum_descripcion", "acceso_activo"]
+    columnas = [
+        "id", "usuario", "nombre_completo", "correo_electronico", "codigo_rol_scrum",
+        "rol_scrum_descripcion", "acceso_activo",
+    ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
@@ -343,36 +348,93 @@ def otorgar_acceso_miembro(cursor, miembro_id: int, password_hash: str, codigo_r
     return cursor.rowcount
 
 
-def actualizar_acceso_miembro(
+def crear_miembro(
+    cursor, usuario: str, nombre_completo: str, correo_electronico: str | None, actor: str
+) -> int:
+    """Crea solo la identidad (sin rol/contraseña/acceso) — el miembro nace con
+    acceso_activo=false. El segundo paso (otorgar_acceso_miembro, vía POST /{id}/acceso)
+    sigue siendo el único que fija password_hash/codigo_rol_scrum. Los índices únicos
+    parciales de la migración 009 (sobre borrado_en IS NULL) son los que garantizan
+    no-duplicados; el IntegrityError se traduce a 409 en la ruta."""
+    cursor.execute(
+        """
+        INSERT INTO miembros_equipo
+            (usuario, nombre_completo, correo_electronico, creado_en, creado_por,
+             actualizado_en, actualizado_por)
+        VALUES
+            (%(usuario)s, %(nombre_completo)s, %(correo_electronico)s, now(), %(actor)s, now(), %(actor)s)
+        RETURNING id
+        """,
+        {
+            "usuario": usuario,
+            "nombre_completo": nombre_completo,
+            "correo_electronico": correo_electronico,
+            "actor": actor,
+        },
+    )
+    return cursor.fetchone()[0]
+
+
+def actualizar_miembro(
     cursor,
     miembro_id: int,
+    usuario: str | None,
+    nombre_completo: str | None,
+    correo_electronico: str | None,
     codigo_rol_scrum: str | None,
     acceso_activo: bool | None,
     password_hash: str | None,
+    actor: str,
 ) -> int:
-    """Todos los campos son opcionales (solo se actualiza lo que no sea None) — el mismo
-    endpoint sirve para cambiar rol, activar/desactivar, y/o resetear la contraseña. Igual
-    que en otorgar_acceso_miembro, si viene password_hash (el Scrum Master reseteó la
-    contraseña de alguien) se fuerza debe_cambiar_password."""
+    """Un único UPDATE con COALESCE por campo (todo opcional): edita identidad
+    (usuario/nombre_completo/correo_electronico) y acceso (rol/activo/contraseña) en la
+    misma pantalla — formulario unificado de la Fase 1.10. Igual que antes, si viene
+    password_hash se fuerza debe_cambiar_password. No permite editar un miembro ya dado de
+    baja (borrado_en IS NULL en el WHERE)."""
     cursor.execute(
         """
         UPDATE miembros_equipo
-        SET codigo_rol_scrum = COALESCE(%(codigo_rol_scrum)s, codigo_rol_scrum),
+        SET usuario = COALESCE(%(usuario)s, usuario),
+            nombre_completo = COALESCE(%(nombre_completo)s, nombre_completo),
+            correo_electronico = COALESCE(%(correo_electronico)s, correo_electronico),
+            codigo_rol_scrum = COALESCE(%(codigo_rol_scrum)s, codigo_rol_scrum),
             acceso_activo = COALESCE(%(acceso_activo)s, acceso_activo),
             password_hash = COALESCE(%(password_hash)s, password_hash),
             debe_cambiar_password = CASE
                 WHEN %(password_hash)s IS NOT NULL THEN true
                 ELSE debe_cambiar_password
             END,
-            actualizado_en = now(), actualizado_por = current_user
-        WHERE id = %(id)s
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
         """,
         {
+            "usuario": usuario,
+            "nombre_completo": nombre_completo,
+            "correo_electronico": correo_electronico,
             "codigo_rol_scrum": codigo_rol_scrum,
             "acceso_activo": acceso_activo,
             "password_hash": password_hash,
             "id": miembro_id,
+            "actor": actor,
         },
+    )
+    return cursor.rowcount
+
+
+def dar_de_baja_miembro(cursor, miembro_id: int, actor: str) -> int:
+    """Borrado lógico: oculta al miembro de list_miembros/list_miembros_con_acceso y le
+    revoca el acceso (get_current_user también exige acceso_activo=true en cada request, así
+    que una sesión JWT vigente deja de servir). No toca ningún JOIN de solicitudes/tareas/
+    comentarios/hitos hacia miembros_equipo — el histórico sigue mostrando su nombre."""
+    cursor.execute(
+        """
+        UPDATE miembros_equipo
+        SET borrado_en = now(), borrado_por = %(actor)s,
+            acceso_activo = false,
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
+        """,
+        {"actor": actor, "id": miembro_id},
     )
     return cursor.rowcount
 
