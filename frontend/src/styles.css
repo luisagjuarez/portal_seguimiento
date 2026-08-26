@@ -118,20 +118,25 @@ textarea {
   gap: 0.25rem;
 }
 
-.sidebar button {
+.sidebar a {
+  display: block;
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
+  text-decoration: none;
+  cursor: pointer;
   background: transparent;
   color: #d1d5db;
+  padding: 0.5rem 0.9rem;
   border-radius: 8px;
 }
 
-.sidebar button:hover {
+.sidebar a:hover {
   background: #1f2937;
   color: #fff;
 }
 
-.sidebar button.sidebar-activo {
+.sidebar a.sidebar-activo {
   background: #2563eb;
   color: #fff;
 }

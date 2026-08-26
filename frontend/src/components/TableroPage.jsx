@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import TableroColumna from "./TableroColumna.jsx";
 import { actualizarTarea, fetchEstatusTarea, fetchMiembrosEquipo, fetchTareasTablero } from "../api.js";
 
-export default function TableroPage({ onVerTarea }) {
+export default function TableroPage() {
+  const navigate = useNavigate();
   const [tareas, setTareas] = useState([]);
   const [estatusTarea, setEstatusTarea] = useState([]);
   const [miembros, setMiembros] = useState([]);
@@ -105,7 +107,7 @@ export default function TableroPage({ onVerTarea }) {
                 key={estatus.codigo}
                 estatus={estatus}
                 tareas={tareas.filter((t) => t.codigo_estatus_tarea === estatus.codigo)}
-                onAbrirTarea={onVerTarea}
+                onAbrirTarea={(id) => navigate(`/tareas/${id}`)}
               />
             ))}
           </div>

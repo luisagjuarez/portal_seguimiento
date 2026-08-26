@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar.jsx";
 import InicioPage from "./components/InicioPage.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
@@ -25,10 +26,8 @@ function leerPreferenciaSidebar() {
 }
 
 export default function App() {
-  const [pagina, setPagina] = useState("inicio");
-  const [solicitudSeleccionadaId, setSolicitudSeleccionadaId] = useState(null);
-  const [tareaSeleccionadaId, setTareaSeleccionadaId] = useState(null);
-  const [origenTarea, setOrigenTarea] = useState("solicitud");
+  const navigate = useNavigate();
+  const location = useLocation();
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [restaurandoSesion, setRestaurandoSesion] = useState(Boolean(getToken()));
   const [resetToken, setResetToken] = useState(
@@ -53,37 +52,10 @@ export default function App() {
     return () => window.removeEventListener("dovela:sesion-expirada", alExpirarSesion);
   }, []);
 
-  const verDetalleSolicitud = (id) => {
-    setSolicitudSeleccionadaId(id);
-    setPagina("solicitud-detalle");
-  };
-
-  const regresarASolicitudes = () => {
-    setSolicitudSeleccionadaId(null);
-    setPagina("solicitudes");
-  };
-
-  const verDetalleTareaDesdeSolicitud = (id) => {
-    setTareaSeleccionadaId(id);
-    setOrigenTarea("solicitud");
-    setPagina("tarea-detalle");
-  };
-
-  const verDetalleTareaDesdeTablero = (id) => {
-    setTareaSeleccionadaId(id);
-    setOrigenTarea("tablero");
-    setPagina("tarea-detalle");
-  };
-
-  const regresarDeTareaDetalle = () => {
-    setTareaSeleccionadaId(null);
-    setPagina(origenTarea === "tablero" ? "tablero" : "solicitud-detalle");
-  };
-
   const cerrarSesion = () => {
     clearToken();
     setUsuarioActual(null);
-    setPagina("inicio");
+    navigate("/");
   };
 
   const limpiarResetToken = () => {
@@ -97,7 +69,7 @@ export default function App() {
 
   const alCambiarPasswordAutoservicio = () => {
     setUsuarioActual((actual) => ({ ...actual, debe_cambiar_password: false }));
-    setPagina("inicio");
+    navigate("/");
   };
 
   const alternarSidebar = () => {
@@ -117,14 +89,12 @@ export default function App() {
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
   const puedeMostrarSidebar = usuarioActual && !debeCambiarPassword;
-  const pantallaCentrada = pantallaSinSidebar || pagina === "inicio" || pagina === "chat";
+  const pantallaCentrada = pantallaSinSidebar || location.pathname === "/" || location.pathname === "/chat";
 
   return (
     <div className="app-layout">
       {puedeMostrarSidebar && sidebarVisible && (
         <Sidebar
-          paginaActual={pagina}
-          onCambiarPagina={setPagina}
           usuarioActual={usuarioActual}
           esScrumMaster={esScrumMaster}
           onCerrarSesion={cerrarSesion}
@@ -147,7 +117,7 @@ export default function App() {
           </div>
           <div className="theme-toggle-wrap">
             {puedeMostrarSidebar && (
-              <button type="button" className="secundario" onClick={() => setPagina("cambiar-password")}>
+              <button type="button" className="secundario" onClick={() => navigate("/cambiar-password")}>
                 Cambiar contraseña
               </button>
             )}
@@ -162,35 +132,32 @@ export default function App() {
             <CambiarPasswordFormulario obligatorio onCambiada={alCambiarPasswordObligatorio} />
           )}
           {!resetToken && !restaurandoSesion && !requiereSesion && !debeCambiarPassword && (
-            <>
-              {pagina === "inicio" && <InicioPage usuarioActual={usuarioActual} onIrA={setPagina} />}
-              {pagina === "chat" && <ChatWindow usuarioActual={usuarioActual} />}
-              {pagina === "solicitudes" && <SolicitudesPage onVerDetalle={verDetalleSolicitud} />}
-              {pagina === "solicitud-detalle" && (
-                <SolicitudDetallePage
-                  solicitudId={solicitudSeleccionadaId}
-                  onRegresar={regresarASolicitudes}
-                  onVerTarea={verDetalleTareaDesdeSolicitud}
-                  esScrumMaster={esScrumMaster}
-                />
-              )}
-              {pagina === "tablero" && <TableroPage onVerTarea={verDetalleTareaDesdeTablero} />}
-              {pagina === "tarea-detalle" && (
-                <TareaDetallePage
-                  tareaId={tareaSeleccionadaId}
-                  onRegresar={regresarDeTareaDetalle}
-                  onVerSolicitud={verDetalleSolicitud}
-                />
-              )}
-              {pagina === "usuarios" && esScrumMaster && <UsuariosPage />}
-              {pagina === "cambiar-password" && (
-                <CambiarPasswordFormulario
-                  obligatorio={false}
-                  onCambiada={alCambiarPasswordAutoservicio}
-                  onCancelar={() => setPagina("inicio")}
-                />
-              )}
-            </>
+            <Routes>
+              <Route path="/" element={<InicioPage usuarioActual={usuarioActual} />} />
+              <Route path="/chat" element={<ChatWindow usuarioActual={usuarioActual} />} />
+              <Route path="/solicitudes" element={<SolicitudesPage />} />
+              <Route
+                path="/solicitudes/:id"
+                element={<SolicitudDetallePage esScrumMaster={esScrumMaster} />}
+              />
+              <Route path="/tablero" element={<TableroPage />} />
+              <Route path="/tareas/:id" element={<TareaDetallePage />} />
+              <Route
+                path="/usuarios"
+                element={esScrumMaster ? <UsuariosPage /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/cambiar-password"
+                element={
+                  <CambiarPasswordFormulario
+                    obligatorio={false}
+                    onCambiada={alCambiarPasswordAutoservicio}
+                    onCancelar={() => navigate("/")}
+                  />
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           )}
         </main>
       </div>

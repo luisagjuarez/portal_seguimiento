@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import ConfirmModal from "./ConfirmModal.jsx";
 import HitoFormulario from "./HitoFormulario.jsx";
 import ComentarioFormulario from "./ComentarioFormulario.jsx";
@@ -30,8 +31,14 @@ function formatearFecha(iso) {
   }
 }
 
-export default function TareaDetallePage({ tareaId, onRegresar, onVerSolicitud }) {
+export default function TareaDetallePage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const tareaId = Number(id);
+  const onVerSolicitud = (solicitudId) => navigate(`/solicitudes/${solicitudId}`);
+
   const [tarea, setTarea] = useState(null);
+  const onRegresar = () => navigate(tarea ? `/solicitudes/${tarea.solicitud_id}` : "/tablero");
   const [hito, setHito] = useState(null);
   const [comentarios, setComentarios] = useState([]);
   const [enlaces, setEnlaces] = useState([]);

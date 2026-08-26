@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-24
+Última actualización: 2026-08-25
 
 ## Dónde vamos en el roadmap
 
@@ -96,6 +96,19 @@ acceso de prueba a `DOVELA_WA` (Team) → `ClaveInicial2026!` y `DOVELA_JC` (Pro
 → `ClaveJC2026!` — el resto de los 12 miembros del equipo siguen sin acceso
 (`acceso_activo=false`) hasta que el Scrum Master se los otorgue desde la página
 "Usuarios".
+
+**2026-08-25 — Migración de navegación por estado a rutas reales (⚠️ en progreso, falta
+verificación visual):** el frontend era efectivamente una landing page de una sola pantalla
+(`App.jsx` con un `useState("pagina")` decidiendo qué renderizar, sin URLs reales, sin F5
+funcional, sin poder compartir un link directo). Se migró a `react-router-dom` con rutas reales
+(`/`, `/chat`, `/solicitudes`, `/solicitudes/:id`, `/tablero`, `/tareas/:id`, `/usuarios`,
+`/cambiar-password`). `npm run build` en verde y el fallback SPA de `nginx.conf`
+(`try_files ... /index.html`, ya existía, no se tocó) confirmado por `curl` sirviendo rutas
+profundas con `200`. **Falta la verificación visual en navegador** (checklist completo en
+`00_ARCHIVOS/BITACORAS/2026-08-25.md`) — no se pudo hacer en esa sesión por falta de conexión
+de la extensión Claude-in-Chrome; el usuario la hará en la próxima sesión. Detalle completo,
+plan y decisiones de diseño en `00_ARCHIVOS/BITACORAS/2026-08-25.md` y
+`/home/lg/.claude/plans/quirky-watching-boole.md`.
 
 A partir de esta sesión, el detalle de cada tarea trabajada se registra en
 `00_ARCHIVOS/BITACORAS/AAAA-MM-DD.md` (un archivo por día). Este documento sigue siendo la
@@ -336,6 +349,10 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
+0. **⭐ Verificar en navegador la migración a rutas reales (2026-08-25).** El código ya está
+   escrito y el build pasa, pero falta el recorrido visual completo (navegar por el sidebar,
+   refrescar F5 en `/solicitudes/:id` y `/tareas/:id`, recuperación de contraseña, guard de
+   `/usuarios`). Checklist completo en `00_ARCHIVOS/BITACORAS/2026-08-25.md`.
 1. **⭐ Otorgar acceso al resto del equipo.** Solo `DOVELA_LG` (Scrum Master), `DOVELA_WA`
    (Team, contraseña de prueba) y `DOVELA_JC` (Product Owner, contraseña de prueba) tienen
    acceso activo hoy. Los otros 9 miembros siguen con `acceso_activo=false`. `DOVELA_LG`

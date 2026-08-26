@@ -1,28 +1,29 @@
+import { NavLink } from "react-router-dom";
 import logoDovela from "../assets/logo-dovela.png";
 
 const OPCIONES = [
-  { id: "inicio", etiqueta: "Inicio" },
-  { id: "chat", etiqueta: "Solicitud por Chat" },
-  { id: "solicitudes", etiqueta: "Solicitudes" },
-  { id: "tablero", etiqueta: "Tablero" },
+  { ruta: "/", etiqueta: "Inicio" },
+  { ruta: "/chat", etiqueta: "Solicitud por Chat" },
+  { ruta: "/solicitudes", etiqueta: "Solicitudes" },
+  { ruta: "/tablero", etiqueta: "Tablero" },
 ];
 
-export default function Sidebar({ paginaActual, onCambiarPagina, usuarioActual, esScrumMaster, onCerrarSesion }) {
-  const opciones = esScrumMaster ? [...OPCIONES, { id: "usuarios", etiqueta: "Usuarios" }] : OPCIONES;
+export default function Sidebar({ usuarioActual, esScrumMaster, onCerrarSesion }) {
+  const opciones = esScrumMaster ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }] : OPCIONES;
 
   return (
     <nav className="sidebar">
       <img src={logoDovela} alt="Dovela Software" className="sidebar-logo" />
       <ul>
         {opciones.map((opcion) => (
-          <li key={opcion.id}>
-            <button
-              type="button"
-              className={opcion.id === paginaActual ? "sidebar-activo" : ""}
-              onClick={() => onCambiarPagina(opcion.id)}
+          <li key={opcion.ruta}>
+            <NavLink
+              to={opcion.ruta}
+              end={opcion.ruta === "/"}
+              className={({ isActive }) => (isActive ? "sidebar-activo" : "")}
             >
               {opcion.etiqueta}
-            </button>
+            </NavLink>
           </li>
         ))}
       </ul>

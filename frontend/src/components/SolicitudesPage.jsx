@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SolicitudCard from "./SolicitudCard.jsx";
 import CrearSolicitudFormulario from "./CrearSolicitudFormulario.jsx";
 import { fetchEstatus, fetchSolicitudes } from "../api.js";
 
-export default function SolicitudesPage({ onVerDetalle }) {
+export default function SolicitudesPage() {
+  const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
   const [estatusCatalogo, setEstatusCatalogo] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -91,7 +93,11 @@ export default function SolicitudesPage({ onVerDetalle }) {
 
       <div className="solicitudes-grid">
         {solicitudes.map((solicitud) => (
-          <SolicitudCard key={solicitud.id} solicitud={solicitud} onSeleccionar={onVerDetalle} />
+          <SolicitudCard
+            key={solicitud.id}
+            solicitud={solicitud}
+            onSeleccionar={(id) => navigate(`/solicitudes/${id}`)}
+          />
         ))}
       </div>
 

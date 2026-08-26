@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import ComentarioItem from "./ComentarioItem.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import EditarSolicitudFormulario from "./EditarSolicitudFormulario.jsx";
@@ -43,7 +44,12 @@ function formatearFechaCorta(iso) {
   }
 }
 
-export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTarea, esScrumMaster }) {
+export default function SolicitudDetallePage({ esScrumMaster }) {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const solicitudId = Number(id);
+  const onRegresar = () => navigate("/solicitudes");
+
   const [solicitud, setSolicitud] = useState(null);
   const [tareas, setTareas] = useState([]);
   const [comentarios, setComentarios] = useState([]);
@@ -274,7 +280,7 @@ export default function SolicitudDetallePage({ solicitudId, onRegresar, onVerTar
                     setMostrarFormularioTarea(true);
                   }}
                   onBorrar={setTareaABorrar}
-                  onAbrirDetalle={onVerTarea}
+                  onAbrirDetalle={(tareaId) => navigate(`/tareas/${tareaId}`)}
                 />
               ))}
             </div>
