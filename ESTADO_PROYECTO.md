@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-25
+Última actualización: 2026-08-26
 
 ## Dónde vamos en el roadmap
 
@@ -91,23 +91,32 @@ diseño y la implementación en `00_ARCHIVOS/BITACORAS/2026-08-24.md` y en el pl
   `DovelaScrum2026!` (la ya documentada arriba). 89 tests de backend en verde (17 nuevos).
 
 **Credenciales creadas durante la implementación (pendiente que el usuario las cambie o
-las tome nota):** `DOVELA_LG` (Scrum Master) → `DovelaScrum2026!`. También se otorgó
-acceso de prueba a `DOVELA_WA` (Team) → `ClaveInicial2026!` y `DOVELA_JC` (Product Owner)
-→ `ClaveJC2026!` — el resto de los 12 miembros del equipo siguen sin acceso
-(`acceso_activo=false`) hasta que el Scrum Master se los otorgue desde la página
+las tome nota):** `DOVELA_LG` (Scrum Master) → `DovelaScrum2026!` (⚠️ el usuario la cambió
+en algún momento antes del 2026-08-26 a `Latitude123$` — ver
+`00_ARCHIVOS/BITACORAS/2026-08-26.md`). También se otorgó
+acceso de prueba a `DOVELA_WA` (Team) → `ClaveInicial2026!` (confirmada vigente el
+2026-08-26) y `DOVELA_JC` (Product Owner) → `ClaveJC2026!` — el resto de los 12 miembros del
+equipo siguen sin acceso (`acceso_activo=false`) hasta que el Scrum Master se los otorgue
+desde la página
 "Usuarios".
 
-**2026-08-25 — Migración de navegación por estado a rutas reales (⚠️ en progreso, falta
-verificación visual):** el frontend era efectivamente una landing page de una sola pantalla
-(`App.jsx` con un `useState("pagina")` decidiendo qué renderizar, sin URLs reales, sin F5
-funcional, sin poder compartir un link directo). Se migró a `react-router-dom` con rutas reales
-(`/`, `/chat`, `/solicitudes`, `/solicitudes/:id`, `/tablero`, `/tareas/:id`, `/usuarios`,
-`/cambiar-password`). `npm run build` en verde y el fallback SPA de `nginx.conf`
-(`try_files ... /index.html`, ya existía, no se tocó) confirmado por `curl` sirviendo rutas
-profundas con `200`. **Falta la verificación visual en navegador** (checklist completo en
-`00_ARCHIVOS/BITACORAS/2026-08-25.md`) — no se pudo hacer en esa sesión por falta de conexión
-de la extensión Claude-in-Chrome; el usuario la hará en la próxima sesión. Detalle completo,
-plan y decisiones de diseño en `00_ARCHIVOS/BITACORAS/2026-08-25.md` y
+**2026-08-25 — Migración de navegación por estado a rutas reales (✅ implementado y
+verificado end-to-end en navegador el 2026-08-26):** el frontend era efectivamente una
+landing page de una sola pantalla (`App.jsx` con un `useState("pagina")` decidiendo qué
+renderizar, sin URLs reales, sin F5 funcional, sin poder compartir un link directo). Se
+migró a `react-router-dom` con rutas reales (`/`, `/chat`, `/solicitudes`, `/solicitudes/:id`,
+`/tablero`, `/tareas/:id`, `/usuarios`, `/cambiar-password`). `npm run build` en verde y el
+fallback SPA de `nginx.conf` (`try_files ... /index.html`, ya existía, no se tocó) confirmado
+por `curl` sirviendo rutas profundas con `200`. Verificación visual completa en navegador
+(checklist de `00_ARCHIVOS/BITACORAS/2026-08-25.md`, ejecutada el 2026-08-26): navegación por
+sidebar cambia la URL en cada opción; `/solicitudes/<id>` sobrevive a F5; desde una tarea
+(abierta tanto desde una solicitud como desde el Tablero) "Regresar" navega a la solicitud
+padre; "Cambiar contraseña" → `/cambiar-password` y cancelar vuelve a `/`; cerrar sesión
+vuelve a `/` sin sidebar; el flujo de recuperación de contraseña por correo (`?reset_token=`)
+se probó de punta a punta con `DOVELA_WA` leyendo el link real del mailserver de pruebas por
+IMAP; un usuario sin rol Scrum Master (`DOVELA_WA`, rol Team) no puede llegar a `/usuarios`
+por URL directa (redirige a `/`). Sin hallazgos — no hizo falta ningún cambio de código.
+Detalle completo, plan y decisiones de diseño en `00_ARCHIVOS/BITACORAS/2026-08-25.md` y
 `/home/lg/.claude/plans/quirky-watching-boole.md`.
 
 A partir de esta sesión, el detalle de cada tarea trabajada se registra en
