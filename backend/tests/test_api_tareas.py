@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.app import app
+from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
 import app.api.routes_tareas as routes
 
 
@@ -204,6 +206,18 @@ def test_borrar_tarea_404(monkeypatch):
     assert fake_conn.rolled_back is True
 
 
+def test_borrar_tarea_403_si_no_es_scrum_master():
+    def _denegar_scrum_master():
+        raise HTTPException(status_code=403, detail="Solo el Scrum Master puede hacer esto")
+
+    app.dependency_overrides[require_scrum_master] = _denegar_scrum_master
+    try:
+        response = client.delete("/api/tareas/1")
+        assert response.status_code == 403
+    finally:
+        del app.dependency_overrides[require_scrum_master]
+
+
 def _fake_hito(hito_id=1):
     return {
         "id": hito_id,
@@ -345,6 +359,68 @@ def test_borrar_hito_tarea_404_sin_hito(monkeypatch):
 
     assert response.status_code == 404
     assert fake_conn.rolled_back is True
+
+
+def test_actualizar_hito_tarea_403_si_no_es_autor_ni_scrum_master(monkeypatch):
+    """_fake_hito() tiene creado_por="DOVELA_LG"; un Team distinto no puede editarlo."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_hito_by_tarea", lambda cursor, id: _fake_hito())
+
+    otro_usuario = UsuarioActual(
+        id=2, usuario="DOVELA_WA", nombre_completo="Wilber Alegria",
+        codigo_rol_scrum="TEAM", correo_electronico=None, debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: otro_usuario
+    try:
+        response = client.put(
+            "/api/tareas/1/hito", json={"nombre": "Intento ajeno", "fecha_vencimiento": "2026-09-15"}
+        )
+        assert response.status_code == 403
+    finally:
+        del app.dependency_overrides[get_current_user]
+
+
+def test_borrar_hito_tarea_403_si_no_es_autor_ni_scrum_master(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_hito_by_tarea", lambda cursor, id: _fake_hito())
+
+    otro_usuario = UsuarioActual(
+        id=2, usuario="DOVELA_WA", nombre_completo="Wilber Alegria",
+        codigo_rol_scrum="TEAM", correo_electronico=None, debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: otro_usuario
+    try:
+        response = client.delete("/api/tareas/1/hito")
+        assert response.status_code == 403
+    finally:
+        del app.dependency_overrides[get_current_user]
+
+
+def test_actualizar_hito_tarea_200_si_es_el_autor_aunque_no_sea_scrum_master(monkeypatch):
+    """_fake_hito() tiene creado_por="DOVELA_LG"; ese mismo usuario, aunque su rol sea Team,
+    puede editar su propio hito."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_hito_by_tarea", lambda cursor, id: _fake_hito())
+    monkeypatch.setattr(routes.repository, "update_hito", lambda cursor, id, **kwargs: 1)
+
+    autor_no_scrum_master = UsuarioActual(
+        id=1, usuario="DOVELA_LG", nombre_completo="Luis Gómez",
+        codigo_rol_scrum="TEAM", correo_electronico=None, debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: autor_no_scrum_master
+    try:
+        response = client.put(
+            "/api/tareas/1/hito", json={"nombre": "Entrega beta v2", "fecha_vencimiento": "2026-09-20"}
+        )
+        assert response.status_code == 200
+    finally:
+        del app.dependency_overrides[get_current_user]
 
 
 def _fake_comentario(comentario_id=1, tarea_id=1):

@@ -3,6 +3,7 @@ export const CLASE_POR_ESTATUS = {
   "EN PROGRESO": "tarea-estado-en-progreso",
   "EN REVISION": "tarea-estado-en-revision",
   COMPLETADO: "tarea-estado-completa",
+  CANCELADO: "tarea-estado-cancelado",
 };
 
 // Mismos hues que CLASE_POR_ESTATUS, pero en el tono saturado usado como texto de las
@@ -13,4 +14,5 @@ export const RELLENO_POR_ESTATUS = {
   "EN PROGRESO": "monitor-bar-fill-en-progreso",
   "EN REVISION": "monitor-bar-fill-en-revision",
   COMPLETADO: "monitor-bar-fill-completado",
+  CANCELADO: "monitor-bar-fill-cancelado",
 };

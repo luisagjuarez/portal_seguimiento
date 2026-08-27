@@ -148,7 +148,10 @@ export default function App() {
                 path="/monitor"
                 element={puedeVerMonitor ? <MonitorPage /> : <Navigate to="/" replace />}
               />
-              <Route path="/tareas/:id" element={<TareaDetallePage />} />
+              <Route
+                path="/tareas/:id"
+                element={<TareaDetallePage usuarioActual={usuarioActual} esScrumMaster={esScrumMaster} />}
+              />
               <Route
                 path="/usuarios"
                 element={esScrumMaster ? <UsuariosPage /> : <Navigate to="/" replace />}

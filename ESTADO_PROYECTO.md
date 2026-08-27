@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-26 (Fase 1.12 cerrada)
+Última actualización: 2026-08-27 (Fase 1.13 cerrada)
 
 ## Dónde vamos en el roadmap
 
@@ -14,7 +14,25 @@
 [x] Fase 1.10 (extraoficial) — Módulo de gestión de usuarios (alta/baja/actualización) ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ✅ implementado y verificado end-to-end (2026-08-26)
+[x] Fase 1.13 (extraoficial) — Reglas de permisos más finas por rol (borrar solo Scrum Master, editar/borrar propio en comentarios/hitos/"por hacer") ✅ implementado y verificado end-to-end (2026-08-27)
 ```
+
+**2026-08-27 — Fase 1.13, reglas de permisos más finas por rol:** hasta ahora solo había 2
+reglas de rol reales (crear tarea y gestión de usuarios, ambas Scrum Master); todo lo demás
+—editar/borrar solicitudes y tareas, crear/editar/borrar hitos/comentarios/"por hacer"— estaba
+abierto a cualquier usuario logueado. Definido con el usuario: **borrar solicitud/tarea pasa a
+ser exclusivo del Scrum Master** (el resto del equipo usa el nuevo estatus "Cancelado" en vez
+de borrar); **editar/borrar comentarios, hitos e ítems "por hacer" pasa a ser solo del autor o
+del Scrum Master** (moderación). Editar solicitud/tarea sigue abierto a todos; crear también
+(salvo tareas, que ya era solo Scrum Master desde la Fase 1.7). Enlaces de tarea quedaron fuera
+de alcance (no tienen endpoint de editar/borrar todavía). Se agregó el estatus "Cancelado" al
+catálogo `estatus_tarea` (no existía, a diferencia del catálogo de solicitudes) vía
+`backend/sql/010_cancelado_tarea.sql`, y se corrigieron las 3 queries del Monitor que
+consideraban "no completada" como sinónimo de "activa" (una tarea cancelada ya no cuenta como
+vencida ni infla la carga de un responsable). 134 tests de backend en verde (11 nuevos).
+Verificado exhaustivamente contra la API real con los 3 roles de prueba y visualmente en
+navegador. Detalle completo en `00_ARCHIVOS/BITACORAS/2026-08-27.md` y plan
+`/home/lg/.claude/plans/stateful-stirring-oasis.md`.
 
 **2026-08-26 — Fase 1.12, Monitor de tareas:** quedaba anotada "sin diseñar" en el roadmap.
 Se definieron con el usuario los cuatro indicadores (tareas vencidas/por vencer, carga por
@@ -477,10 +495,13 @@ Castañeda, `canal=1`).
    acceso activo hoy. Los otros 9 miembros siguen con `acceso_activo=false`. `DOVELA_LG`
    puede otorgárselo desde la página "Usuarios" del portal. Ver también la nota de
    contraseñas de prueba más abajo — conviene cambiarlas o rotarlas.
-2. Confirmar con el usuario si la única regla de permisos actual (crear tarea → solo Scrum
-   Master) es suficiente, o si se quieren reglas más finas por rol para otras acciones
-   (editar/borrar solicitud o tarea, hitos, comentarios) — hoy cualquier usuario logueado
-   puede hacer todo lo demás.
+2. ~~Confirmar con el usuario si la única regla de permisos actual... es suficiente~~ —
+   **resuelto en la Fase 1.13** (2026-08-27): borrar solicitud/tarea ahora es solo Scrum
+   Master; editar/borrar comentarios, hitos y "por hacer" ahora es solo del autor o Scrum
+   Master. Pendiente futuro si surge: reglas de rol para hitos/comentarios/enlaces a nivel de
+   solicitud (hoy esas acciones agregadas de solo lectura en `SolicitudDetallePage` no tienen
+   botones de editar/borrar, así que no aplicó gating ahí), y construir editar/borrar de
+   enlaces de tarea si algún día se necesita (hoy no existe esa funcionalidad en absoluto).
 3. Resolver la conexión IMAP real de M365 (ver bloqueo de autenticación básica arriba) —
    decidir entre pedir el cambio de política al admin o implementar OAuth2.
 4. Decidir si seguimos con **Fase 1.3 (conexión al ERP Oracle de Mesa de Ayuda)**, **Fase 1.4

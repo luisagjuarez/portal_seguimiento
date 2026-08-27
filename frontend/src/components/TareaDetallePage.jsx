@@ -30,11 +30,12 @@ function formatearFecha(iso) {
   }
 }
 
-export default function TareaDetallePage() {
+export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const tareaId = Number(id);
   const onVerSolicitud = (solicitudId) => navigate(`/solicitudes/${solicitudId}`);
+  const esAutor = (registro) => esScrumMaster || registro.creado_por === usuarioActual.usuario;
 
   const [tarea, setTarea] = useState(null);
   const onRegresar = () => navigate(tarea ? `/solicitudes/${tarea.solicitud_id}` : "/tablero");
@@ -278,11 +279,16 @@ export default function TareaDetallePage() {
                   key={item.id}
                   item={item}
                   onToggle={alTogglePorHacer}
-                  onEditar={(i) => {
-                    setItemPorHacerEnEdicion(i);
-                    setMostrarFormularioPorHacer(true);
-                  }}
-                  onBorrar={setItemPorHacerABorrar}
+                  puedeGestionar={esAutor(item)}
+                  onEditar={
+                    esAutor(item)
+                      ? (i) => {
+                          setItemPorHacerEnEdicion(i);
+                          setMostrarFormularioPorHacer(true);
+                        }
+                      : undefined
+                  }
+                  onBorrar={esAutor(item) ? setItemPorHacerABorrar : undefined}
                 />
               ))}
             </div>
@@ -303,14 +309,16 @@ export default function TareaDetallePage() {
                 <h4>{hito.nombre}</h4>
                 {hito.descripcion && <p>{hito.descripcion}</p>}
                 <p className="solicitud-fecha">Vence: {hito.fecha_vencimiento}</p>
-                <div className="resumen-acciones">
-                  <button type="button" className="secundario" onClick={() => setMostrarFormularioHito(true)}>
-                    Editar
-                  </button>
-                  <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarHito(true)}>
-                    Borrar
-                  </button>
-                </div>
+                {esAutor(hito) && (
+                  <div className="resumen-acciones">
+                    <button type="button" className="secundario" onClick={() => setMostrarFormularioHito(true)}>
+                      Editar
+                    </button>
+                    <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarHito(true)}>
+                      Borrar
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <p>Esta tarea todavía no tiene un hito asignado.</p>
@@ -339,11 +347,15 @@ export default function TareaDetallePage() {
                 <ComentarioItem
                   key={comentario.id}
                   comentario={comentario}
-                  onEditar={(c) => {
-                    setComentarioEnEdicion(c);
-                    setMostrarFormularioComentario(true);
-                  }}
-                  onBorrar={setComentarioABorrar}
+                  onEditar={
+                    esAutor(comentario)
+                      ? (c) => {
+                          setComentarioEnEdicion(c);
+                          setMostrarFormularioComentario(true);
+                        }
+                      : undefined
+                  }
+                  onBorrar={esAutor(comentario) ? setComentarioABorrar : undefined}
                 />
               ))}
             </div>

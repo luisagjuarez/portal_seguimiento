@@ -466,6 +466,18 @@ def test_borrar_solicitud_404(monkeypatch):
     assert fake_conn.rolled_back is True
 
 
+def test_borrar_solicitud_403_si_no_es_scrum_master():
+    def _denegar_scrum_master():
+        raise HTTPException(status_code=403, detail="Solo el Scrum Master puede hacer esto")
+
+    app.dependency_overrides[require_scrum_master] = _denegar_scrum_master
+    try:
+        response = client.delete("/api/solicitudes/1")
+        assert response.status_code == 403
+    finally:
+        del app.dependency_overrides[require_scrum_master]
+
+
 def _fake_tarea(tarea_id=1, solicitud_id=1):
     return {
         "id": tarea_id,

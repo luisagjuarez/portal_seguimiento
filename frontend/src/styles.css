@@ -683,6 +683,11 @@ button:disabled {
   color: var(--success-text);
 }
 
+.tarea-estado-cancelado {
+  background: var(--tag-gray-bg);
+  color: var(--danger-text);
+}
+
 .monitor-page {
   display: flex;
   flex-direction: column;
@@ -760,6 +765,7 @@ button:disabled {
 .monitor-bar-fill-en-progreso { background: var(--tag-blue-text); }
 .monitor-bar-fill-en-revision { background: var(--tag-purple-text); }
 .monitor-bar-fill-completado { background: var(--success-text); }
+.monitor-bar-fill-cancelado { background: var(--danger); }
 
 .monitor-bar-cumplida { background: var(--success-text); }
 .monitor-bar-atrasada { background: var(--danger); }

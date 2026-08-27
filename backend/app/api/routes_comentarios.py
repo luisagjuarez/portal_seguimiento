@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.schemas import ComentarioCreateUpdate, ComentarioOut
-from app.auth.dependencies import UsuarioActual, get_current_user
+from app.auth.dependencies import UsuarioActual, get_current_user, require_autor_o_scrum_master
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -20,16 +20,18 @@ def actualizar_comentario(
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas_afectadas = repository.update_comentario(
+        comentario_actual = repository.get_comentario_by_id(cursor, comentario_id)
+        if comentario_actual is None:
+            raise HTTPException(status_code=404, detail="Comentario no encontrado")
+        require_autor_o_scrum_master(usuario_actual, comentario_actual["creado_por"])
+
+        repository.update_comentario(
             cursor, comentario_id, texto=body.texto_comentario, actor=usuario_actual.usuario
         )
-        if filas_afectadas == 0:
-            db_conn.rollback()
-            raise HTTPException(status_code=404, detail="Comentario no encontrado")
-
         fila = repository.get_comentario_by_id(cursor, comentario_id)
         db_conn.commit()
     except HTTPException:
+        db_conn.rollback()
         raise
     except Exception:
         db_conn.rollback()
@@ -46,12 +48,15 @@ def borrar_comentario(comentario_id: int, usuario_actual: UsuarioActual = Depend
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas_afectadas = repository.delete_comentario(cursor, comentario_id, actor=usuario_actual.usuario)
-        if filas_afectadas == 0:
-            db_conn.rollback()
+        comentario_actual = repository.get_comentario_by_id(cursor, comentario_id)
+        if comentario_actual is None:
             raise HTTPException(status_code=404, detail="Comentario no encontrado")
+        require_autor_o_scrum_master(usuario_actual, comentario_actual["creado_por"])
+
+        repository.delete_comentario(cursor, comentario_id, actor=usuario_actual.usuario)
         db_conn.commit()
     except HTTPException:
+        db_conn.rollback()
         raise
     except Exception:
         db_conn.rollback()

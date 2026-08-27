@@ -247,7 +247,7 @@ def actualizar_solicitud(
 
 
 @router.delete("/solicitudes/{solicitud_id}", status_code=204)
-def borrar_solicitud(solicitud_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
+def borrar_solicitud(solicitud_id: int, usuario_actual: UsuarioActual = Depends(require_scrum_master)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()

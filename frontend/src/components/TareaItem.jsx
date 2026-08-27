@@ -37,16 +37,18 @@ export default function TareaItem({ tarea, onEditar, onBorrar, onAbrirDetalle })
         >
           Actualizar
         </button>
-        <button
-          type="button"
-          className="peligro"
-          onClick={(event) => {
-            event.stopPropagation();
-            onBorrar(tarea);
-          }}
-        >
-          Borrar
-        </button>
+        {onBorrar && (
+          <button
+            type="button"
+            className="peligro"
+            onClick={(event) => {
+              event.stopPropagation();
+              onBorrar(tarea);
+            }}
+          >
+            Borrar
+          </button>
+        )}
       </div>
     </div>
   );

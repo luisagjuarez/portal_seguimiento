@@ -202,9 +202,11 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
           <button type="button" onClick={() => setMostrarEditar(true)}>
             Editar Solicitud
           </button>
-          <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarSolicitud(true)}>
-            Borrar Solicitud
-          </button>
+          {esScrumMaster && (
+            <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarSolicitud(true)}>
+              Borrar Solicitud
+            </button>
+          )}
         </div>
       </div>
 
@@ -279,7 +281,7 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
                     setTareaEnEdicion(t);
                     setMostrarFormularioTarea(true);
                   }}
-                  onBorrar={setTareaABorrar}
+                  onBorrar={esScrumMaster ? setTareaABorrar : undefined}
                   onAbrirDetalle={(tareaId) => navigate(`/tareas/${tareaId}`)}
                 />
               ))}

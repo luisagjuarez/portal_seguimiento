@@ -673,7 +673,7 @@ def list_tareas_vencidas(cursor, hoy: date) -> list[dict]:
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
           AND t.fecha_fin < %(hoy)s
         ORDER BY t.fecha_fin
         """,
@@ -696,7 +696,7 @@ def list_tareas_por_vencer(cursor, hoy: date, dias_ventana: int = 7) -> list[dic
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
           AND t.fecha_fin >= %(hoy)s AND t.fecha_fin <= %(limite)s
         ORDER BY t.fecha_fin
         """,
@@ -713,7 +713,7 @@ def list_carga_por_responsable(cursor) -> list[dict]:
         SELECT t.responsable_id, m.nombre_completo AS responsable, count(*) AS tareas_abiertas
         FROM tareas t
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
         GROUP BY t.responsable_id, m.nombre_completo
         ORDER BY tareas_abiertas DESC, responsable NULLS LAST
         """

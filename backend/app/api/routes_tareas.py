@@ -17,7 +17,12 @@ from app.api.schemas import (
     TareaOut,
     TareaTableroOut,
 )
-from app.auth.dependencies import UsuarioActual, get_current_user
+from app.auth.dependencies import (
+    UsuarioActual,
+    get_current_user,
+    require_autor_o_scrum_master,
+    require_scrum_master,
+)
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -94,7 +99,7 @@ def actualizar_tarea(
 
 
 @router.delete("/tareas/{tarea_id}", status_code=204)
-def borrar_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
+def borrar_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(require_scrum_master)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -173,6 +178,7 @@ def actualizar_hito_tarea(
         hito_actual = repository.get_hito_by_tarea(cursor, tarea_id)
         if hito_actual is None:
             raise HTTPException(status_code=404, detail="Esta tarea no tiene hito")
+        require_autor_o_scrum_master(usuario_actual, hito_actual["creado_por"])
 
         repository.update_hito(
             cursor,
@@ -205,6 +211,7 @@ def borrar_hito_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get
         hito_actual = repository.get_hito_by_tarea(cursor, tarea_id)
         if hito_actual is None:
             raise HTTPException(status_code=404, detail="Esta tarea no tiene hito")
+        require_autor_o_scrum_master(usuario_actual, hito_actual["creado_por"])
 
         repository.delete_hito(cursor, hito_actual["id"], actor=usuario_actual.usuario)
         db_conn.commit()
