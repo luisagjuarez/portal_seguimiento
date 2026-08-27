@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-27 (Fase 1.13 cerrada)
+Última actualización: 2026-08-27 (Fase 1.14 cerrada)
 
 ## Dónde vamos en el roadmap
 
@@ -15,7 +15,24 @@
 [x] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.13 (extraoficial) — Reglas de permisos más finas por rol (borrar solo Scrum Master, editar/borrar propio en comentarios/hitos/"por hacer") ✅ implementado y verificado end-to-end (2026-08-27)
+[x] Fase 1.14 (extraoficial) — Publicar el portal bajo el subpath /dovela_control ✅ implementado y verificado end-to-end en local y TEST (2026-08-27)
 ```
+
+**2026-08-27 — Fase 1.14, portal bajo el subpath /dovela_control:** infraestructura pidió que
+el portal responda bajo `/dovela_control` (para ponerlo detrás de un dominio/reverse-proxy
+compartido más adelante), con la API accesible por el mismo host/puerto que el frontend (no en
+su propio origen como hasta ahora) y la raíz (`/`) funcionando en paralelo con la misma app. El
+nginx del contenedor `frontend` pasó a ser el único punto de entrada: sirve la SPA bajo
+`/dovela_control` (y en `/`, mismo build) y hace de reverse proxy de `/dovela_control/api/*`
+hacia el contenedor `api` interno — sin CORS de por medio para el navegador. El puerto directo
+de la API (8000 local, 8005 TEST) sigue publicado sin cambios, en paralelo. Ver detalle completo
+de los hallazgos no obvios (reescritura de rutas de Vite, `new URL()` sin base en `api.js`,
+separación de `FRONTEND_ORIGIN`/`FRONTEND_BASE_PATH`, `client_max_body_size`, y un 403 propio de
+nginx encontrado y corregido en la sesión) en `00_ARCHIVOS/BITACORAS/2026-08-27.md` y el plan
+`/home/lg/.claude/plans/stateful-stirring-oasis.md`. Desplegado y verificado por `curl` y en
+navegador tanto local como en TEST (`t_apex`, `/u01/docker_containers/portal_seguimiento`) —
+recuperación de contraseña de punta a punta con el link ya apuntando al subpath nuevo, login,
+navegación, F5 en ruta profunda, y carga de un adjunto de ~9 MB a través del proxy nuevo.
 
 **2026-08-27 — Fase 1.13, reglas de permisos más finas por rol:** hasta ahora solo había 2
 reglas de rol reales (crear tarea y gestión de usuarios, ambas Scrum Master); todo lo demás
