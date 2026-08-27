@@ -1,13 +1,17 @@
-const PLACEHOLDER = "API_BASE_URL_PLACEHOLDER";
-
 function resolveApiBaseUrl() {
-  const runtimeValue = window.__API_BASE_URL__;
-  if (runtimeValue && runtimeValue !== PLACEHOLDER) {
-    return runtimeValue;
-  }
-  // Fuera de Docker (npm run dev/preview) config.js nunca se sustituye: se usa la
+  // En dev (npm run dev) no hay nginx haciendo de reverse proxy de la API: se usa la
   // variable de entorno de Vite, con un default razonable para desarrollo local.
-  return import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  if (import.meta.env.DEV) {
+    return import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  }
+  // En producción (build servido por el nginx del contenedor frontend) la API siempre
+  // vive en el mismo origen que la página, bajo /dovela_control/api — el nginx del
+  // frontend la reverse-proxea internamente. Calcularlo desde window.location.origin (en
+  // vez de grabar un origen fijo en el build) es lo único que funciona sin importar por
+  // qué dominio/IP/protocolo se haya llegado (localhost, IP interna, o un dominio HTTPS
+  // detrás de un reverse proxy de infraestructura) — un valor fijo nunca puede servir para
+  // los tres a la vez, y mezclar http/https dispara bloqueos de "mixed content".
+  return `${window.location.origin}/dovela_control`;
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
