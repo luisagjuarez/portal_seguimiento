@@ -53,6 +53,9 @@ class Settings:
 
     # API HTTP (Fase 1.2 — chat web)
     frontend_origin: str = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    # Subpath fijo bajo el que se sirve el portal (Fase 1.14) — separado de frontend_origin
+    # porque ese es el origen puro que usa CORS, que por spec no puede llevar path.
+    frontend_base_path: str = os.environ.get("FRONTEND_BASE_PATH", "/dovela_control")
 
     # Autenticación (login usuario/contraseña + JWT)
     jwt_secret_key: str = os.environ.get("JWT_SECRET_KEY", "")

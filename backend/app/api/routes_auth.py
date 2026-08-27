@@ -89,7 +89,7 @@ def forgot_password(body: ForgotPasswordRequest) -> dict:
             repository.crear_token_reset(cursor, miembro["id"], hash_token(token), expira_en)
             db_conn.commit()
 
-            enlace = f"{settings.frontend_origin}/?reset_token={token}"
+            enlace = f"{settings.frontend_origin}{settings.frontend_base_path}/?reset_token={token}"
             cuerpo = (
                 f"Hola {miembro['nombre_completo']},\n\n"
                 "Recibimos una solicitud para restablecer tu contraseña del Portal de "
