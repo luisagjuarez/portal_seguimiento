@@ -34,6 +34,16 @@ navegador tanto local como en TEST (`t_apex`, `/u01/docker_containers/portal_seg
 recuperación de contraseña de punta a punta con el link ya apuntando al subpath nuevo, login,
 navegación, F5 en ruta profunda, y carga de un adjunto de ~9 MB a través del proxy nuevo.
 
+**Mismo día, seguimiento — fix de mixed content:** al publicarlo en un dominio HTTPS real
+(`https://apps.stofactura.com/dovela_control/`, reverse proxy externo de infraestructura) el
+login falló por "mixed content" — `config.js` traía grabado el origen HTTP interno de TEST, que
+el navegador bloqueó desde una página HTTPS. Se reemplazó ese mecanismo (grababa un valor fijo
+por ambiente) por un cálculo en runtime en `frontend/src/api.js`
+(`` `${window.location.origin}/dovela_control` ``), que funciona automáticamente para cualquier
+dominio/IP/protocolo sin configuración por ambiente — se borraron `public/config.js` y
+`docker-entrypoint.sh`, ya no hacen falta. Verificado con login real por `curl` y en navegador
+contra local, TEST, y el dominio público. Commit `90d51dc`.
+
 **2026-08-27 — Fase 1.13, reglas de permisos más finas por rol:** hasta ahora solo había 2
 reglas de rol reales (crear tarea y gestión de usuarios, ambas Scrum Master); todo lo demás
 —editar/borrar solicitudes y tareas, crear/editar/borrar hitos/comentarios/"por hacer"— estaba
