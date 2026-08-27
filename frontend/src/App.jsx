@@ -8,6 +8,7 @@ import SolicitudDetallePage from "./components/SolicitudDetallePage.jsx";
 import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
+import MonitorPage from "./components/MonitorPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
 import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.jsx";
@@ -85,6 +86,7 @@ export default function App() {
   };
 
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
+  const puedeVerMonitor = ["SCRUM MASTER", "PRODUCT OWNER"].includes(usuarioActual?.codigo_rol_scrum);
   const requiereSesion = !usuarioActual;
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
@@ -97,6 +99,7 @@ export default function App() {
         <Sidebar
           usuarioActual={usuarioActual}
           esScrumMaster={esScrumMaster}
+          puedeVerMonitor={puedeVerMonitor}
           onCerrarSesion={cerrarSesion}
         />
       )}
@@ -141,6 +144,10 @@ export default function App() {
                 element={<SolicitudDetallePage esScrumMaster={esScrumMaster} />}
               />
               <Route path="/tablero" element={<TableroPage />} />
+              <Route
+                path="/monitor"
+                element={puedeVerMonitor ? <MonitorPage /> : <Navigate to="/" replace />}
+              />
               <Route path="/tareas/:id" element={<TareaDetallePage />} />
               <Route
                 path="/usuarios"

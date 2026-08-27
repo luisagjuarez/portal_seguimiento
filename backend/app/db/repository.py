@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from app.models import NuevaSolicitud
 
@@ -651,6 +651,114 @@ def list_tareas(
         "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+_COLUMNAS_TAREA_MONITOR = [
+    "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "responsable_id",
+    "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_fin", "dias",
+]
+
+
+def list_tareas_vencidas(cursor, hoy: date) -> list[dict]:
+    """Tareas activas, no completadas, cuya fecha_fin planeada ya pasó. `dias` = días de
+    atraso (positivo)."""
+    cursor.execute(
+        """
+        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
+               t.nombre, t.responsable_id, m.nombre_completo AS responsable,
+               t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
+               t.fecha_fin, (%(hoy)s - t.fecha_fin) AS dias
+        FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
+        LEFT JOIN clientes c ON c.id = s.cliente
+        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+          AND t.fecha_fin < %(hoy)s
+        ORDER BY t.fecha_fin
+        """,
+        {"hoy": hoy},
+    )
+    return [dict(zip(_COLUMNAS_TAREA_MONITOR, row)) for row in cursor.fetchall()]
+
+
+def list_tareas_por_vencer(cursor, hoy: date, dias_ventana: int = 7) -> list[dict]:
+    """Tareas activas, no completadas, cuya fecha_fin planeada cae dentro de los próximos
+    `dias_ventana` días. `dias` = días restantes (positivo, 0 = vence hoy)."""
+    cursor.execute(
+        """
+        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
+               t.nombre, t.responsable_id, m.nombre_completo AS responsable,
+               t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
+               t.fecha_fin, (t.fecha_fin - %(hoy)s) AS dias
+        FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
+        LEFT JOIN clientes c ON c.id = s.cliente
+        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+          AND t.fecha_fin >= %(hoy)s AND t.fecha_fin <= %(limite)s
+        ORDER BY t.fecha_fin
+        """,
+        {"hoy": hoy, "limite": hoy + timedelta(days=dias_ventana)},
+    )
+    return [dict(zip(_COLUMNAS_TAREA_MONITOR, row)) for row in cursor.fetchall()]
+
+
+def list_carga_por_responsable(cursor) -> list[dict]:
+    """Tareas activas no completadas por responsable, incluye un bucket responsable_id=NULL
+    ('Sin asignar')."""
+    cursor.execute(
+        """
+        SELECT t.responsable_id, m.nombre_completo AS responsable, count(*) AS tareas_abiertas
+        FROM tareas t
+        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
+        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea <> 'COMPLETADO'
+        GROUP BY t.responsable_id, m.nombre_completo
+        ORDER BY tareas_abiertas DESC, responsable NULLS LAST
+        """
+    )
+    columnas = ["responsable_id", "responsable", "tareas_abiertas"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def list_distribucion_estatus(cursor) -> list[dict]:
+    """Cuántas tareas activas hay en cada estatus del catálogo (incluye estatus en 0)."""
+    cursor.execute(
+        """
+        SELECT et.codigo, et.descripcion, count(t.id) AS total
+        FROM estatus_tarea et
+        LEFT JOIN tareas t ON t.codigo_estatus_tarea = et.codigo AND t.borrado_en IS NULL
+        GROUP BY et.codigo, et.descripcion, et.orden_visualizacion
+        ORDER BY et.orden_visualizacion
+        """
+    )
+    columnas = ["codigo_estatus_tarea", "descripcion", "total"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def get_cumplimiento_planeado_real(cursor) -> dict:
+    """Entre las tareas con fecha_fin_real registrada, cuántas cumplieron fecha_fin
+    planeada vs. cuántas se atrasaron, y el atraso promedio (en días) de las atrasadas."""
+    cursor.execute(
+        """
+        SELECT
+            count(*) AS total_con_fecha_real,
+            count(*) FILTER (WHERE fecha_fin_real <= fecha_fin) AS cumplidas,
+            count(*) FILTER (WHERE fecha_fin_real > fecha_fin) AS atrasadas,
+            avg(fecha_fin_real - fecha_fin) FILTER (WHERE fecha_fin_real > fecha_fin) AS promedio_atraso
+        FROM tareas
+        WHERE borrado_en IS NULL AND fecha_fin_real IS NOT NULL
+        """
+    )
+    total, cumplidas, atrasadas, promedio = cursor.fetchone()
+    return {
+        "total_con_fecha_real": total,
+        "cumplidas": cumplidas,
+        "atrasadas": atrasadas,
+        "porcentaje_cumplimiento": round(cumplidas / total * 100, 1) if total else None,
+        "promedio_dias_atraso": round(float(promedio), 1) if promedio is not None else None,
+    }
 
 
 def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:

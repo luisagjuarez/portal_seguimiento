@@ -149,6 +149,48 @@ class TareaCreateUpdate(BaseModel):
     horas_reales: int | None = None
 
 
+class TareaResumenMonitorOut(BaseModel):
+    id: int
+    solicitud_id: int
+    solicitud_nombre: str
+    cliente: str | None
+    nombre: str
+    responsable_id: int | None
+    responsable: str | None
+    codigo_estatus_tarea: str
+    estatus_tarea_descripcion: str | None
+    fecha_fin: date
+    dias: int
+
+
+class CargaResponsableOut(BaseModel):
+    responsable_id: int | None
+    responsable: str | None
+    tareas_abiertas: int
+
+
+class DistribucionEstatusOut(BaseModel):
+    codigo_estatus_tarea: str
+    descripcion: str
+    total: int
+
+
+class CumplimientoOut(BaseModel):
+    total_con_fecha_real: int
+    cumplidas: int
+    atrasadas: int
+    porcentaje_cumplimiento: float | None
+    promedio_dias_atraso: float | None
+
+
+class MonitorKpisOut(BaseModel):
+    vencidas: list[TareaResumenMonitorOut]
+    por_vencer: list[TareaResumenMonitorOut]
+    carga_por_responsable: list[CargaResponsableOut]
+    distribucion_estatus: list[DistribucionEstatusOut]
+    cumplimiento: CumplimientoOut
+
+
 class HitoOut(BaseModel):
     id: int
     solicitud_id: int

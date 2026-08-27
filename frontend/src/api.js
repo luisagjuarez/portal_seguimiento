@@ -239,6 +239,11 @@ export async function fetchMiembrosEquipo() {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchMonitorKpis() {
+  const response = await fetch(`${API_BASE_URL}/api/monitor/kpis`, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchTiposSolicitud() {
   const response = await fetch(`${API_BASE_URL}/api/tipos-solicitud`);
   return parseJsonOrThrow(response);

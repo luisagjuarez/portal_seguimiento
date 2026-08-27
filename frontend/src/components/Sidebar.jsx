@@ -8,8 +8,11 @@ const OPCIONES = [
   { ruta: "/tablero", etiqueta: "Tablero" },
 ];
 
-export default function Sidebar({ usuarioActual, esScrumMaster, onCerrarSesion }) {
-  const opciones = esScrumMaster ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }] : OPCIONES;
+export default function Sidebar({ usuarioActual, esScrumMaster, puedeVerMonitor, onCerrarSesion }) {
+  let opciones = esScrumMaster ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }] : OPCIONES;
+  if (puedeVerMonitor) {
+    opciones = [...opciones, { ruta: "/monitor", etiqueta: "Monitor" }];
+  }
 
   return (
     <nav className="sidebar">

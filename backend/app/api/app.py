@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_auth import router as auth_router
 from app.api.routes_catalogos import router as catalogos_router
 from app.api.routes_comentarios import router as comentarios_router
+from app.api.routes_monitor import router as monitor_router
 from app.api.routes_solicitudes import router as solicitudes_router
 from app.api.routes_tarea_por_hacer import router as tarea_por_hacer_router
 from app.api.routes_tareas import router as tareas_router
@@ -26,5 +27,6 @@ app.include_router(catalogos_router)
 app.include_router(tareas_router)
 app.include_router(comentarios_router)
 app.include_router(tarea_por_hacer_router)
+app.include_router(monitor_router)
 app.include_router(auth_router)
 app.include_router(usuarios_router)

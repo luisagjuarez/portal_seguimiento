@@ -53,3 +53,13 @@ def require_scrum_master(usuario_actual: UsuarioActual = Depends(get_current_use
     if usuario_actual.codigo_rol_scrum != "SCRUM MASTER":
         raise HTTPException(status_code=403, detail="Solo el Scrum Master puede hacer esto")
     return usuario_actual
+
+
+def require_scrum_master_or_product_owner(
+    usuario_actual: UsuarioActual = Depends(get_current_user),
+) -> UsuarioActual:
+    if usuario_actual.codigo_rol_scrum not in {"SCRUM MASTER", "PRODUCT OWNER"}:
+        raise HTTPException(
+            status_code=403, detail="Solo el Scrum Master o el Product Owner pueden ver esto"
+        )
+    return usuario_actual

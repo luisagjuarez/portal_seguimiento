@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-26 (Fase 1.11 cerrada)
+Última actualización: 2026-08-26 (Fase 1.12 cerrada)
 
 ## Dónde vamos en el roadmap
 
@@ -13,8 +13,37 @@
 [x] Fase 1.9 (extraoficial) — Login obligatorio total, cambio forzado/autoservicio y recuperación de contraseña ✅ implementado y verificado end-to-end (2026-08-24)
 [x] Fase 1.10 (extraoficial) — Módulo de gestión de usuarios (alta/baja/actualización) ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.11 (extraoficial) — "Por hacer" en tareas (tabla tarea_por_hacer)          ✅ implementado y verificado end-to-end (2026-08-26)
-[ ] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ⬜ no iniciado
+[x] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ✅ implementado y verificado end-to-end (2026-08-26)
 ```
+
+**2026-08-26 — Fase 1.12, Monitor de tareas:** quedaba anotada "sin diseñar" en el roadmap.
+Se definieron con el usuario los cuatro indicadores (tareas vencidas/por vencer, carga por
+responsable, cumplimiento planeado vs. real, distribución por estatus), el acceso (solo
+Scrum Master y Product Owner) y la ubicación (página nueva `/monitor` en el sidebar).
+
+- **Sin precedente en el repo**: no existía ninguna función de agregación (`COUNT`/`GROUP
+  BY`) en `repository.py`, ninguna dependency de auth para "más de un rol" (se agregó
+  `require_scrum_master_or_product_owner`), ni ninguna librería de gráficas instalada. Se
+  construyó con CSS plano (sin nueva dependencia de npm) reusando el sistema de tokens de
+  color ya establecido — las barras de "Distribución por estatus" reusan los mismos hues
+  que ya identifican cada estatus en Tablero/detalle de tarea (aunque en un tono más
+  saturado que el pastel de las insignias, necesario para que el relleno de la barra no se
+  pierda contra el fondo — mismo hue, distinto paso de la rampa). Se agregó un token nuevo
+  `--warning-bg`/`--warning-text` (no existía) para "por vencer".
+- Pequeño refactor habilitador: `CLASE_POR_ESTATUS` estaba duplicado en `TareaItem.jsx` y
+  `TareaDetallePage.jsx`; se centralizó en `frontend/src/constants/estatusTarea.js` (que
+  también exporta `RELLENO_POR_ESTATUS`, el mapeo de colores saturados para barras) para no
+  agregar una tercera copia.
+- Cada indicador de "vencidas"/"por vencer" es una tabla real (no solo un conteo), con
+  enlace directo a cada tarea — el punto es poder actuar, no solo ver un número.
+- 4 tests nuevos (`test_api_monitor.py`), 123 tests de backend en verde. Verificado
+  end-to-end en navegador en modo claro y oscuro: números del monitor contrastados contra
+  consultas directas a la BD real (coinciden exactamente); un usuario Team no ve "Monitor"
+  en el sidebar y recibe 403 tanto navegando a `/monitor` por URL directa (redirige a `/`)
+  como pegándole al endpoint `/api/monitor/kpis` directamente con su token. Nota curiosa
+  de la verificación: los conteos de "vencidas"/"por vencer" cambiaron en vivo entre dos
+  chequeos (23→24 y 4→3) porque pasó suficiente tiempo real como para cruzar la medianoche
+  — confirma que el cálculo por fecha es dinámico, no un bug.
 
 **2026-08-26 — Fase 1.11, checklist "Por hacer" en tareas:** la tabla
 `solicitudes.tarea_por_hacer` ya existía en la BD real (esquema heredado, sin migración

@@ -19,6 +19,8 @@
   --danger-text: #b91c1c;
   --success-bg: #dcfce7;
   --success-text: #166534;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
   --tag-blue-bg: #dbeafe;
   --tag-blue-text: #1e3a8a;
   --tag-purple-bg: #ede9fe;
@@ -50,6 +52,8 @@
   --danger-text: #fca5a5;
   --success-bg: #14532d;
   --success-text: #86efac;
+  --warning-bg: #78350f;
+  --warning-text: #fcd34d;
   --tag-blue-bg: #1e3a5f;
   --tag-blue-text: #93c5fd;
   --tag-purple-bg: #3b2f63;
@@ -678,6 +682,95 @@ button:disabled {
   background: var(--success-bg);
   color: var(--success-text);
 }
+
+.monitor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1100px;
+}
+
+.monitor-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.monitor-stat-tile {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.monitor-stat-valor {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.monitor-stat-etiqueta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.monitor-section {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+}
+
+.monitor-section h3 {
+  margin-top: 0;
+}
+
+.monitor-bar-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 3rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.monitor-bar-etiqueta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-bar-track {
+  background: var(--bg-muted);
+  border-radius: 999px;
+  height: 0.9rem;
+  overflow: hidden;
+  display: flex;
+  gap: 2px;
+}
+
+.monitor-bar-fill {
+  background: var(--accent);
+  border-radius: 999px;
+  height: 100%;
+}
+
+.monitor-bar-fill-por-hacer { background: var(--tag-gray-text); }
+.monitor-bar-fill-en-progreso { background: var(--tag-blue-text); }
+.monitor-bar-fill-en-revision { background: var(--tag-purple-text); }
+.monitor-bar-fill-completado { background: var(--success-text); }
+
+.monitor-bar-cumplida { background: var(--success-text); }
+.monitor-bar-atrasada { background: var(--danger); }
+
+.monitor-bar-valor {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-dias-vencida { color: var(--danger-text); font-weight: 600; }
+.monitor-dias-por-vencer { color: var(--warning-text); font-weight: 600; }
 
 .tarea-item-acciones {
   display: flex;

@@ -9,6 +9,7 @@ import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import PorHacerFormulario from "./PorHacerFormulario.jsx";
 import PorHacerItem from "./PorHacerItem.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
+import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import {
   actualizarPorHacer,
   eliminarComentario,
@@ -20,13 +21,6 @@ import {
   fetchPorHacerTarea,
   fetchTareaDetalle,
 } from "../api.js";
-
-const CLASE_POR_ESTATUS = {
-  "POR HACER": "tarea-estado-por-hacer",
-  "EN PROGRESO": "tarea-estado-en-progreso",
-  "EN REVISION": "tarea-estado-en-revision",
-  COMPLETADO: "tarea-estado-completa",
-};
 
 function formatearFecha(iso) {
   try {
