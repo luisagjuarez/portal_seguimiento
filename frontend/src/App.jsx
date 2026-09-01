@@ -9,6 +9,7 @@ import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
 import MonitorPage from "./components/MonitorPage.jsx";
+import DireccionGeneralPage from "./components/DireccionGeneralPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
 import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.jsx";
@@ -86,7 +87,9 @@ export default function App() {
   };
 
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
-  const puedeVerMonitor = ["SCRUM MASTER", "PRODUCT OWNER"].includes(usuarioActual?.codigo_rol_scrum);
+  const puedeVerReportesGerenciales = ["SCRUM MASTER", "PRODUCT OWNER"].includes(
+    usuarioActual?.codigo_rol_scrum,
+  );
   const requiereSesion = !usuarioActual;
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
@@ -99,7 +102,7 @@ export default function App() {
         <Sidebar
           usuarioActual={usuarioActual}
           esScrumMaster={esScrumMaster}
-          puedeVerMonitor={puedeVerMonitor}
+          puedeVerReportesGerenciales={puedeVerReportesGerenciales}
           onCerrarSesion={cerrarSesion}
         />
       )}
@@ -146,7 +149,13 @@ export default function App() {
               <Route path="/tablero" element={<TableroPage />} />
               <Route
                 path="/monitor"
-                element={puedeVerMonitor ? <MonitorPage /> : <Navigate to="/" replace />}
+                element={puedeVerReportesGerenciales ? <MonitorPage /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/direccion-general"
+                element={
+                  puedeVerReportesGerenciales ? <DireccionGeneralPage /> : <Navigate to="/" replace />
+                }
               />
               <Route
                 path="/tareas/:id"

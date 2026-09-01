@@ -191,6 +191,43 @@ class MonitorKpisOut(BaseModel):
     cumplimiento: CumplimientoOut
 
 
+class DireccionGeneralTotalesOut(BaseModel):
+    solicitudes_en_proceso: int
+    tareas_en_proceso: int
+    solicitudes_concluidas_periodo: int
+    tareas_concluidas_periodo: int
+    solicitudes_nuevas_periodo: int
+    tareas_nuevas_periodo: int
+    horas_estimadas_periodo: int
+
+
+class DireccionGeneralGrupoOut(BaseModel):
+    grupo_id: int | str | None
+    grupo: str
+    solicitudes_en_proceso: int
+    solicitudes_concluidas_periodo: int
+    solicitudes_nuevas_periodo: int
+    tareas_en_proceso: int
+    tareas_concluidas_periodo: int
+    tareas_nuevas_periodo: int
+    horas_estimadas_periodo: int
+
+
+class DistribucionEstatusSolicitudOut(BaseModel):
+    codigo_estatus: str
+    descripcion: str
+    total: int
+
+
+class DireccionGeneralKpisOut(BaseModel):
+    totales: DireccionGeneralTotalesOut
+    por_cliente: list[DireccionGeneralGrupoOut]
+    por_tipo: list[DireccionGeneralGrupoOut]
+    por_area: list[DireccionGeneralGrupoOut]
+    solicitudes_por_estatus: list[DistribucionEstatusSolicitudOut]
+    tareas_por_estatus: list[DistribucionEstatusOut]
+
+
 class HitoOut(BaseModel):
     id: int
     solicitud_id: int

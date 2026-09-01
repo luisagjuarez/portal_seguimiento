@@ -778,6 +778,28 @@ button:disabled {
 .monitor-dias-vencida { color: var(--danger-text); font-weight: 600; }
 .monitor-dias-por-vencer { color: var(--warning-text); font-weight: 600; }
 
+.direccion-general-rango {
+  display: flex;
+  gap: 1rem;
+}
+
+.direccion-general-rango label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.tabla-scroll {
+  overflow-x: auto;
+}
+
+.celda-numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .tarea-item-acciones {
   display: flex;
   gap: 0.4rem;

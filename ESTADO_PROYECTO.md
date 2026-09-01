@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-27 (Fase 1.14 cerrada)
+Última actualización: 2026-08-31 (Fase 1.15 cerrada)
 
 ## Dónde vamos en el roadmap
 
@@ -16,7 +16,24 @@
 [x] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.13 (extraoficial) — Reglas de permisos más finas por rol (borrar solo Scrum Master, editar/borrar propio en comentarios/hitos/"por hacer") ✅ implementado y verificado end-to-end (2026-08-27)
 [x] Fase 1.14 (extraoficial) — Publicar el portal bajo el subpath /dovela_control ✅ implementado y verificado end-to-end en local y TEST (2026-08-27)
+[x] Fase 1.15 (extraoficial) — Tablero de Dirección General (KPIs por rango de fechas, desglosados por cliente/tipo/área/estatus) ✅ implementado y verificado por API contra la BD real (2026-08-31); falta la pasada visual en navegador
 ```
+
+**2026-08-31 — Fase 1.15, Tablero de Dirección General:** el usuario pidió una vista de solo
+lectura, minimalista, para presentar el avance del área a dirección general — separada del
+Monitor existente (operativo, para Scrum Master/Product Owner). Muestra 7 KPIs (solicitudes y
+tareas en proceso, concluidas en un rango de fechas elegible, nuevas en el rango, y horas
+estimadas del rango) desglosados por Cliente, Tipo de solicitud, Área (`miembros_equipo.perfil`
+— columna que ya existía en la BD real y ya estaba poblada, no hizo falta ninguna migración) y
+Estatus. Nuevo endpoint `GET /api/direccion-general/kpis?desde=...&hasta=...` (mismo guard de
+rol que el Monitor, `require_scrum_master_or_product_owner`), nueva página
+`DireccionGeneralPage.jsx` (ruta `/direccion-general`), todo con tablas HTML simples (sin
+gráficas nuevas). 139 tests de backend en verde (6 nuevos); verificado por `curl` contra la BD
+real con los 3 roles de prueba, números contrastados exactamente contra SQL directo. Falta la
+pasada visual en navegador (Chrome no estaba disponible en esta sesión). Detalle completo,
+incluida una nota de diseño explícita sobre qué significa "área" para solicitudes vs. tareas,
+en `00_ARCHIVOS/BITACORAS/2026-08-31.md` y el plan
+`/home/lg/.claude/plans/compressed-dreaming-sunset.md`.
 
 **2026-08-27 — Fase 1.14, portal bajo el subpath /dovela_control:** infraestructura pidió que
 el portal responda bajo `/dovela_control` (para ponerlo detrás de un dominio/reverse-proxy
@@ -512,6 +529,11 @@ y el canal de correo se sigue verificando ahí (última prueba: solicitud id=58,
 Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
+
+**⭐ Verificar en navegador el Tablero de Dirección General (Fase 1.15, 2026-08-31).** Backend y
+frontend ya están verificados por API/`curl` contra la BD real (números exactos, 3 roles de
+prueba); falta la pasada visual (modo claro/oscuro, refetch al cambiar el rango de fechas, guard
+de `/direccion-general` para el rol Team). Checklist en `00_ARCHIVOS/BITACORAS/2026-08-31.md`.
 
 0. **⭐ Verificar en navegador la migración a rutas reales (2026-08-25).** El código ya está
    escrito y el build pasa, pero falta el recorrido visual completo (navegar por el sidebar,

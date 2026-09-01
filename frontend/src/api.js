@@ -248,6 +248,14 @@ export async function fetchMonitorKpis() {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchDireccionGeneralKpis(desde, hasta) {
+  const url = new URL(`${API_BASE_URL}/api/direccion-general/kpis`);
+  url.searchParams.set("desde", desde);
+  url.searchParams.set("hasta", hasta);
+  const response = await fetch(url, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchTiposSolicitud() {
   const response = await fetch(`${API_BASE_URL}/api/tipos-solicitud`);
   return parseJsonOrThrow(response);
