@@ -230,6 +230,85 @@ def get_adjunto_de_solicitud(cursor, solicitud_id: int, adjunto_id: int) -> dict
     return dict(zip(columnas, row))
 
 
+def count_adjuntos_by_solicitud(cursor, solicitud_id: int) -> int:
+    """Usado para validar el máximo de 5 adjuntos al agregar más a una solicitud ya creada
+    (Fase 1.21) — a diferencia de la creación, aquí hay que sumar los que ya existen."""
+    cursor.execute(
+        "SELECT count(*) FROM solicitudes_adjuntos WHERE solicitud_id = %(solicitud_id)s",
+        {"solicitud_id": solicitud_id},
+    )
+    return cursor.fetchone()[0]
+
+
+def insert_adjunto_tarea(
+    cursor,
+    tarea_id: int,
+    nombre_archivo: str,
+    ruta_almacenamiento: str,
+    tipo_mime: str | None,
+    tamano_bytes: int,
+) -> int:
+    """Mismo patrón que insert_adjunto, pero vinculando a tareas_adjuntos (Fase 1.21)."""
+    cursor.execute(
+        """
+        INSERT INTO adjuntos (nombre_archivo, ruta_almacenamiento, tipo_mime, tamano_bytes)
+        VALUES (%(nombre_archivo)s, %(ruta_almacenamiento)s, %(tipo_mime)s, %(tamano_bytes)s)
+        RETURNING id
+        """,
+        {
+            "nombre_archivo": nombre_archivo,
+            "ruta_almacenamiento": ruta_almacenamiento,
+            "tipo_mime": tipo_mime,
+            "tamano_bytes": tamano_bytes,
+        },
+    )
+    id_adjunto = cursor.fetchone()[0]
+    cursor.execute(
+        "INSERT INTO tareas_adjuntos (tarea_id, adjunto_id) VALUES (%(tarea_id)s, %(id_adjunto)s)",
+        {"tarea_id": tarea_id, "id_adjunto": id_adjunto},
+    )
+    return id_adjunto
+
+
+def list_adjuntos_by_tarea(cursor, tarea_id: int) -> list[dict]:
+    cursor.execute(
+        """
+        SELECT a.id, a.nombre_archivo, a.tipo_mime, a.tamano_bytes, a.fecha_carga
+        FROM adjuntos a
+        JOIN tareas_adjuntos ta ON ta.adjunto_id = a.id
+        WHERE ta.tarea_id = %(tarea_id)s
+        ORDER BY a.fecha_carga
+        """,
+        {"tarea_id": tarea_id},
+    )
+    columnas = ["id", "nombre_archivo", "tipo_mime", "tamano_bytes", "fecha_carga"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def count_adjuntos_by_tarea(cursor, tarea_id: int) -> int:
+    cursor.execute(
+        "SELECT count(*) FROM tareas_adjuntos WHERE tarea_id = %(tarea_id)s", {"tarea_id": tarea_id}
+    )
+    return cursor.fetchone()[0]
+
+
+def get_adjunto_de_tarea(cursor, tarea_id: int, adjunto_id: int) -> dict | None:
+    cursor.execute(
+        """
+        SELECT a.id, a.nombre_archivo, a.ruta_almacenamiento, a.tipo_mime, a.tamano_bytes
+        FROM adjuntos a
+        JOIN tareas_adjuntos ta ON ta.adjunto_id = a.id
+        WHERE ta.tarea_id = %(tarea_id)s AND a.id = %(adjunto_id)s
+        """,
+        {"tarea_id": tarea_id, "adjunto_id": adjunto_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "nombre_archivo", "ruta_almacenamiento", "tipo_mime", "tamano_bytes"]
+    return dict(zip(columnas, row))
+
+
 def mark_email_processed(cursor, message_id: str, id_solicitud: int | None) -> None:
     cursor.execute(
         "INSERT INTO emails_procesados (email_message_id, solicitud_id) VALUES (%(message_id)s, %(id_solicitud)s)",
@@ -239,11 +318,11 @@ def mark_email_processed(cursor, message_id: str, id_solicitud: int | None) -> N
 
 def list_miembros(cursor) -> list[dict]:
     cursor.execute(
-        "SELECT id, nombre_completo, correo_electronico FROM miembros_equipo "
+        "SELECT id, usuario, nombre_completo, correo_electronico FROM miembros_equipo "
         "WHERE borrado_en IS NULL ORDER BY nombre_completo"
     )
     return [
-        {"id": row[0], "nombre_completo": row[1], "correo_electronico": row[2]}
+        {"id": row[0], "usuario": row[1], "nombre_completo": row[2], "correo_electronico": row[3]}
         for row in cursor.fetchall()
     ]
 
@@ -514,13 +593,16 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
                t.tipo AS tipo, s.tipo AS tipo_id, s.codigo_estatus,
                e.descripcion AS estatus_descripcion, m.nombre_completo AS solicitante,
                s.orden_prioridad, cs.canal AS canal, s.canal AS canal_id,
-               s.fecha_completado, s.creado_en, s.actualizado_en, s.actualizado_por
+               s.fecha_completado, s.fecha_entrega, s.responsable_atencion_id,
+               ra.nombre_completo AS responsable_atencion,
+               s.creado_en, s.actualizado_en, s.actualizado_por
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
         LEFT JOIN estatus e ON e.codigo = s.codigo_estatus
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
         LEFT JOIN canales_solicitud cs ON cs.id = s.canal
+        LEFT JOIN miembros_equipo ra ON ra.id = s.responsable_atencion_id
         WHERE s.id = %(id)s AND s.borrado_en IS NULL
         """,
         {"id": solicitud_id},
@@ -531,7 +613,8 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
     columnas = [
         "id", "nombre", "descripcion", "cliente", "cliente_id", "tipo", "tipo_id",
         "codigo_estatus", "estatus_descripcion", "solicitante", "orden_prioridad",
-        "canal", "canal_id", "fecha_completado", "creado_en", "actualizado_en", "actualizado_por",
+        "canal", "canal_id", "fecha_completado", "fecha_entrega", "responsable_atencion_id",
+        "responsable_atencion", "creado_en", "actualizado_en", "actualizado_por",
     ]
     return dict(zip(columnas, row))
 
@@ -545,8 +628,10 @@ def update_solicitud(
     tipo_id: int | None,
     canal_id: int | None,
     codigo_estatus: str,
-    orden_prioridad: str | None,
+    orden_prioridad: int,
     fecha_completado,
+    fecha_entrega,
+    responsable_atencion_id: int | None,
     actor: str,
 ) -> int:
     # fecha_completado solo tiene sentido si el estatus es Completado: si se cambia a
@@ -558,6 +643,7 @@ def update_solicitud(
         SET nombre = %(nombre)s, descripcion = %(descripcion)s, cliente = %(cliente)s,
             tipo = %(tipo)s, canal = %(canal)s, codigo_estatus = %(codigo_estatus)s,
             orden_prioridad = %(orden_prioridad)s, fecha_completado = %(fecha_completado)s,
+            fecha_entrega = %(fecha_entrega)s, responsable_atencion_id = %(responsable_atencion_id)s,
             actualizado_en = now(), actualizado_por = %(actor)s
         WHERE id = %(id)s AND borrado_en IS NULL
         """,
@@ -570,6 +656,8 @@ def update_solicitud(
             "codigo_estatus": codigo_estatus,
             "orden_prioridad": orden_prioridad,
             "fecha_completado": fecha_completado_final,
+            "fecha_entrega": fecha_entrega,
+            "responsable_atencion_id": responsable_atencion_id,
             "id": solicitud_id,
             "actor": actor,
         },
@@ -630,6 +718,7 @@ def list_tareas(
         f"""
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
                t.nombre, t.descripcion, t.responsable_id, m.nombre_completo AS responsable,
+               s.orden_prioridad AS solicitud_prioridad, s.fecha_entrega AS solicitud_fecha_entrega,
                t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
                t.fecha_inicio, t.fecha_fin, t.fecha_inicio_real, t.fecha_fin_real,
                t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
@@ -646,9 +735,10 @@ def list_tareas(
     )
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
-        "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
-        "fecha_inicio", "fecha_fin", "fecha_inicio_real", "fecha_fin_real",
-        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "responsable_id", "responsable", "solicitud_prioridad", "solicitud_fecha_entrega",
+        "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
+        "fecha_inicio_real", "fecha_fin_real", "horas_estimadas", "horas_reales",
+        "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -1025,6 +1115,39 @@ def list_direccion_general_por_area(cursor, desde: date, hasta: date) -> list[di
     return _combinar_por_grupo(filas_solicitudes, filas_tareas)
 
 
+_FILTRO_DETALLE_POR_METRICA = {
+    "en_proceso": "s.codigo_estatus NOT IN ('COMPLETADO', 'CANCELADO')",
+    "concluidas": (
+        "s.codigo_estatus = 'COMPLETADO' AND s.fecha_completado::date BETWEEN %(desde)s AND %(hasta)s"
+    ),
+    "nuevas": "s.creado_en::date BETWEEN %(desde)s AND %(hasta)s",
+}
+
+
+def list_direccion_general_detalle_solicitudes(
+    cursor, metrica: str, desde: date, hasta: date
+) -> list[dict]:
+    """Solicitudes individuales detrás de una de las 3 métricas de conteo de solicitudes del
+    tablero de Dirección General (Fase 1.15+, subvista por métrica). Mismo criterio de filtro
+    que `get_direccion_general_totales` para cada métrica — 'en_proceso' es un snapshot, ignora
+    desde/hasta, igual que el tile."""
+    filtro = _FILTRO_DETALLE_POR_METRICA[metrica]
+    cursor.execute(
+        f"""
+        SELECT s.id, s.nombre, c.nombre AS cliente, coalesce(m.perfil, 'Sin área') AS area,
+               m.nombre_completo AS solicitante, s.creado_en
+        FROM solicitudes s
+        LEFT JOIN clientes c ON c.id = s.cliente
+        LEFT JOIN miembros_equipo m ON m.id = s.solicitante
+        WHERE s.borrado_en IS NULL AND {filtro}
+        ORDER BY s.creado_en DESC
+        """,
+        {"desde": desde, "hasta": hasta},
+    )
+    columnas = ["id", "nombre", "cliente", "area", "solicitante", "creado_en"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
 def list_distribucion_estatus_solicitud(cursor) -> list[dict]:
     """Cuántas solicitudes activas hay en cada estatus del catálogo (incluye estatus en 0).
     Equivalente a `list_distribucion_estatus` pero del lado de solicitudes — son catálogos
@@ -1046,11 +1169,14 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     cursor.execute(
         """
         SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
-               m.nombre_completo AS responsable, t.codigo_estatus_tarea,
+               m.nombre_completo AS responsable, s.orden_prioridad AS solicitud_prioridad,
+               s.fecha_entrega AS solicitud_fecha_entrega,
+               t.codigo_estatus_tarea,
                et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
                t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
                t.creado_en, t.actualizado_en
         FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
         LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
         WHERE t.solicitud_id = %(id)s AND t.borrado_en IS NULL
@@ -1060,9 +1186,9 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     )
     columnas = [
         "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
-        "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
-        "fecha_inicio_real", "fecha_fin_real", "horas_estimadas", "horas_reales",
-        "creado_en", "actualizado_en",
+        "solicitud_prioridad", "solicitud_fecha_entrega", "codigo_estatus_tarea",
+        "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin", "fecha_inicio_real",
+        "fecha_fin_real", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -1172,7 +1298,9 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
         """
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
                t.nombre, t.descripcion, t.responsable_id,
-               m.nombre_completo AS responsable, t.codigo_estatus_tarea,
+               m.nombre_completo AS responsable, s.orden_prioridad AS solicitud_prioridad,
+               s.fecha_entrega AS solicitud_fecha_entrega,
+               t.codigo_estatus_tarea,
                et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
                t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
                t.creado_en, t.actualizado_en
@@ -1190,9 +1318,10 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
         return None
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
-        "responsable_id", "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion",
-        "fecha_inicio", "fecha_fin", "fecha_inicio_real", "fecha_fin_real",
-        "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+        "responsable_id", "responsable", "solicitud_prioridad", "solicitud_fecha_entrega",
+        "codigo_estatus_tarea",
+        "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin", "fecha_inicio_real",
+        "fecha_fin_real", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
     return dict(zip(columnas, row))
 
@@ -1654,13 +1783,8 @@ _ORDEN_SOLICITUDES = {
     "estatus": "e.orden_visualizacion NULLS LAST, s.creado_en DESC",
     "tipo": "t.orden NULLS LAST, t.tipo NULLS LAST, s.creado_en DESC",
     "cliente": "c.nombre NULLS LAST, s.creado_en DESC",
-    # orden_prioridad es un varchar libre (no un catálogo); se castea a entero solo cuando
-    # el valor es puramente numérico para poder ordenar 1 < 2 < 10 en vez de alfabético
-    # ("1" < "10" < "2"), sin que un valor no numérico futuro rompa la consulta.
-    "prioridad": (
-        "CASE WHEN s.orden_prioridad ~ '^[0-9]+$' THEN s.orden_prioridad::int END NULLS LAST, "
-        "s.creado_en DESC"
-    ),
+    # orden_prioridad es un entero validado 1-5 desde la Fase 1.17 (antes era varchar libre).
+    "prioridad": "s.orden_prioridad, s.creado_en DESC",
 }
 
 
@@ -1670,11 +1794,14 @@ def list_solicitudes(
     nombre: str | None = None,
     estatus: str | None = None,
     orden_por: str | None = None,
+    involucrado_id: int | None = None,
     limit: int = 100,
 ) -> list[dict]:
     """Listado para la página de Solicitudes (Fase 1.6). Trae nombres legibles de los
     catálogos (no solo ids) vía LEFT JOIN. Por default, más recientes primero; `orden_por`
-    permite ordenar por estatus/tipo/cliente/prioridad (ver _ORDEN_SOLICITUDES)."""
+    permite ordenar por estatus/tipo/cliente/prioridad (ver _ORDEN_SOLICITUDES).
+    `involucrado_id` (Fase 1.19) filtra a las solicitudes donde ese miembro participa: como
+    solicitante, como responsable de atención, o como responsable de alguna de sus tareas."""
     condiciones = ["s.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
@@ -1686,6 +1813,13 @@ def list_solicitudes(
     if estatus:
         condiciones.append("s.codigo_estatus = %(estatus)s")
         parametros["estatus"] = estatus
+    if involucrado_id:
+        condiciones.append(
+            "(s.solicitante = %(involucrado_id)s OR s.responsable_atencion_id = %(involucrado_id)s "
+            "OR EXISTS (SELECT 1 FROM tareas ti WHERE ti.solicitud_id = s.id "
+            "AND ti.responsable_id = %(involucrado_id)s AND ti.borrado_en IS NULL))"
+        )
+        parametros["involucrado_id"] = involucrado_id
 
     where = f"WHERE {' AND '.join(condiciones)}"
     order_by = _ORDEN_SOLICITUDES.get(orden_por or "", "s.creado_en DESC")
@@ -1693,12 +1827,14 @@ def list_solicitudes(
         f"""
         SELECT s.id, s.nombre, c.nombre AS cliente, t.tipo AS tipo,
                s.codigo_estatus, e.descripcion AS estatus_descripcion,
-               m.nombre_completo AS solicitante, s.orden_prioridad, s.creado_en
+               m.nombre_completo AS solicitante, s.orden_prioridad,
+               s.fecha_entrega, ra.nombre_completo AS responsable_atencion, s.creado_en
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
         LEFT JOIN estatus e ON e.codigo = s.codigo_estatus
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
+        LEFT JOIN miembros_equipo ra ON ra.id = s.responsable_atencion_id
         {where}
         ORDER BY {order_by}
         LIMIT %(max_rows)s
@@ -1707,6 +1843,109 @@ def list_solicitudes(
     )
     columnas = [
         "id", "nombre", "cliente", "tipo", "codigo_estatus", "estatus_descripcion",
-        "solicitante", "orden_prioridad", "creado_en",
+        "solicitante", "orden_prioridad", "fecha_entrega", "responsable_atencion", "creado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+# ---------------------------------------------------------------------------------
+# Notificaciones (Fase 1.20)
+# ---------------------------------------------------------------------------------
+
+
+def find_miembro_activo_by_usuario(cursor, usuario: str) -> dict | None:
+    """Resuelve una mención @usuario en un comentario: solo miembros con acceso activo (no
+    tiene sentido notificar a alguien dado de baja o sin acceso)."""
+    cursor.execute(
+        """
+        SELECT id, nombre_completo
+        FROM miembros_equipo
+        WHERE usuario ILIKE %(usuario)s AND acceso_activo = true AND borrado_en IS NULL
+        """,
+        {"usuario": usuario},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return {"id": row[0], "nombre_completo": row[1]}
+
+
+def list_miembros_activos_ids(cursor) -> list[int]:
+    """Usado para "@todos": todos los miembros con acceso activo."""
+    cursor.execute("SELECT id FROM miembros_equipo WHERE acceso_activo = true AND borrado_en IS NULL")
+    return [row[0] for row in cursor.fetchall()]
+
+
+def insert_notificacion(
+    cursor,
+    destinatario_id: int,
+    tipo: str,
+    mensaje: str,
+    entidad_tipo: str | None = None,
+    entidad_id: int | None = None,
+) -> int:
+    cursor.execute(
+        """
+        INSERT INTO notificaciones (destinatario_id, tipo, mensaje, entidad_tipo, entidad_id)
+        VALUES (%(destinatario_id)s, %(tipo)s, %(mensaje)s, %(entidad_tipo)s, %(entidad_id)s)
+        RETURNING id
+        """,
+        {
+            "destinatario_id": destinatario_id,
+            "tipo": tipo,
+            "mensaje": mensaje,
+            "entidad_tipo": entidad_tipo,
+            "entidad_id": entidad_id,
+        },
+    )
+    return cursor.fetchone()[0]
+
+
+def list_notificaciones_by_destinatario(
+    cursor, miembro_id: int, solo_no_leidas: bool = False, limit: int = 50
+) -> list[dict]:
+    condiciones = ["destinatario_id = %(miembro_id)s"]
+    if solo_no_leidas:
+        condiciones.append("leido_en IS NULL")
+    where = " AND ".join(condiciones)
+    cursor.execute(
+        f"""
+        SELECT id, tipo, mensaje, entidad_tipo, entidad_id, leido_en, creado_en
+        FROM notificaciones
+        WHERE {where}
+        ORDER BY creado_en DESC
+        LIMIT %(limit)s
+        """,
+        {"miembro_id": miembro_id, "limit": limit},
+    )
+    columnas = ["id", "tipo", "mensaje", "entidad_tipo", "entidad_id", "leido_en", "creado_en"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def count_no_leidas(cursor, miembro_id: int) -> int:
+    cursor.execute(
+        "SELECT count(*) FROM notificaciones WHERE destinatario_id = %(miembro_id)s AND leido_en IS NULL",
+        {"miembro_id": miembro_id},
+    )
+    return cursor.fetchone()[0]
+
+
+def marcar_notificacion_leida(cursor, notificacion_id: int, miembro_id: int) -> int:
+    """Solo el propio destinatario puede marcarla leída (WHERE destinatario_id = miembro_id),
+    para no exponer un endpoint que permita marcar notificaciones ajenas."""
+    cursor.execute(
+        """
+        UPDATE notificaciones SET leido_en = now()
+        WHERE id = %(id)s AND destinatario_id = %(miembro_id)s AND leido_en IS NULL
+        """,
+        {"id": notificacion_id, "miembro_id": miembro_id},
+    )
+    return cursor.rowcount
+
+
+def marcar_todas_notificaciones_leidas(cursor, miembro_id: int) -> int:
+    cursor.execute(
+        "UPDATE notificaciones SET leido_en = now() WHERE destinatario_id = %(miembro_id)s AND leido_en IS NULL",
+        {"miembro_id": miembro_id},
+    )
+    return cursor.rowcount

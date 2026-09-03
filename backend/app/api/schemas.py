@@ -37,6 +37,7 @@ class AdjuntoOut(BaseModel):
 
 class MiembroEquipoOut(BaseModel):
     id: int
+    usuario: str
     nombre_completo: str
     correo_electronico: str | None
 
@@ -64,7 +65,9 @@ class SolicitudResumen(BaseModel):
     codigo_estatus: str
     estatus_descripcion: str | None
     solicitante: str | None
-    orden_prioridad: str | None
+    orden_prioridad: int
+    fecha_entrega: date | None
+    responsable_atencion: str | None
     creado_en: datetime
 
 
@@ -79,13 +82,21 @@ class SolicitudDetalle(BaseModel):
     codigo_estatus: str
     estatus_descripcion: str | None
     solicitante: str | None
-    orden_prioridad: str | None
+    orden_prioridad: int
     canal: str | None
     canal_id: int | None
     fecha_completado: date | None
+    fecha_entrega: date | None
+    responsable_atencion_id: int | None
+    responsable_atencion: str | None
     creado_en: datetime
     actualizado_en: datetime
     actualizado_por: str
+
+
+# Estatus a partir de los cuales una solicitud ya fue planeada (orden_visualizacion >= el de
+# PLANEADO): desde aquí, fecha_entrega y responsable_atencion_id son obligatorios.
+ESTATUS_REQUIERE_FECHA_ENTREGA = {"PLANEADO", "EN PROGRESO", "COMPLETADO"}
 
 
 class SolicitudUpdate(BaseModel):
@@ -95,8 +106,10 @@ class SolicitudUpdate(BaseModel):
     tipo: str = Field(min_length=1, max_length=100)
     canal: str = Field(min_length=1, max_length=100)
     codigo_estatus: str = Field(min_length=1, max_length=15)
-    orden_prioridad: str | None = Field(default=None, max_length=20)
+    orden_prioridad: int = Field(default=3, ge=1, le=5)
     fecha_completado: date | None = None
+    fecha_entrega: date | None = None
+    responsable_atencion_id: int | None = None
 
     @model_validator(mode="after")
     def _fecha_completado_obligatoria_si_completado(self) -> "SolicitudUpdate":
@@ -104,6 +117,16 @@ class SolicitudUpdate(BaseModel):
             raise ValueError(
                 "fecha_completado es obligatoria cuando el estatus es Completado"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _fecha_entrega_y_responsable_obligatorios_si_planeada(self) -> "SolicitudUpdate":
+        if self.codigo_estatus in ESTATUS_REQUIERE_FECHA_ENTREGA:
+            if self.fecha_entrega is None or self.responsable_atencion_id is None:
+                raise ValueError(
+                    "fecha_entrega y responsable_atencion_id son obligatorios a partir del "
+                    "estatus Planeado"
+                )
         return self
 
 
@@ -119,6 +142,8 @@ class TareaOut(BaseModel):
     descripcion: str | None
     responsable_id: int | None
     responsable: str | None
+    solicitud_prioridad: int
+    solicitud_fecha_entrega: date | None
     codigo_estatus_tarea: str
     estatus_tarea_descripcion: str | None
     fecha_inicio: date
@@ -226,6 +251,15 @@ class DireccionGeneralKpisOut(BaseModel):
     por_area: list[DireccionGeneralGrupoOut]
     solicitudes_por_estatus: list[DistribucionEstatusSolicitudOut]
     tareas_por_estatus: list[DistribucionEstatusOut]
+
+
+class SolicitudDireccionGeneralOut(BaseModel):
+    id: int
+    nombre: str
+    cliente: str | None
+    area: str
+    solicitante: str | None
+    creado_en: datetime
 
 
 class HitoOut(BaseModel):
@@ -381,6 +415,20 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str = Field(min_length=1)
     password_nueva: str = Field(min_length=8, max_length=255)
+
+
+class NotificacionOut(BaseModel):
+    id: int
+    tipo: str
+    mensaje: str
+    entidad_tipo: str | None
+    entidad_id: int | None
+    leido_en: datetime | None
+    creado_en: datetime
+
+
+class NotificacionesNoLeidasCountOut(BaseModel):
+    no_leidas: int
 
 
 class ChangePasswordRequest(BaseModel):

@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { crearTarea, actualizarTarea, fetchEstatusTarea, fetchMiembrosEquipo } from "../api.js";
+import AdjuntosInput from "./AdjuntosInput.jsx";
+import {
+  agregarAdjuntosTarea,
+  actualizarTarea,
+  crearTarea,
+  fetchEstatusTarea,
+  fetchMiembrosEquipo,
+} from "../api.js";
 
 function formatearFecha(iso) {
   try {
@@ -24,6 +31,7 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
   const [fechaFinReal, setFechaFinReal] = useState(tareaInicial?.fecha_fin_real || "");
   const [horasEstimadas, setHorasEstimadas] = useState(tareaInicial?.horas_estimadas ?? "");
   const [horasReales, setHorasReales] = useState(tareaInicial?.horas_reales ?? "");
+  const [adjuntos, setAdjuntos] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
 
@@ -61,6 +69,9 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
     };
     try {
       const tarea = esEdicion ? await actualizarTarea(tareaInicial.id, datos) : await crearTarea(solicitudId, datos);
+      if (!esEdicion && adjuntos.length > 0) {
+        await agregarAdjuntosTarea(tarea.id, adjuntos);
+      }
       onGuardada(tarea);
     } catch (err) {
       setError(err.message || "No se pudo guardar la tarea. Intenta de nuevo.");
@@ -161,6 +172,13 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
           />
         </label>
       </div>
+
+      {!esEdicion && (
+        <div>
+          <p className="crear-solicitud-etiqueta">Adjuntos (opcional)</p>
+          <AdjuntosInput archivos={adjuntos} onChange={setAdjuntos} />
+        </div>
+      )}
 
       {esEdicion && (
         <p className="tarea-fechas-info">

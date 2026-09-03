@@ -25,14 +25,16 @@ def test_listar_miembros_equipo(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "list_miembros",
-        lambda cursor: [{"id": 1, "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}],
+        lambda cursor: [
+            {"id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
+        ],
     )
 
     response = client.get("/api/miembros-equipo")
 
     assert response.status_code == 200
     assert response.json() == [
-        {"id": 1, "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
+        {"id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
     ]
 
 

@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.app import app
-from app.auth.dependencies import require_scrum_master
+from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
 import app.api.routes_solicitudes as routes
 
 
@@ -187,7 +187,7 @@ def test_listar_solicitudes(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None):
+    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
         filtros_recibidos.update(
             {"cliente": cliente, "nombre": nombre, "estatus": estatus, "orden_por": orden_por}
         )
@@ -200,7 +200,9 @@ def test_listar_solicitudes(monkeypatch):
                 "codigo_estatus": "EN ESPERA",
                 "estatus_descripcion": "En espera",
                 "solicitante": "Ramon Rosales",
-                "orden_prioridad": None,
+                "orden_prioridad": 3,
+                "fecha_entrega": None,
+                "responsable_atencion": None,
                 "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
             }
         ]
@@ -227,7 +229,7 @@ def test_listar_solicitudes_ordenadas(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None):
+    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
         filtros_recibidos.update({"orden_por": orden_por})
         return []
 
@@ -237,6 +239,25 @@ def test_listar_solicitudes_ordenadas(monkeypatch):
 
     assert response.status_code == 200
     assert filtros_recibidos == {"orden_por": "prioridad"}
+
+
+def test_listar_solicitudes_filtra_por_involucrado(monkeypatch):
+    """Fase 1.19: el filtro 'mis solicitudes' se traduce en involucrado_id hacia el repository."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    filtros_recibidos = {}
+
+    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
+        filtros_recibidos.update({"involucrado_id": involucrado_id})
+        return []
+
+    monkeypatch.setattr(routes.repository, "list_solicitudes", _fake_list_solicitudes)
+
+    response = client.get("/api/solicitudes", params={"involucrado_id": 6})
+
+    assert response.status_code == 200
+    assert filtros_recibidos == {"involucrado_id": 6}
 
 
 def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
@@ -264,6 +285,73 @@ def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
     body = response.json()
     assert body["id_solicitud"] == 789
     assert body["cliente"] == "Chantilly"
+
+
+def test_crear_solicitud_formulario_orden_prioridad_default(monkeypatch, tmp_path):
+    """Fase 1.17: si no se manda orden_prioridad, debe quedar en 3 (Media) por default."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+
+    solicitudes_creadas = {}
+
+    def _fake_insert_solicitud(cursor, solicitud, **kwargs):
+        solicitudes_creadas["orden_prioridad"] = solicitud.orden_prioridad
+        return 789
+
+    monkeypatch.setattr(routes.repository, "insert_solicitud", _fake_insert_solicitud)
+    monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
+    monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud capturada por formulario.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+        },
+    )
+
+    assert response.status_code == 201
+    assert solicitudes_creadas["orden_prioridad"] == 3
+
+
+def test_crear_solicitud_formulario_rechaza_prioridad_fuera_de_rango():
+    for valor in ("0", "6", "alta"):
+        response = client.post(
+            "/api/solicitudes/formulario",
+            data={
+                "solicitante_email": "ramon_rosales@stoconsulting.com",
+                "titulo": "Nueva integración",
+                "descripcion": "Detalle de la solicitud.",
+                "tipo": "Nuevo",
+                "canal": "Formulario",
+                "orden_prioridad": valor,
+            },
+        )
+        assert response.status_code == 422, f"orden_prioridad={valor!r} debería rechazarse"
+
+
+def test_actualizar_solicitud_rechaza_prioridad_fuera_de_rango(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "orden_prioridad": 6,
+            "codigo_estatus": "EN ESPERA",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_crear_solicitud_formulario_requiere_tipo():
@@ -306,10 +394,13 @@ def _fake_solicitud_detalle(solicitud_id=1):
         "codigo_estatus": "EN ESPERA",
         "estatus_descripcion": "En espera",
         "solicitante": "Ramon Rosales",
-        "orden_prioridad": None,
+        "orden_prioridad": 3,
         "canal": "Formulario",
         "canal_id": 3,
         "fecha_completado": None,
+        "fecha_entrega": None,
+        "responsable_atencion_id": None,
+        "responsable_atencion": None,
         "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_por": "dovela_control",
@@ -356,13 +447,163 @@ def test_actualizar_solicitud_success(monkeypatch):
             "cliente": "Chantilly",
             "tipo": "Nuevo",
             "canal": "Formulario",
-            "orden_prioridad": "1",
+            "orden_prioridad": 1,
             "codigo_estatus": "EN PROCESO",
         },
     )
 
     assert response.status_code == 200
     assert fake_conn.committed is True
+
+
+def test_actualizar_solicitud_planeado_requiere_fecha_entrega_y_responsable():
+    """Fase 1.18: al pasar a Planeado (o posterior), fecha_entrega y responsable_atencion_id
+    son obligatorios."""
+    for estatus in ("PLANEADO", "EN PROGRESO", "COMPLETADO"):
+        response = client.put(
+            "/api/solicitudes/1",
+            json={
+                "nombre": "Reporte de gastos",
+                "descripcion": "Detalle",
+                "cliente": "Chantilly",
+                "tipo": "Nuevo",
+                "canal": "Formulario",
+                "codigo_estatus": estatus,
+                "fecha_completado": "2026-08-24" if estatus == "COMPLETADO" else None,
+            },
+        )
+        assert response.status_code == 422, f"estatus={estatus} debería exigir fecha_entrega/responsable"
+
+
+def test_actualizar_solicitud_planeado_con_fecha_entrega_y_responsable_ok(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "PLANEADO",
+            "fecha_entrega": "2026-09-15",
+            "responsable_atencion_id": 6,
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_conn.committed is True
+
+
+def test_actualizar_solicitud_notifica_al_asignar_responsable_atencion(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 1)
+    # _fake_solicitud_detalle trae responsable_atencion_id=None -> el body lo cambia a 6
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs["tipo"])),
+    )
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "PLANEADO",
+            "fecha_entrega": "2026-09-15",
+            "responsable_atencion_id": 6,
+        },
+    )
+
+    assert response.status_code == 200
+    assert notificaciones == [(6, "SOLICITUD_ASIGNADA")]
+
+
+def test_actualizar_solicitud_notifica_aunque_se_asigne_a_si_mismo(monkeypatch):
+    """Ajuste: ya no se excluye la auto-notificación al asignarse uno mismo como responsable
+    de atención (USUARIO_DE_PRUEBA de conftest tiene id=1)."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs["tipo"])),
+    )
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "PLANEADO",
+            "fecha_entrega": "2026-09-15",
+            "responsable_atencion_id": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert notificaciones == [(1, "SOLICITUD_ASIGNADA")]
+
+
+def test_actualizar_solicitud_en_espera_no_requiere_fecha_entrega(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "EN ESPERA",
+        },
+    )
+
+    assert response.status_code == 200
 
 
 def test_actualizar_solicitud_404(monkeypatch):
@@ -373,6 +614,7 @@ def test_actualizar_solicitud_404(monkeypatch):
     monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
     monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
     monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: None)
     monkeypatch.setattr(routes.repository, "update_solicitud", lambda cursor, id, **kwargs: 0)
 
     response = client.put(
@@ -424,6 +666,7 @@ def test_actualizar_solicitud_completado_con_fecha(monkeypatch):
 
     monkeypatch.setattr(routes.repository, "update_solicitud", _fake_update_solicitud)
     monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
 
     response = client.put(
         "/api/solicitudes/1",
@@ -435,6 +678,8 @@ def test_actualizar_solicitud_completado_con_fecha(monkeypatch):
             "canal": "Formulario",
             "codigo_estatus": "COMPLETADO",
             "fecha_completado": "2026-08-24",
+            "fecha_entrega": "2026-08-20",
+            "responsable_atencion_id": 6,
         },
     )
 
@@ -486,6 +731,8 @@ def _fake_tarea(tarea_id=1, solicitud_id=1):
         "descripcion": "Reunión con el cliente",
         "responsable_id": 6,
         "responsable": "Ramon Rosales",
+        "solicitud_prioridad": 3,
+        "solicitud_fecha_entrega": None,
         "codigo_estatus_tarea": "POR HACER",
         "estatus_tarea_descripcion": "Por hacer",
         "fecha_inicio": date(2026, 8, 23),
@@ -508,6 +755,7 @@ def test_listar_tareas(monkeypatch):
 
     assert response.status_code == 200
     assert len(response.json()) == 1
+    assert response.json()[0]["solicitud_prioridad"] == 3
 
 
 def test_listar_comentarios_solicitud(monkeypatch):
@@ -669,12 +917,80 @@ def test_descargar_adjunto_solicitud_404_si_falta_en_disco(monkeypatch, tmp_path
     assert response.status_code == 404
 
 
+def test_agregar_adjuntos_solicitud_success(monkeypatch, tmp_path):
+    """Fase 1.21: agregar adjuntos a una solicitud ya creada (antes solo se podía al crearla)."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "count_adjuntos_by_solicitud", lambda cursor, id: 2)
+    monkeypatch.setattr(routes, "save_attachment", lambda id_solicitud, filename, content: f"/fake/{filename}")
+
+    guardados = []
+
+    def _fake_insert_adjunto(cursor, id_solicitud, nombre_archivo, ruta, tipo_mime, tamano):
+        guardados.append(nombre_archivo)
+        return len(guardados)
+
+    monkeypatch.setattr(routes.repository, "insert_adjunto", _fake_insert_adjunto)
+    monkeypatch.setattr(
+        routes.repository,
+        "list_adjuntos_by_solicitud",
+        lambda cursor, id: [
+            {
+                "id": i + 1,
+                "nombre_archivo": nombre,
+                "tipo_mime": "text/plain",
+                "tamano_bytes": 10,
+                "fecha_carga": datetime(2026, 9, 2, tzinfo=timezone.utc),
+            }
+            for i, nombre in enumerate(guardados)
+        ],
+    )
+
+    response = client.post(
+        "/api/solicitudes/1/adjuntos", files=[("files", ("nuevo.txt", b"contenido", "text/plain"))]
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["nombre_archivo"] == "nuevo.txt"
+
+
+def test_agregar_adjuntos_solicitud_rechaza_si_pasa_del_maximo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    # ya tiene 5 adjuntos -> 0 disponibles, cualquier archivo nuevo se rechaza
+    monkeypatch.setattr(routes.repository, "count_adjuntos_by_solicitud", lambda cursor, id: 5)
+
+    response = client.post(
+        "/api/solicitudes/1/adjuntos", files=[("files", ("otro.txt", b"contenido", "text/plain"))]
+    )
+
+    assert response.status_code == 422
+
+
+def test_agregar_adjuntos_solicitud_404_si_no_existe(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: None)
+
+    response = client.post(
+        "/api/solicitudes/999/adjuntos", files=[("files", ("nuevo.txt", b"contenido", "text/plain"))]
+    )
+
+    assert response.status_code == 404
+
+
 def test_crear_tarea_success(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
     monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
 
     response = client.post(
         "/api/solicitudes/1/tareas",
@@ -686,23 +1002,131 @@ def test_crear_tarea_success(monkeypatch):
     assert fake_conn.committed is True
 
 
-def test_crear_tarea_403_si_no_es_scrum_master():
-    def _denegar_scrum_master():
-        raise HTTPException(status_code=403, detail="Solo el Scrum Master puede hacer esto")
+def test_crear_tarea_notifica_al_responsable(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
 
-    app.dependency_overrides[require_scrum_master] = _denegar_scrum_master
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs["tipo"])),
+    )
+
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={"nombre": "Levantar requerimientos", "descripcion": "Reunión", "responsable_id": 6},
+    )
+
+    assert response.status_code == 201
+    assert notificaciones == [(6, "TAREA_ASIGNADA")]
+
+
+def test_crear_tarea_notifica_aunque_el_responsable_sea_quien_crea(monkeypatch):
+    """El responsable de atención (o el Scrum Master) puede asignarse la tarea a sí mismo y
+    aun así recibir la notificación (ajuste: ya no se excluye la auto-notificación)."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs["tipo"])),
+    )
+
+    # USUARIO_DE_PRUEBA (conftest) tiene id=1
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={"nombre": "Levantar requerimientos", "descripcion": "Reunión", "responsable_id": 1},
+    )
+
+    assert response.status_code == 201
+    assert notificaciones == [(1, "TAREA_ASIGNADA")]
+
+
+def test_crear_tarea_403_si_no_es_scrum_master_ni_responsable_de_atencion(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    solicitud = _fake_solicitud_detalle(1)
+    solicitud["responsable_atencion_id"] = 99
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: solicitud)
+
+    otro_usuario = UsuarioActual(
+        id=2,
+        usuario="DOVELA_WA",
+        nombre_completo="Wendy Aguilar",
+        codigo_rol_scrum="TEAM",
+        correo_electronico="wendy@dovela.com",
+        debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: otro_usuario
     try:
         response = client.post("/api/solicitudes/1/tareas", json={"nombre": "Levantar requerimientos"})
         assert response.status_code == 403
     finally:
-        del app.dependency_overrides[require_scrum_master]
+        del app.dependency_overrides[get_current_user]
+
+
+def test_crear_tarea_permitido_al_responsable_de_atencion_aunque_no_sea_scrum_master(monkeypatch):
+    """Fase 1.18 + ajuste: cualquier miembro (Product Owner, Scrum Master o Team) asignado
+    como responsable de atención de la solicitud puede crear y asignar tareas dentro de ella."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    solicitud = _fake_solicitud_detalle(1)
+    solicitud["responsable_atencion_id"] = 2
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: solicitud)
+    monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
+
+    product_owner = UsuarioActual(
+        id=2,
+        usuario="DOVELA_JC",
+        nombre_completo="Juan Carlos",
+        codigo_rol_scrum="PRODUCT OWNER",
+        correo_electronico="juan.carlos@dovela.com",
+        debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: product_owner
+    try:
+        response = client.post(
+            "/api/solicitudes/1/tareas",
+            json={"nombre": "Levantar requerimientos", "responsable_id": 6},
+        )
+        assert response.status_code == 201
+    finally:
+        del app.dependency_overrides[get_current_user]
+
+
+def test_crear_tarea_404_si_la_solicitud_no_existe(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: None)
+
+    response = client.post("/api/solicitudes/999/tareas", json={"nombre": "Levantar requerimientos"})
+
+    assert response.status_code == 404
 
 
 def test_crear_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
 
     kwargs_recibidos = {}
 

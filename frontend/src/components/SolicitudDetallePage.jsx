@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import AdjuntosInput from "./AdjuntosInput.jsx";
 import ComentarioItem from "./ComentarioItem.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import EditarSolicitudFormulario from "./EditarSolicitudFormulario.jsx";
 import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
+import PrioridadBadge from "./PrioridadBadge.jsx";
+import VencimientoBadge from "./VencimientoBadge.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import TareaItem from "./TareaItem.jsx";
 import {
+  agregarAdjuntosSolicitud,
   descargarAdjuntoSolicitud,
   eliminarSolicitud,
   eliminarTarea,
@@ -44,7 +48,7 @@ function formatearFechaCorta(iso) {
   }
 }
 
-export default function SolicitudDetallePage({ esScrumMaster }) {
+export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const solicitudId = Number(id);
@@ -57,6 +61,8 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
   const [enlaces, setEnlaces] = useState([]);
   const [adjuntos, setAdjuntos] = useState([]);
   const [descargandoId, setDescargandoId] = useState(null);
+  const [nuevosAdjuntos, setNuevosAdjuntos] = useState([]);
+  const [subiendoAdjuntos, setSubiendoAdjuntos] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -102,6 +108,21 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
       setError(err.message || "No se pudo descargar el adjunto.");
     } finally {
       setDescargandoId(null);
+    }
+  };
+
+  const subirAdjuntos = async () => {
+    if (nuevosAdjuntos.length === 0) return;
+    setSubiendoAdjuntos(true);
+    setError(null);
+    try {
+      const agregados = await agregarAdjuntosSolicitud(solicitudId, nuevosAdjuntos);
+      setAdjuntos((actuales) => [...actuales, ...agregados]);
+      setNuevosAdjuntos([]);
+    } catch (err) {
+      setError(err.message || "No se pudieron subir los adjuntos.");
+    } finally {
+      setSubiendoAdjuntos(false);
     }
   };
 
@@ -162,6 +183,12 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
     );
   }
 
+  // Fase 1.18/nuevo ajuste: el responsable de atención asignado a la solicitud también puede
+  // crear tareas y asignarlas a cualquier miembro del equipo, sin importar su rol Scrum.
+  const esResponsableAtencion =
+    usuarioActual != null && usuarioActual.id === solicitud.responsable_atencion_id;
+  const puedeCrearTarea = esScrumMaster || esResponsableAtencion;
+
   return (
     <div className="solicitud-detalle-page">
       <button type="button" className="secundario" onClick={onRegresar}>
@@ -189,8 +216,19 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
           <strong>Canal:</strong> {solicitud.canal || "Sin definir"}
         </p>
         <p>
-          <strong>Orden de prioridad:</strong> {solicitud.orden_prioridad || "Sin definir"}
+          <strong>Prioridad:</strong> <PrioridadBadge nivel={solicitud.orden_prioridad} />
         </p>
+        {solicitud.responsable_atencion && (
+          <p>
+            <strong>Responsable de atención:</strong> {solicitud.responsable_atencion}
+          </p>
+        )}
+        {solicitud.fecha_entrega && (
+          <p>
+            <strong>Fecha de entrega:</strong>{" "}
+            <VencimientoBadge fechaEntrega={solicitud.fecha_entrega} codigoEstatus={solicitud.codigo_estatus} />
+          </p>
+        )}
         {solicitud.codigo_estatus === "COMPLETADO" && solicitud.fecha_completado && (
           <p>
             <strong>Fecha Completado:</strong> {formatearFechaCorta(solicitud.fecha_completado)}
@@ -251,12 +289,24 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
                 </li>
               ))}
             </ul>
+
+            <div className="adjuntos-agregar">
+              <p className="crear-solicitud-etiqueta">Agregar adjuntos</p>
+              <AdjuntosInput archivos={nuevosAdjuntos} onChange={setNuevosAdjuntos} />
+              <button
+                type="button"
+                disabled={nuevosAdjuntos.length === 0 || subiendoAdjuntos}
+                onClick={subirAdjuntos}
+              >
+                {subiendoAdjuntos ? "Subiendo..." : "Subir adjuntos"}
+              </button>
+            </div>
           </>
         )}
 
         {pestanaActiva === "tareas" && (
           <>
-            {esScrumMaster ? (
+            {puedeCrearTarea ? (
               <div className="resumen-acciones">
                 <button
                   type="button"
@@ -269,7 +319,9 @@ export default function SolicitudDetallePage({ esScrumMaster }) {
                 </button>
               </div>
             ) : (
-              <p className="adjuntos-ayuda">Solo el Scrum Master puede agregar tareas.</p>
+              <p className="adjuntos-ayuda">
+                Solo el Scrum Master o el responsable de atención de la solicitud pueden agregar tareas.
+              </p>
             )}
             {tareas.length === 0 && <p>Esta solicitud todavía no tiene tareas.</p>}
             <div className="tarea-lista">

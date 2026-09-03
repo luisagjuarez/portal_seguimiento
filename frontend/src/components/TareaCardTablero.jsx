@@ -1,4 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
+import PrioridadBadge from "./PrioridadBadge.jsx";
+import VencimientoBadge from "./VencimientoBadge.jsx";
 
 export default function TareaCardTablero({ tarea, onAbrir }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -18,7 +20,10 @@ export default function TareaCardTablero({ tarea, onAbrir }) {
       {...listeners}
       {...attributes}
     >
-      <h4>{tarea.nombre}</h4>
+      <div className="tarea-card-tablero-encabezado">
+        <h4>{tarea.nombre}</h4>
+        <PrioridadBadge nivel={tarea.solicitud_prioridad} />
+      </div>
       <p className="tarea-card-tablero-referencia">
         {tarea.solicitud_nombre}
         {tarea.cliente ? ` · ${tarea.cliente}` : ""}
@@ -27,6 +32,10 @@ export default function TareaCardTablero({ tarea, onAbrir }) {
         <span>{tarea.responsable || "Sin asignar"}</span>
         <span className="solicitud-fecha">Vence: {tarea.fecha_fin}</span>
       </p>
+      <VencimientoBadge
+        fechaEntrega={tarea.solicitud_fecha_entrega}
+        codigoEstatus={tarea.codigo_estatus_tarea}
+      />
     </div>
   );
 }

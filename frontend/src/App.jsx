@@ -14,6 +14,7 @@ import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
 import CambiarPasswordFormulario from "./components/CambiarPasswordFormulario.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
+import NotificacionesBell from "./components/NotificacionesBell.jsx";
 import { clearToken, fetchMe, getToken } from "./api.js";
 
 const SIDEBAR_STORAGE_KEY = "dovela:sidebar-visible";
@@ -123,9 +124,12 @@ export default function App() {
           </div>
           <div className="theme-toggle-wrap">
             {puedeMostrarSidebar && (
-              <button type="button" className="secundario" onClick={() => navigate("/cambiar-password")}>
-                Cambiar contraseña
-              </button>
+              <>
+                <NotificacionesBell />
+                <button type="button" className="secundario" onClick={() => navigate("/cambiar-password")}>
+                  Cambiar contraseña
+                </button>
+              </>
             )}
             <ThemeToggle />
           </div>
@@ -141,12 +145,12 @@ export default function App() {
             <Routes>
               <Route path="/" element={<InicioPage usuarioActual={usuarioActual} />} />
               <Route path="/chat" element={<ChatWindow usuarioActual={usuarioActual} />} />
-              <Route path="/solicitudes" element={<SolicitudesPage />} />
+              <Route path="/solicitudes" element={<SolicitudesPage usuarioActual={usuarioActual} />} />
               <Route
                 path="/solicitudes/:id"
-                element={<SolicitudDetallePage esScrumMaster={esScrumMaster} />}
+                element={<SolicitudDetallePage esScrumMaster={esScrumMaster} usuarioActual={usuarioActual} />}
               />
-              <Route path="/tablero" element={<TableroPage />} />
+              <Route path="/tablero" element={<TableroPage usuarioActual={usuarioActual} />} />
               <Route
                 path="/monitor"
                 element={puedeVerReportesGerenciales ? <MonitorPage /> : <Navigate to="/" replace />}

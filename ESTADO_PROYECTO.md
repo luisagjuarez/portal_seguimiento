@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-08-31 (Fase 1.15 cerrada)
+Última actualización: 2026-09-03 (Fases 1.17-1.21 con pasada visual del usuario; dos ajustes de notificaciones/permisos aplicados, falta verificación e2e con curl/navegador)
 
 ## Dónde vamos en el roadmap
 
@@ -16,8 +16,210 @@
 [x] Fase 1.12 (extraoficial) — Monitor de tareas con indicadores para Scrum Master y Product Owner ✅ implementado y verificado end-to-end (2026-08-26)
 [x] Fase 1.13 (extraoficial) — Reglas de permisos más finas por rol (borrar solo Scrum Master, editar/borrar propio en comentarios/hitos/"por hacer") ✅ implementado y verificado end-to-end (2026-08-27)
 [x] Fase 1.14 (extraoficial) — Publicar el portal bajo el subpath /dovela_control ✅ implementado y verificado end-to-end en local y TEST (2026-08-27)
-[x] Fase 1.15 (extraoficial) — Tablero de Dirección General (KPIs por rango de fechas, desglosados por cliente/tipo/área/estatus) ✅ implementado y verificado por API contra la BD real (2026-08-31); falta la pasada visual en navegador
+[x] Fase 1.15 (extraoficial) — Tablero de Dirección General (KPIs por rango de fechas, desglosados por cliente/tipo/área/estatus) ✅ implementado, verificado en navegador y desplegado en TEST (2026-09-01)
+[~] Fase 1.16 (extraoficial) — Subvistas de detalle por métrica en Dirección General (mosaico + pies por cliente/área + tabla de solicitudes) — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
+[~] Fase 1.17 (extraoficial) — Semáforo de prioridad (1-5) heredado en tareas — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
+[~] Fase 1.18 (extraoficial) — Fecha de entrega + responsable de atención (obligatorios desde "Planeado") + semáforo de vencimiento — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
+[~] Fase 1.19 (extraoficial) — Filtros por defecto "mis tareas"/"mis solicitudes" en Tablero y Solicitudes — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
+[~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 2 ajustes tras la pasada visual (auto-notificación y permiso de creación de tareas, ver entrada 2026-09-03) verificados por 180 tests de backend; falta verificación e2e con curl/navegador de esos 2 ajustes y el deploy a TEST
+[~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
 ```
+
+**2026-09-03 — Pasada visual del usuario (Fases 1.16-1.21) y dos ajustes de
+notificaciones/permisos:** el usuario recorrió el checklist de verificación visual pendiente
+directamente en su navegador (sin necesitar que se condujera el navegador por él). Todo quedó
+bien salvo dos preguntas sobre la Fase 1.20 que se convirtieron en ajustes:
+
+1. **Auto-notificación**: la Fase 1.20 excluía a propósito al propio actor como destinatario de
+   sus 4 disparadores (asignarse una tarea, asignarse responsable de atención de una solicitud,
+   asignarse un "por hacer", mencionarse a sí mismo con `@usuario` en un comentario). El usuario
+   pidió invertirlo: ahora sí llega la notificación en los 4 casos. Se quitaron las 5 condiciones
+   `!= usuario_actual.id` / `discard(usuario_actual.id)` correspondientes en
+   `routes_tareas.py`/`routes_solicitudes.py`. De paso se confirmó (sin cambios) que las
+   notificaciones son asíncronas por polling cada 30s (`NotificacionesBell.jsx`), no en tiempo
+   real — no hay websockets en el proyecto.
+2. **Permiso de creación de tareas**: `POST /solicitudes/{id}/tareas` estaba restringido a
+   `require_scrum_master` desde su origen, sin relación con el responsable de atención agregado
+   en la Fase 1.18. El usuario pidió que el responsable de atención de una solicitud —que puede
+   ser cualquier miembro del equipo, no un rol fijo— también pueda crear tareas y asignarlas a
+   cualquier miembro (esto último ya funcionaba sin restricción). Nueva regla
+   `require_scrum_master_o_responsable_solicitud` en `app/auth/dependencies.py` (no puede ser un
+   `Depends`, el responsable solo se conoce tras leer la solicitud dentro del endpoint, mismo
+   patrón que `require_autor_o_scrum_master`); `crear_tarea` ahora lee la solicitud primero (404
+   si no existe) y aplica la regla. Frontend: `SolicitudDetallePage` recibe `usuarioActual` y
+   muestra "Agregar Tarea" también si `usuarioActual.id === solicitud.responsable_atencion_id`.
+   Borrar tarea sigue siendo exclusivo del Scrum Master (Fase 1.13, sin cambios).
+
+180 tests de backend en verde (5 nuevos). Se corrieron copiando `backend/app`/`backend/tests` al
+contenedor `api` en ejecución (la imagen de producción no incluye `tests/`), y luego se
+reconstruyeron `api`/`backend`/`frontend` de verdad con `docker compose build` + `up -d`.
+**Falta verificación end-to-end con `curl`/navegador contra la BD real de estos 2 ajustes**
+(no se hizo en esta sesión por no tener credenciales de prueba a mano) y el **deploy a TEST**
+de las 6 sub-fases completas (1.16 a 1.21, todas ya verificadas visualmente).
+
+De la pasada visual de estos 2 ajustes surgió un tercer detalle: el picker de menciones `@` en
+comentarios (Fase 1.20, `ComentarioFormulario.jsx`) no tenía navegación por teclado, solo clic de
+mouse. Se agregó `ArrowUp`/`ArrowDown` para moverse entre opciones, `Enter` para confirmar y
+`Escape` para cerrar el picker, con la opción activa resaltada (`.mencion-picker-activa` en
+`styles.css`). Verificado con `npm run build` y contenedor `frontend` reconstruido; falta la
+pasada visual de este detalle puntual.
+
+**2026-09-02 — Fase 1.21, multi-adjuntos (quinta y última sub-fase del plan
+`/home/lg/.claude/plans/nifty-wishing-hopper.md`):** ya se podían adjuntar varios archivos de
+una vez al CREAR una solicitud (`AdjuntosInput`, máx. 5, 10MB c/u) — el hueco real, confirmado
+con el usuario, era (a) no poder agregar adjuntos a una solicitud ya creada, y (b) que las
+tareas no tuvieran ningún soporte de adjuntos. Ambos resueltos:
+
+- Nuevo `POST /api/solicitudes/{id}/adjuntos` (agrega a una ya creada; valida que
+  existentes+nuevos no pase de 5) y tab "Adjuntos" de `SolicitudDetallePage` ahora tiene control
+  de subida (antes solo listaba/descargaba).
+- Adjuntos en tareas desde cero: tabla `tareas_adjuntos` (`backend/sql/014_adjuntos_tarea.sql`,
+  mismo patrón N:M que `solicitudes_adjuntos`, corrida contra la BD real),
+  `POST/GET /api/tareas/{id}/adjuntos` y `GET .../{adjunto_id}/descargar`. Nueva pestaña
+  "Adjuntos" en `TareaDetallePage`, y `TareaFormulario` permite adjuntar también al crear la
+  tarea (subida en un segundo paso tras crearla, mismo endpoint que "agregar después").
+- El helper de validación de adjuntos (límites, lectura) se extrajo a
+  `app/api/adjuntos_helpers.py`, compartido entre `routes_solicitudes.py` y `routes_tareas.py`
+  (antes solo vivía en el primero).
+- **Hallazgo importante:** `solicitudes.id` y `tareas.id` son secuencias independientes que sí
+  pueden coincidir (se confirmó creando solicitud 74 y tarea 74 al mismo tiempo) — guardar los
+  adjuntos de tarea en la misma ruta que los de solicitud (`adjuntos/<id>/`) los habría
+  sobreescrito entre sí. Se corrigió agregando un parámetro `subdir` a
+  `app/storage.py:save_attachment` (`adjuntos/tareas/<id>/` para tareas, sin cambiar la ruta ya
+  usada por solicitudes) — verificado en disco que ambos conjuntos de archivos con el mismo id
+  conviven sin pisarse.
+- Se expuso `usuario` en `GET /api/miembros-equipo` (aprovechado también por el picker de
+  menciones de la Fase 1.20).
+
+175 tests de backend en verde (9 nuevos). Verificado por `curl` contra la BD real: agregar un
+adjunto a una solicitud ya creada, crear una tarea y agregarle un adjunto, descargar ambos
+confirmando que no se pisaron en disco pese a compartir id, y rechazo 422 al intentar pasar de 5
+adjuntos en una tarea. Datos y archivos de prueba borrados (incluida la carpeta en disco, vía
+`docker exec` por permisos de root del contenedor). Reconstruidos y reiniciados los contenedores
+`api`/`frontend` locales con este código.
+
+**Con esto quedan implementadas y verificadas por tests/curl las 5 sub-fases del flujo
+Solicitud-Tarea pedido por el usuario (semáforo de prioridad, fecha de entrega/responsable de
+atención + semáforo de vencimiento, filtros por defecto, notificaciones + menciones, y
+multi-adjuntos). Falta la pasada visual en navegador de las 5 antes de dar por cerrada la
+iniciativa completa — ver sección "Pendientes" abajo.**
+
+**2026-09-02 — Fase 1.20, notificaciones + menciones @ (cuarta de 5 sub-fases del plan
+`/home/lg/.claude/plans/nifty-wishing-hopper.md`):** no existía absolutamente nada de
+notificaciones (grep exhaustivo, cero resultados). Nueva tabla `notificaciones`
+(`backend/sql/013_notificaciones.sql`, corrida contra la BD real: `destinatario_id`, `tipo`,
+`mensaje`, `entidad_tipo`/`entidad_id` para armar el link, `leido_en` nullable = no leída).
+Nuevo router `routes_notificaciones.py` (`GET /api/notificaciones`,
+`GET /api/notificaciones/no-leidas/count`, `PUT /api/notificaciones/{id}/leer` — solo el propio
+destinatario puede marcarla, `PUT /api/notificaciones/leer-todas`). Disparadores agregados
+inline (misma transacción) en los endpoints ya existentes, comparando contra el estado anterior
+para no notificar si el responsable no cambió ni notificarse a sí mismo:
+- Asignar/reasignar responsable de una tarea (`POST/PUT /solicitudes/{id}/tareas`,
+  `/tareas/{id}`) → tipo `TAREA_ASIGNADA`.
+- Asignar/reasignar responsable de atención de una solicitud (`PUT /solicitudes/{id}`, Fase
+  1.18) → tipo `SOLICITUD_ASIGNADA`.
+- Asignar responsable de un "por hacer" (`POST /tareas/{id}/por-hacer`) → tipo
+  `POR_HACER_ASIGNADO`.
+- Menciones en comentarios (`POST /tareas/{id}/comentarios`): parseo por regex `@(\w+)` contra
+  `miembros_equipo.usuario` (solo activos) → tipo `MENCION_COMENTARIO`; `@todos` reparte a
+  todo el equipo con acceso activo (confirmado con el usuario), excluyendo siempre a quien
+  escribió el comentario.
+- Se expuso `usuario` en `GET /api/miembros-equipo` (antes solo nombre/correo) — lo necesita el
+  picker de menciones del frontend para insertar el token correcto.
+
+Frontend: `NotificacionesBell.jsx` en la esquina superior derecha del header (junto a
+`ThemeToggle`), con badge rojo del conteo (poll cada 30s, sin librería nueva — no hay
+websockets en el proyecto), panel desplegable con las notificaciones recientes (clic navega a
+la solicitud/tarea y la marca leída) y "Marcar todas como leídas". `ComentarioFormulario.jsx`
+gana un picker ligero de menciones (al escribir `@` filtra `fetchMiembrosEquipo()` + una entrada
+sintética "todos") — es solo una ayuda de UI, el backend reconoce `@usuario`/`@todos` igual si
+se escribe a mano.
+
+166 tests de backend en verde (13 nuevos). Verificado por `curl` contra la BD real con sesión de
+Scrum Master y de Team (`DOVELA_WA`): asignar una tarea a otro miembro genera su notificación;
+`@todos` en un comentario notificó exactamente a los 2 miembros activos distintos del autor (de
+12 miembros solo 3 tienen acceso activo hoy); `@DOVELA_WA` notificó solo a ese miembro; marcar
+una notificación propia funciona, marcar todas funciona, e intentar marcar una notificación ajena
+devuelve 404 (protegido por `destinatario_id` en el `WHERE`). Datos y notificaciones de prueba
+borrados de la BD real al terminar. Reconstruidos y reiniciados los contenedores `api`/`frontend`
+locales con este código. **Falta la pasada visual del usuario** (junto con las de las Fases
+1.17-1.19).
+
+**2026-09-02 — Fase 1.19, filtros por defecto "mis tareas"/"mis solicitudes" (tercera de 5
+sub-fases del plan `/home/lg/.claude/plans/nifty-wishing-hopper.md`):** el Tablero ya tenía un
+filtro de responsable (`<select>` con "Todos los responsables"), pero arrancaba siempre en
+"Todos" — ahora `TableroPage` recibe `usuarioActual` (nuevo, antes no lo recibía en
+`App.jsx`) y preselecciona su propio id, sin quitar la opción de cambiarlo. Para Solicitudes no
+existía ningún filtro de involucramiento: nuevo parámetro `involucrado_id` en
+`GET /api/solicitudes` (`repository.list_solicitudes`) que filtra por `solicitante =
+involucrado_id OR responsable_atencion_id = involucrado_id OR EXISTS tarea con responsable_id =
+involucrado_id` — cubre los 3 roles en los que alguien puede estar involucrado en una solicitud.
+Nuevo selector "Ver: Mis solicitudes / Todas" en `SolicitudesPage` (ahora también recibe
+`usuarioActual`), default "Mis solicitudes". 153 tests de backend en verde (1 nuevo); verificado
+por `curl` contra la BD real con sesión de Scrum Master: sin filtro trae 47 solicitudes, con
+`involucrado_id` del propio usuario trae 17 (mezcla de solicitudes propias como solicitante y
+ajenas donde es responsable de alguna tarea, confirmando que las 3 condiciones del OR
+funcionan). Reconstruidos y reiniciados los contenedores `api`/`frontend` locales con este
+código. **Falta la pasada visual del usuario** (junto con las de las Fases 1.17 y 1.18).
+
+**2026-09-02 — Fase 1.18, fecha de entrega + responsable de atención + semáforo de
+vencimiento (segunda de 5 sub-fases del plan `/home/lg/.claude/plans/nifty-wishing-hopper.md`):**
+`solicitudes` no tenía fecha de entrega ni un responsable de *atenderla* (distinto del
+`solicitante`, que es quien la pidió). Se agregaron `fecha_entrega` (date) y
+`responsable_atencion_id` (FK a `miembros_equipo`) vía
+`backend/sql/012_fecha_entrega_responsable_solicitud.sql` (corrida contra la BD real). Ambos
+campos son obligatorios (validados en `SolicitudUpdate`, mismo criterio que ya usaba
+`fecha_completado`, no un constraint de BD) desde que el estatus llega a "Planeado" (y se
+mantienen obligatorios en "En progreso"/"Completado"); en "En espera"/"Cancelado" siguen siendo
+opcionales. El formulario de editar solicitud extiende la lógica condicional que ya existía para
+"Fecha Completado" y muestra/exige los dos campos nuevos al elegir esos estatus. Las tareas
+heredan y muestran `solicitud_fecha_entrega` (mismo JOIN que ya traía `solicitud_prioridad` de la
+Fase 1.17). Nuevo semáforo de vencimiento (`frontend/src/utils/vencimiento.js` +
+`VencimientoBadge.jsx`, distinto del semáforo de prioridad): verde (>7 días, misma ventana que ya
+usa el Monitor para "por vencer"), amarillo (≤7 días), rojo (vencida) — se apaga en estatus
+terminales (Completado/Cancelado, evaluado por tarea, no por la solicitud completa). Badges
+visibles en `SolicitudDetallePage`, `SolicitudCard`, `TareaItem`, `TareaDetallePage` y las
+tarjetas del Tablero. 152 tests de backend en verde (3 nuevos); verificado por `curl` contra la
+BD real con sesión de Scrum Master: rechazo 422 al pasar a Planeado/En progreso/Completado sin
+ambos campos, aceptación con ambos, y herencia confirmada en la tarea recién creada. Datos de
+prueba limpiados de la BD real al terminar (solicitud y tarea de prueba borradas). Reconstruidos
+y reiniciados los contenedores `api`/`frontend` locales con este código. **Falta la pasada visual
+del usuario** (junto con la de la Fase 1.17, pendiente también).
+
+**2026-09-02 — Fase 1.17, semáforo de prioridad heredado en tareas (primera de 5 sub-fases del
+flujo Solicitud-Tarea pedido por el usuario; ver plan completo en
+`/home/lg/.claude/plans/nifty-wishing-hopper.md`):** `solicitudes.orden_prioridad` era
+`varchar(100)` de texto libre sin validar; se migró (`backend/sql/011_orden_prioridad_entero.sql`,
+corrida contra la BD real) a entero validado 1-5 con default 3 (Media), según
+`00_ARCHIVOS/matriz_prioridades_scrum.md` (1=Crítica...5=Trivial, colores fijos de la matriz, no
+un catálogo en BD). Las tareas ahora heredan y muestran la prioridad de su solicitud padre
+(`solicitud_prioridad` en `TareaOut`, vía el mismo JOIN que ya traía `cliente` heredado) — de
+solo lectura, sin duplicar la columna en `tareas`. Formularios de crear/editar solicitud pasan de
+un `<input type="number">` libre a un `<select>` de 5 niveles. Nuevo componente
+`PrioridadBadge.jsx` reutilizado en `SolicitudDetallePage`, `SolicitudCard`, `TareaItem`,
+`TareaDetallePage` y las tarjetas del Tablero. 149 tests de backend en verde (3 nuevos);
+verificado por `curl` contra la BD real con sesión de Scrum Master: rechazo 422 con
+`orden_prioridad` fuera de 1-5, default 3 si se omite, herencia correcta confirmada en
+`GET /api/solicitudes/{id}/tareas` y `GET /api/tareas` (Tablero). Reconstruidos y reiniciados los
+contenedores `api`/`frontend` locales con este código. **Falta la pasada visual (claro/oscuro)
+del usuario** — la extensión de Chrome no estaba conectada en esta sesión.
+
+**2026-09-01 — Fase 1.16, subvistas de detalle por métrica en Dirección General:** para las 3
+métricas de conteo de solicitudes del tablero (en proceso, concluidas, nuevas — tareas y horas
+quedan igual, son agregados), el usuario pidió una subvista con mosaico + gráfica de pie por
+cliente + gráfica de pie por área + tabla de solicitudes individuales (Nombre, Cliente, Fecha
+de solicitud, Solicitante), abierta con clic en el tile correspondiente y un botón "Volver".
+Nuevo endpoint `GET /api/direccion-general/detalle-solicitudes?metrica=&desde=&hasta=` (mismo
+guard de rol), nuevo componente `PieChart.jsx` reutilizable en SVG puro (sin librería nueva) y
+`DireccionGeneralDetalleMetrica.jsx`. Con 15 clientes y 9 áreas reales en la BD, cada pie se
+limita a top 5 + "Otros" (máx. 6 rebanadas), con paleta de 5 colores categóricos validada con el
+skill `dataviz` (`validate_palette.js`, PASS claro/oscuro) — "Otros" en gris neutro, no
+validado como color de serie. 146 tests de backend en verde (7 nuevos); verificado por `curl`
+contra la BD real con sesión de Product Owner: el conteo de solicitudes de las 3 métricas
+(29/17/47 para 2026-08-01/31) coincide exacto con los totales del endpoint de KPIs ya
+existente. Falta la pasada visual en navegador y el deploy a TEST. Detalle completo en
+`00_ARCHIVOS/BITACORAS/2026-09-01.md` y el plan
+`/home/lg/.claude/plans/calm-beaming-muffin.md`.
 
 **2026-08-31 — Fase 1.15, Tablero de Dirección General:** el usuario pidió una vista de solo
 lectura, minimalista, para presentar el avance del área a dirección general — separada del
@@ -29,11 +231,11 @@ Estatus. Nuevo endpoint `GET /api/direccion-general/kpis?desde=...&hasta=...` (m
 rol que el Monitor, `require_scrum_master_or_product_owner`), nueva página
 `DireccionGeneralPage.jsx` (ruta `/direccion-general`), todo con tablas HTML simples (sin
 gráficas nuevas). 139 tests de backend en verde (6 nuevos); verificado por `curl` contra la BD
-real con los 3 roles de prueba, números contrastados exactamente contra SQL directo. Falta la
-pasada visual en navegador (Chrome no estaba disponible en esta sesión). Detalle completo,
-incluida una nota de diseño explícita sobre qué significa "área" para solicitudes vs. tareas,
-en `00_ARCHIVOS/BITACORAS/2026-08-31.md` y el plan
-`/home/lg/.claude/plans/compressed-dreaming-sunset.md`.
+real con los 3 roles de prueba, números contrastados exactamente contra SQL directo. Detalle
+completo, incluida una nota de diseño explícita sobre qué significa "área" para solicitudes vs.
+tareas, en `00_ARCHIVOS/BITACORAS/2026-08-31.md` y el plan
+`/home/lg/.claude/plans/compressed-dreaming-sunset.md`. **2026-09-01:** verificado en navegador
+por el usuario y desplegado en TEST (ver `00_ARCHIVOS/BITACORAS/2026-09-01.md`).
 
 **2026-08-27 — Fase 1.14, portal bajo el subpath /dovela_control:** infraestructura pidió que
 el portal responda bajo `/dovela_control` (para ponerlo detrás de un dominio/reverse-proxy
@@ -530,10 +732,15 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
-**⭐ Verificar en navegador el Tablero de Dirección General (Fase 1.15, 2026-08-31).** Backend y
-frontend ya están verificados por API/`curl` contra la BD real (números exactos, 3 roles de
-prueba); falta la pasada visual (modo claro/oscuro, refetch al cambiar el rango de fechas, guard
-de `/direccion-general` para el rol Team). Checklist en `00_ARCHIVOS/BITACORAS/2026-08-31.md`.
+**⭐ Verificar e2e con curl/navegador los 2 ajustes del 2026-09-03** (auto-notificación y permiso
+de creación de tareas para el responsable de atención) contra la BD real — hoy solo están
+verificados por los 180 tests de backend (mocks de repositorio), no se hizo la pasada con curl
+contra la BD real por no tener credenciales de prueba a mano en esa sesión.
+
+**⭐ Desplegar a TEST las Fases 1.16 a 1.21.** Las 6 sub-fases (subvistas de Dirección General +
+las 5 del flujo Solicitud-Tarea) ya están implementadas y **verificadas visualmente por el
+usuario** (2026-09-03); falta el deploy (mismo procedimiento que la Fase 1.15: push,
+`git stash`/`pull`/`stash pop` en `t_apex`, rebuild de `api`/`backend`/`frontend`).
 
 0. **⭐ Verificar en navegador la migración a rutas reales (2026-08-25).** El código ya está
    escrito y el build pasa, pero falta el recorrido visual completo (navegar por el sidebar,

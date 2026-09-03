@@ -1,22 +1,38 @@
 import { useEffect, useState } from "react";
 import ClienteAutocomplete from "./ClienteAutocomplete.jsx";
-import { actualizarSolicitud, fetchCanalesSolicitud, fetchEstatus, fetchTiposSolicitud } from "../api.js";
+import { PRIORIDAD_INFO, NIVELES_PRIORIDAD } from "../constants/prioridad.js";
+import {
+  actualizarSolicitud,
+  fetchCanalesSolicitud,
+  fetchEstatus,
+  fetchMiembrosEquipo,
+  fetchTiposSolicitud,
+} from "../api.js";
 
 function fechaHoy() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Mismo criterio que ESTATUS_REQUIERE_FECHA_ENTREGA en backend/app/api/schemas.py: a partir
+// de "Planeado", la fecha de entrega y el responsable de atención son obligatorios.
+const ESTATUS_REQUIERE_FECHA_ENTREGA = new Set(["PLANEADO", "EN PROGRESO", "COMPLETADO"]);
+
 export default function EditarSolicitudFormulario({ solicitud, onActualizada, onCancelar }) {
   const [tipos, setTipos] = useState([]);
   const [canales, setCanales] = useState([]);
   const [estatusCatalogo, setEstatusCatalogo] = useState([]);
+  const [miembros, setMiembros] = useState([]);
   const [nombre, setNombre] = useState(solicitud.nombre);
   const [descripcion, setDescripcion] = useState(solicitud.descripcion || "");
   const [tipo, setTipo] = useState(solicitud.tipo || "");
   const [canal, setCanal] = useState(solicitud.canal || "");
-  const [ordenPrioridad, setOrdenPrioridad] = useState(solicitud.orden_prioridad || "");
+  const [ordenPrioridad, setOrdenPrioridad] = useState(solicitud.orden_prioridad || 3);
   const [codigoEstatus, setCodigoEstatus] = useState(solicitud.codigo_estatus);
   const [fechaCompletado, setFechaCompletado] = useState(solicitud.fecha_completado || "");
+  const [fechaEntrega, setFechaEntrega] = useState(solicitud.fecha_entrega || "");
+  const [responsableAtencionId, setResponsableAtencionId] = useState(
+    solicitud.responsable_atencion_id || "",
+  );
   const [cliente, setCliente] = useState(solicitud.cliente || null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
@@ -31,6 +47,9 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
     fetchEstatus()
       .then(setEstatusCatalogo)
       .catch(() => setError("No se pudo cargar el catálogo de estatus."));
+    fetchMiembrosEquipo()
+      .then(setMiembros)
+      .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
   }, []);
 
   const alCambiarEstatus = (nuevoEstatus) => {
@@ -40,6 +59,8 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
     }
   };
 
+  const requiereFechaEntrega = ESTATUS_REQUIERE_FECHA_ENTREGA.has(codigoEstatus);
+
   const enviar = async (event) => {
     event.preventDefault();
     if (!nombre.trim() || !descripcion.trim() || !tipo || !canal || !codigoEstatus) {
@@ -48,6 +69,10 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
     }
     if (codigoEstatus === "COMPLETADO" && !fechaCompletado) {
       setError("Ingresa la fecha en que se completó la solicitud.");
+      return;
+    }
+    if (requiereFechaEntrega && (!fechaEntrega || !responsableAtencionId)) {
+      setError("Ingresa la fecha de entrega y el responsable de atención antes de guardar.");
       return;
     }
 
@@ -61,8 +86,10 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
         tipo,
         canal,
         codigoEstatus,
-        ordenPrioridad: ordenPrioridad || null,
+        ordenPrioridad,
         fechaCompletado: codigoEstatus === "COMPLETADO" ? fechaCompletado : null,
+        fechaEntrega: requiereFechaEntrega ? fechaEntrega : null,
+        responsableAtencionId: requiereFechaEntrega ? Number(responsableAtencionId) : null,
       });
       onActualizada(actualizada);
     } catch (err) {
@@ -120,13 +147,14 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
         </label>
 
         <label>
-          Orden de prioridad (opcional)
-          <input
-            type="number"
-            min="1"
-            value={ordenPrioridad}
-            onChange={(event) => setOrdenPrioridad(event.target.value)}
-          />
+          Prioridad
+          <select value={ordenPrioridad} onChange={(event) => setOrdenPrioridad(Number(event.target.value))}>
+            {NIVELES_PRIORIDAD.map((nivel) => (
+              <option key={nivel} value={nivel}>
+                {nivel} - {PRIORIDAD_INFO[nivel].etiqueta}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 
@@ -154,6 +182,38 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
           </label>
         )}
       </div>
+
+      {requiereFechaEntrega && (
+        <div className="tarea-form-fila">
+          <label>
+            Fecha de entrega
+            <input
+              type="date"
+              value={fechaEntrega}
+              onChange={(event) => setFechaEntrega(event.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Responsable de atención
+            <select
+              value={responsableAtencionId}
+              onChange={(event) => setResponsableAtencionId(event.target.value)}
+              required
+            >
+              <option value="" disabled>
+                Selecciona un miembro del equipo...
+              </option>
+              {miembros.map((miembro) => (
+                <option key={miembro.id} value={miembro.id}>
+                  {miembro.nombre_completo}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <div>
         <p className="crear-solicitud-etiqueta">Cliente (opcional)</p>

@@ -41,6 +41,8 @@ def _fake_tarea(tarea_id=1):
         "descripcion": "Reunión con el cliente",
         "responsable_id": 6,
         "responsable": "Ramon Rosales",
+        "solicitud_prioridad": 3,
+        "solicitud_fecha_entrega": None,
         "codigo_estatus_tarea": "COMPLETADO",
         "estatus_tarea_descripcion": "Completado",
         "fecha_inicio": date(2026, 8, 23),
@@ -171,6 +173,7 @@ def test_actualizar_tarea_404(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: None)
     monkeypatch.setattr(routes.repository, "update_tarea", lambda cursor, id, **kwargs: 0)
 
     response = client.put(
@@ -612,5 +615,308 @@ def test_crear_por_hacer_tarea_404_si_tarea_no_existe(monkeypatch):
     monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: None)
 
     response = client.post("/api/tareas/999/por-hacer", json={"nombre": "Ítem"})
+
+    assert response.status_code == 404
+
+
+def test_crear_por_hacer_tarea_notifica_al_responsable(monkeypatch):
+    """Fase 1.20: asignar un 'por hacer' a alguien (que no sea quien lo crea) notifica."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_por_hacer", lambda cursor, tarea_id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_por_hacer_by_id", lambda cursor, id: _fake_por_hacer(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs)),
+    )
+
+    response = client.post(
+        "/api/tareas/1/por-hacer",
+        json={"nombre": "Revisar checklist", "responsable_id": 6},
+    )
+
+    assert response.status_code == 201
+    assert len(notificaciones) == 1
+    assert notificaciones[0][0] == 6
+    assert notificaciones[0][1]["tipo"] == "POR_HACER_ASIGNADO"
+
+
+def test_crear_por_hacer_tarea_notifica_aunque_el_responsable_sea_quien_crea(monkeypatch):
+    """Ajuste: ya no se excluye la auto-notificación al asignarse uno mismo un pendiente."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_por_hacer", lambda cursor, tarea_id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_por_hacer_by_id", lambda cursor, id: _fake_por_hacer(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    # USUARIO_DE_PRUEBA (conftest) tiene id=1
+    response = client.post(
+        "/api/tareas/1/por-hacer",
+        json={"nombre": "Revisar checklist", "responsable_id": 1},
+    )
+
+    assert response.status_code == 201
+    assert notificaciones == [1]
+
+
+def test_crear_comentario_tarea_notifica_mencion(monkeypatch):
+    """Fase 1.20: @usuario en el texto del comentario notifica a ese miembro si tiene acceso
+    activo."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
+    monkeypatch.setattr(
+        routes.repository,
+        "find_miembro_activo_by_usuario",
+        lambda cursor, usuario: {"id": 6, "nombre_completo": "Ramon Rosales"} if usuario == "DOVELA_WA" else None,
+    )
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append((destinatario_id, kwargs)),
+    )
+
+    response = client.post(
+        "/api/tareas/1/comentarios", json={"texto_comentario": "@DOVELA_WA revisa esto por favor"}
+    )
+
+    assert response.status_code == 201
+    assert len(notificaciones) == 1
+    destinatario_id, kwargs = notificaciones[0]
+    assert destinatario_id == 6
+    assert kwargs["tipo"] == "MENCION_COMENTARIO"
+    assert kwargs["entidad_tipo"] == "TAREA"
+    assert kwargs["entidad_id"] == 1
+
+
+def test_crear_comentario_tarea_notifica_si_el_autor_se_menciona_a_si_mismo(monkeypatch):
+    """Ajuste: ya no se excluye la auto-notificación al mencionarse uno mismo con @usuario."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
+    monkeypatch.setattr(
+        routes.repository,
+        "find_miembro_activo_by_usuario",
+        lambda cursor, usuario: {"id": 1, "nombre_completo": "Luis Gómez"} if usuario == "DOVELA_LG" else None,
+    )
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    # USUARIO_DE_PRUEBA (conftest) es DOVELA_LG con id=1
+    response = client.post("/api/tareas/1/comentarios", json={"texto_comentario": "@DOVELA_LG me lo anoto"})
+
+    assert response.status_code == 201
+    assert notificaciones == [1]
+
+
+def test_crear_comentario_tarea_notifica_a_todos_con_arroba_todos(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
+    monkeypatch.setattr(routes.repository, "list_miembros_activos_ids", lambda cursor: [1, 2, 6, 9])
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    response = client.post("/api/tareas/1/comentarios", json={"texto_comentario": "@todos revisen esto"})
+
+    assert response.status_code == 201
+    # ajuste: el propio autor (id=1, USUARIO_DE_PRUEBA) también se notifica si queda incluido
+    assert sorted(notificaciones) == [1, 2, 6, 9]
+
+
+def test_crear_comentario_tarea_sin_mencion_no_notifica(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    response = client.post("/api/tareas/1/comentarios", json={"texto_comentario": "Sin menciones aquí"})
+
+    assert response.status_code == 201
+    assert notificaciones == []
+
+
+def test_actualizar_tarea_notifica_si_cambia_el_responsable(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    # _fake_tarea() trae responsable_id=6; el body cambia a 9 -> debe notificar a 9
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "update_tarea", lambda cursor, id, **kwargs: 1)
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    response = client.put(
+        "/api/tareas/1",
+        json={
+            "nombre": "Levantar requerimientos",
+            "descripcion": "Reunión con el cliente",
+            "responsable_id": 9,
+            "codigo_estatus_tarea": "EN PROGRESO",
+        },
+    )
+
+    assert response.status_code == 200
+    assert notificaciones == [9]
+
+
+# ---------------------------------------------------------------------------------
+# Adjuntos en tareas (Fase 1.21) — no existía nada antes de esta fase.
+# ---------------------------------------------------------------------------------
+
+
+def test_listar_adjuntos_tarea(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    fake_adjunto = {
+        "id": 1,
+        "nombre_archivo": "captura.png",
+        "tipo_mime": "image/png",
+        "tamano_bytes": 1234,
+        "fecha_carga": datetime(2026, 9, 2, tzinfo=timezone.utc),
+    }
+    monkeypatch.setattr(routes.repository, "list_adjuntos_by_tarea", lambda cursor, id: [fake_adjunto])
+
+    response = client.get("/api/tareas/1/adjuntos")
+
+    assert response.status_code == 200
+    assert response.json()[0]["nombre_archivo"] == "captura.png"
+
+
+def test_agregar_adjuntos_tarea_success(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "count_adjuntos_by_tarea", lambda cursor, id: 0)
+    monkeypatch.setattr(routes, "save_attachment", lambda id_tarea, filename, content, subdir="": f"/fake/{filename}")
+
+    guardados = []
+
+    def _fake_insert_adjunto_tarea(cursor, id_tarea, nombre_archivo, ruta, tipo_mime, tamano):
+        guardados.append(nombre_archivo)
+        return len(guardados)
+
+    monkeypatch.setattr(routes.repository, "insert_adjunto_tarea", _fake_insert_adjunto_tarea)
+    monkeypatch.setattr(
+        routes.repository,
+        "list_adjuntos_by_tarea",
+        lambda cursor, id: [
+            {
+                "id": i + 1,
+                "nombre_archivo": nombre,
+                "tipo_mime": "text/plain",
+                "tamano_bytes": 10,
+                "fecha_carga": datetime(2026, 9, 2, tzinfo=timezone.utc),
+            }
+            for i, nombre in enumerate(guardados)
+        ],
+    )
+
+    response = client.post("/api/tareas/1/adjuntos", files=[("files", ("nuevo.txt", b"contenido", "text/plain"))])
+
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["nombre_archivo"] == "nuevo.txt"
+
+
+def test_agregar_adjuntos_tarea_rechaza_si_pasa_del_maximo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "count_adjuntos_by_tarea", lambda cursor, id: 5)
+
+    response = client.post("/api/tareas/1/adjuntos", files=[("files", ("otro.txt", b"contenido", "text/plain"))])
+
+    assert response.status_code == 422
+
+
+def test_agregar_adjuntos_tarea_404_si_no_existe(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: None)
+
+    response = client.post("/api/tareas/999/adjuntos", files=[("files", ("nuevo.txt", b"contenido", "text/plain"))])
+
+    assert response.status_code == 404
+
+
+def test_descargar_adjunto_tarea_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    archivo = tmp_path / "captura.png"
+    archivo.write_bytes(b"contenido-fake-png")
+    monkeypatch.setattr(
+        routes.repository,
+        "get_adjunto_de_tarea",
+        lambda cursor, tarea_id, adjunto_id: {
+            "id": adjunto_id,
+            "nombre_archivo": "captura.png",
+            "ruta_almacenamiento": str(archivo),
+            "tipo_mime": "image/png",
+            "tamano_bytes": 19,
+        },
+    )
+
+    response = client.get("/api/tareas/1/adjuntos/1/descargar")
+
+    assert response.status_code == 200
+    assert response.content == b"contenido-fake-png"
+
+
+def test_descargar_adjunto_tarea_404_si_no_pertenece(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_adjunto_de_tarea", lambda cursor, tarea_id, adjunto_id: None)
+
+    response = client.get("/api/tareas/1/adjuntos/999/descargar")
 
     assert response.status_code == 404

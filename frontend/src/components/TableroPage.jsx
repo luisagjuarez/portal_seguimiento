@@ -4,13 +4,17 @@ import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import TableroColumna from "./TableroColumna.jsx";
 import { actualizarTarea, fetchEstatusTarea, fetchMiembrosEquipo, fetchTareasTablero } from "../api.js";
 
-export default function TableroPage() {
+export default function TableroPage({ usuarioActual }) {
   const navigate = useNavigate();
   const [tareas, setTareas] = useState([]);
   const [estatusTarea, setEstatusTarea] = useState([]);
   const [miembros, setMiembros] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
-  const [filtroResponsable, setFiltroResponsable] = useState("");
+  // Por defecto, cada quien ve solo sus propias tareas; "Todos los responsables" sigue
+  // disponible para cambiarlo manualmente.
+  const [filtroResponsable, setFiltroResponsable] = useState(
+    usuarioActual ? String(usuarioActual.id) : "",
+  );
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 

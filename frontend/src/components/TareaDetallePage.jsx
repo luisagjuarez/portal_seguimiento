@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import AdjuntosInput from "./AdjuntosInput.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import HitoFormulario from "./HitoFormulario.jsx";
 import ComentarioFormulario from "./ComentarioFormulario.jsx";
@@ -8,13 +9,18 @@ import EnlaceTareaFormulario from "./EnlaceTareaFormulario.jsx";
 import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import PorHacerFormulario from "./PorHacerFormulario.jsx";
 import PorHacerItem from "./PorHacerItem.jsx";
+import PrioridadBadge from "./PrioridadBadge.jsx";
+import VencimientoBadge from "./VencimientoBadge.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import {
   actualizarPorHacer,
+  agregarAdjuntosTarea,
+  descargarAdjuntoTarea,
   eliminarComentario,
   eliminarHitoTarea,
   eliminarPorHacer,
+  fetchAdjuntosTarea,
   fetchComentariosTarea,
   fetchEnlacesTarea,
   fetchHitoDeTarea,
@@ -30,6 +36,13 @@ function formatearFecha(iso) {
   }
 }
 
+function formatearTamano(bytes) {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -43,6 +56,10 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
   const [comentarios, setComentarios] = useState([]);
   const [enlaces, setEnlaces] = useState([]);
   const [porHacer, setPorHacer] = useState([]);
+  const [adjuntos, setAdjuntos] = useState([]);
+  const [descargandoId, setDescargandoId] = useState(null);
+  const [nuevosAdjuntos, setNuevosAdjuntos] = useState([]);
+  const [subiendoAdjuntos, setSubiendoAdjuntos] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -75,16 +92,44 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
       fetchComentariosTarea(tareaId),
       fetchEnlacesTarea(tareaId),
       fetchPorHacerTarea(tareaId),
+      fetchAdjuntosTarea(tareaId),
     ])
-      .then(([detalleTarea, hitoActual, listaComentarios, listaEnlaces, listaPorHacer]) => {
+      .then(([detalleTarea, hitoActual, listaComentarios, listaEnlaces, listaPorHacer, listaAdjuntos]) => {
         setTarea(detalleTarea);
         setHito(hitoActual);
         setComentarios(listaComentarios);
         setEnlaces(listaEnlaces);
         setPorHacer(listaPorHacer);
+        setAdjuntos(listaAdjuntos);
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la tarea."))
       .finally(() => setCargando(false));
+  };
+
+  const descargarAdjunto = async (adjunto) => {
+    setDescargandoId(adjunto.id);
+    try {
+      await descargarAdjuntoTarea(tareaId, adjunto.id, adjunto.nombre_archivo);
+    } catch (err) {
+      setError(err.message || "No se pudo descargar el adjunto.");
+    } finally {
+      setDescargandoId(null);
+    }
+  };
+
+  const subirAdjuntos = async () => {
+    if (nuevosAdjuntos.length === 0) return;
+    setSubiendoAdjuntos(true);
+    setError(null);
+    try {
+      const agregados = await agregarAdjuntosTarea(tareaId, nuevosAdjuntos);
+      setAdjuntos((actuales) => [...actuales, ...agregados]);
+      setNuevosAdjuntos([]);
+    } catch (err) {
+      setError(err.message || "No se pudieron subir los adjuntos.");
+    } finally {
+      setSubiendoAdjuntos(false);
+    }
   };
 
   useEffect(() => {
@@ -200,9 +245,16 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
       <div className="solicitud-detalle-info">
         <div className="solicitudes-encabezado">
           <h2>{tarea.nombre}</h2>
-          <span className={`tarea-estado ${claseEstatus}`}>
-            {tarea.estatus_tarea_descripcion || tarea.codigo_estatus_tarea}
-          </span>
+          <div className="tarea-detalle-badges">
+            <PrioridadBadge nivel={tarea.solicitud_prioridad} />
+            <VencimientoBadge
+              fechaEntrega={tarea.solicitud_fecha_entrega}
+              codigoEstatus={tarea.codigo_estatus_tarea}
+            />
+            <span className={`tarea-estado ${claseEstatus}`}>
+              {tarea.estatus_tarea_descripcion || tarea.codigo_estatus_tarea}
+            </span>
+          </div>
         </div>
         {tarea.descripcion && <p>{tarea.descripcion}</p>}
         <p>
@@ -241,6 +293,7 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
       <div className="solicitud-detalle-tareas">
         <div className="tabs-nav">
           {[
+            { key: "adjuntos", label: "Adjuntos", total: adjuntos.length },
             { key: "por-hacer", label: "Por hacer", total: porHacer.length },
             { key: "hito", label: "Hito", total: hito ? 1 : 0 },
             { key: "comentarios", label: "Comentarios", total: comentarios.length },
@@ -256,6 +309,42 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
             </button>
           ))}
         </div>
+
+        {pestanaActiva === "adjuntos" && (
+          <>
+            {adjuntos.length === 0 && <p>Esta tarea todavía no tiene adjuntos.</p>}
+            <ul className="adjuntos-lista">
+              {adjuntos.map((adjunto) => (
+                <li key={adjunto.id}>
+                  <span>
+                    {adjunto.nombre_archivo}
+                    {adjunto.tamano_bytes != null && ` (${formatearTamano(adjunto.tamano_bytes)})`}
+                  </span>
+                  <button
+                    type="button"
+                    className="secundario"
+                    disabled={descargandoId === adjunto.id}
+                    onClick={() => descargarAdjunto(adjunto)}
+                  >
+                    {descargandoId === adjunto.id ? "Descargando..." : "Descargar"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="adjuntos-agregar">
+              <p className="crear-solicitud-etiqueta">Agregar adjuntos</p>
+              <AdjuntosInput archivos={nuevosAdjuntos} onChange={setNuevosAdjuntos} />
+              <button
+                type="button"
+                disabled={nuevosAdjuntos.length === 0 || subiendoAdjuntos}
+                onClick={subirAdjuntos}
+              >
+                {subiendoAdjuntos ? "Subiendo..." : "Subir adjuntos"}
+              </button>
+            </div>
+          </>
+        )}
 
         {pestanaActiva === "por-hacer" && (
           <>

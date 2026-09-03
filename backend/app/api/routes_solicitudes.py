@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 from pydantic import EmailStr
 
+from app.api import adjuntos_helpers
 from app.api.schemas import (
     AdjuntoOut,
     ChatSolicitudRequest,
@@ -25,7 +26,12 @@ from app.api.schemas import (
     TareaCreateUpdate,
     TareaOut,
 )
-from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
+from app.auth.dependencies import (
+    UsuarioActual,
+    get_current_user,
+    require_scrum_master,
+    require_scrum_master_o_responsable_solicitud,
+)
 from app.config import settings
 from app.db import repository
 from app.db.connection import get_connection, release_connection
@@ -37,30 +43,11 @@ from app.storage import save_attachment
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
-# Límite de producto para los canales expuestos en un navegador (chat y formulario), sin
-# autenticación fuerte: el canal de correo no tiene este límite porque ya está acotado a
-# quien tenga acceso al buzón de solicitudes.
-MAX_ADJUNTOS_POR_SOLICITUD = 5
-MAX_ADJUNTO_SIZE_BYTES = 10 * 1024 * 1024
-
-
-async def _leer_y_validar_adjuntos(files: list[UploadFile]) -> list[tuple[str, bytes, str | None]]:
-    if len(files) > MAX_ADJUNTOS_POR_SOLICITUD:
-        raise HTTPException(
-            status_code=422, detail=f"Máximo {MAX_ADJUNTOS_POR_SOLICITUD} adjuntos por solicitud"
-        )
-
-    contenidos: list[tuple[str, bytes, str | None]] = []
-    for file in files:
-        contenido = await file.read()
-        if len(contenido) > MAX_ADJUNTO_SIZE_BYTES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"El archivo '{file.filename}' supera el límite de "
-                f"{MAX_ADJUNTO_SIZE_BYTES // (1024 * 1024)} MB",
-            )
-        contenidos.append((file.filename, contenido, file.content_type))
-    return contenidos
+# Reexportados desde adjuntos_helpers (compartido con routes_tareas.py, Fase 1.21) para no
+# romper el nombre que ya usan los tests (`routes.MAX_ADJUNTO_SIZE_BYTES`, etc.).
+MAX_ADJUNTOS_POR_SOLICITUD = adjuntos_helpers.MAX_ADJUNTOS_POR_ENTIDAD
+MAX_ADJUNTO_SIZE_BYTES = adjuntos_helpers.MAX_ADJUNTO_SIZE_BYTES
+_leer_y_validar_adjuntos = adjuntos_helpers.leer_y_validar_adjuntos
 
 
 def _crear_solicitud_con_adjuntos(
@@ -116,6 +103,7 @@ def listar_solicitudes(
     nombre: str = Query(default="", max_length=200),
     estatus: str = Query(default="", max_length=15),
     orden_por: str = Query(default="", max_length=20),
+    involucrado_id: int | None = Query(default=None),
     _: UsuarioActual = Depends(get_current_user),
 ) -> list[SolicitudResumen]:
     db_conn = get_connection()
@@ -127,6 +115,7 @@ def listar_solicitudes(
             nombre=nombre or None,
             estatus=estatus or None,
             orden_por=orden_por or None,
+            involucrado_id=involucrado_id,
         )
     finally:
         release_connection(db_conn)
@@ -210,6 +199,8 @@ def actualizar_solicitud(
     try:
         cursor = db_conn.cursor()
 
+        solicitud_antes = repository.get_solicitud_by_id(cursor, solicitud_id)
+
         cliente_resuelto = repository.get_or_create_cliente(cursor, body.cliente)
         cliente_id = repository.find_cliente_id_by_name(cursor, cliente_resuelto) if cliente_resuelto else None
         tipo_id = repository.find_tipo_id(cursor, body.tipo)
@@ -226,11 +217,24 @@ def actualizar_solicitud(
             codigo_estatus=body.codigo_estatus,
             orden_prioridad=body.orden_prioridad,
             fecha_completado=body.fecha_completado,
+            fecha_entrega=body.fecha_entrega,
+            responsable_atencion_id=body.responsable_atencion_id,
             actor=usuario_actual.usuario,
         )
         if filas_afectadas == 0:
             db_conn.rollback()
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+        responsable_atencion_anterior = (solicitud_antes or {}).get("responsable_atencion_id")
+        if body.responsable_atencion_id and body.responsable_atencion_id != responsable_atencion_anterior:
+            repository.insert_notificacion(
+                cursor,
+                body.responsable_atencion_id,
+                tipo="SOLICITUD_ASIGNADA",
+                mensaje=f"Se te asignó la atención de la solicitud '{body.nombre}'",
+                entidad_tipo="SOLICITUD",
+                entidad_id=solicitud_id,
+            )
 
         fila = repository.get_solicitud_by_id(cursor, solicitud_id)
         db_conn.commit()
@@ -329,6 +333,49 @@ def listar_adjuntos_solicitud(
     return [AdjuntoOut(**fila) for fila in filas]
 
 
+@router.post("/solicitudes/{solicitud_id}/adjuntos", response_model=list[AdjuntoOut], status_code=201)
+async def agregar_adjuntos_solicitud(
+    solicitud_id: int,
+    files: Annotated[list[UploadFile], File()] = [],
+    usuario_actual: UsuarioActual = Depends(get_current_user),
+) -> list[AdjuntoOut]:
+    """Fase 1.21: agrega adjuntos a una solicitud ya creada (antes solo se podían adjuntar al
+    crearla). Valida que el total existentes + nuevos no pase de 5, igual que al crear."""
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        if repository.get_solicitud_by_id(cursor, solicitud_id) is None:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+        existentes = repository.count_adjuntos_by_solicitud(cursor, solicitud_id)
+        disponibles = adjuntos_helpers.MAX_ADJUNTOS_POR_ENTIDAD - existentes
+        contenidos = await adjuntos_helpers.leer_y_validar_adjuntos(files, maximo=max(disponibles, 0))
+
+        nuevos_ids = []
+        for filename, contenido, content_type in contenidos:
+            ruta = save_attachment(solicitud_id, filename, contenido)
+            nuevos_ids.append(
+                repository.insert_adjunto(cursor, solicitud_id, filename, ruta, content_type, len(contenido))
+            )
+        db_conn.commit()
+
+        filas = [
+            fila
+            for fila in repository.list_adjuntos_by_solicitud(cursor, solicitud_id)
+            if fila["id"] in nuevos_ids
+        ]
+    except HTTPException:
+        db_conn.rollback()
+        raise
+    except Exception:
+        db_conn.rollback()
+        logger.exception("Error agregando adjuntos a solicitud %s", solicitud_id)
+        raise HTTPException(status_code=500, detail="No se pudieron agregar los adjuntos") from None
+    finally:
+        release_connection(db_conn)
+    return [AdjuntoOut(**fila) for fila in filas]
+
+
 @router.get("/solicitudes/{solicitud_id}/adjuntos/{adjunto_id}/descargar")
 def descargar_adjunto_solicitud(
     solicitud_id: int, adjunto_id: int, _: UsuarioActual = Depends(get_current_user)
@@ -359,11 +406,18 @@ def descargar_adjunto_solicitud(
 
 @router.post("/solicitudes/{solicitud_id}/tareas", response_model=TareaOut, status_code=201)
 def crear_tarea(
-    solicitud_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(require_scrum_master)
+    solicitud_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
 ) -> TareaOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        require_scrum_master_o_responsable_solicitud(
+            usuario_actual, solicitud.get("responsable_atencion_id")
+        )
+
         tarea_id = repository.insert_tarea(
             cursor,
             solicitud_id,
@@ -379,8 +433,20 @@ def crear_tarea(
             horas_estimadas=body.horas_estimadas,
             horas_reales=body.horas_reales,
         )
+        if body.responsable_id:
+            repository.insert_notificacion(
+                cursor,
+                body.responsable_id,
+                tipo="TAREA_ASIGNADA",
+                mensaje=f"Se te asignó la tarea '{body.nombre}'",
+                entidad_tipo="TAREA",
+                entidad_id=tarea_id,
+            )
         fila = repository.get_tarea_by_id(cursor, tarea_id)
         db_conn.commit()
+    except HTTPException:
+        db_conn.rollback()
+        raise
     except Exception:
         db_conn.rollback()
         logger.exception("Error creando tarea para solicitud %s", solicitud_id)
@@ -399,7 +465,7 @@ async def crear_solicitud_formulario(
     tipo: Annotated[str, Form(min_length=1, max_length=100)],
     canal: Annotated[str, Form(min_length=1, max_length=100)],
     cliente: Annotated[str | None, Form(max_length=100)] = None,
-    orden_prioridad: Annotated[str | None, Form(max_length=20)] = None,
+    orden_prioridad: Annotated[int, Form(ge=1, le=5)] = 3,
     files: Annotated[list[UploadFile], File()] = [],
     usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> ChatSolicitudResponse:

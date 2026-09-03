@@ -71,3 +71,18 @@ def require_autor_o_scrum_master(usuario_actual: UsuarioActual, creado_por: str)
     propio endpoint."""
     if usuario_actual.usuario != creado_por and usuario_actual.codigo_rol_scrum != "SCRUM MASTER":
         raise HTTPException(status_code=403, detail="Solo el autor o el Scrum Master pueden hacer esto")
+
+
+def require_scrum_master_o_responsable_solicitud(
+    usuario_actual: UsuarioActual, responsable_atencion_id: int | None
+) -> None:
+    """Tampoco puede ser un `Depends`: el responsable de atención a comparar solo se conoce
+    tras leer la solicitud dentro del propio endpoint. El responsable de atención asignado a
+    la solicitud (Fase 1.18) puede crear tareas dentro de ella y asignarlas a cualquier
+    miembro del equipo, sin importar su propio rol Scrum (puede ser Product Owner, Scrum
+    Master o Team)."""
+    if usuario_actual.codigo_rol_scrum != "SCRUM MASTER" and usuario_actual.id != responsable_atencion_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo el Scrum Master o el responsable de atención de la solicitud pueden hacer esto",
+        )

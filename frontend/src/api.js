@@ -220,12 +220,13 @@ export async function crearSolicitudChat({ solicitanteEmail, titulo, descripcion
   return parseJsonOrThrow(response);
 }
 
-export async function fetchSolicitudes({ cliente, nombre, estatus, ordenPor } = {}) {
+export async function fetchSolicitudes({ cliente, nombre, estatus, ordenPor, involucradoId } = {}) {
   const url = new URL(`${API_BASE_URL}/api/solicitudes`);
   if (cliente) url.searchParams.set("cliente", cliente);
   if (nombre) url.searchParams.set("nombre", nombre);
   if (estatus) url.searchParams.set("estatus", estatus);
   if (ordenPor) url.searchParams.set("orden_por", ordenPor);
+  if (involucradoId) url.searchParams.set("involucrado_id", involucradoId);
   const response = await fetch(url, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
@@ -250,6 +251,15 @@ export async function fetchMonitorKpis() {
 
 export async function fetchDireccionGeneralKpis(desde, hasta) {
   const url = new URL(`${API_BASE_URL}/api/direccion-general/kpis`);
+  url.searchParams.set("desde", desde);
+  url.searchParams.set("hasta", hasta);
+  const response = await fetch(url, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta) {
+  const url = new URL(`${API_BASE_URL}/api/direccion-general/detalle-solicitudes`);
+  url.searchParams.set("metrica", metrica);
   url.searchParams.set("desde", desde);
   url.searchParams.set("hasta", hasta);
   const response = await fetch(url, { headers: authHeaders() });
@@ -283,7 +293,18 @@ export async function fetchSolicitudDetalle(id) {
 
 export async function actualizarSolicitud(
   id,
-  { nombre, descripcion, cliente, tipo, canal, codigoEstatus, ordenPrioridad, fechaCompletado },
+  {
+    nombre,
+    descripcion,
+    cliente,
+    tipo,
+    canal,
+    codigoEstatus,
+    ordenPrioridad,
+    fechaCompletado,
+    fechaEntrega,
+    responsableAtencionId,
+  },
 ) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
     method: "PUT",
@@ -295,8 +316,10 @@ export async function actualizarSolicitud(
       tipo,
       canal,
       codigo_estatus: codigoEstatus,
-      orden_prioridad: ordenPrioridad || null,
+      orden_prioridad: ordenPrioridad,
       fecha_completado: fechaCompletado || null,
+      fecha_entrega: fechaEntrega || null,
+      responsable_atencion_id: responsableAtencionId || null,
     }),
   });
   return parseJsonOrThrow(response);
@@ -605,9 +628,7 @@ export async function crearSolicitudFormulario({
   formData.append("descripcion", descripcion);
   formData.append("tipo", tipo);
   formData.append("canal", canal);
-  if (ordenPrioridad) {
-    formData.append("orden_prioridad", ordenPrioridad);
-  }
+  formData.append("orden_prioridad", ordenPrioridad);
   if (cliente) {
     formData.append("cliente", cliente);
   }
@@ -621,4 +642,88 @@ export async function crearSolicitudFormulario({
     body: formData,
   });
   return parseJsonOrThrow(response);
+}
+
+export async function fetchNotificaciones({ soloNoLeidas } = {}) {
+  const url = new URL(`${API_BASE_URL}/api/notificaciones`);
+  if (soloNoLeidas) url.searchParams.set("solo_no_leidas", "true");
+  const response = await fetch(url, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchNotificacionesNoLeidasCount() {
+  const response = await fetch(`${API_BASE_URL}/api/notificaciones/no-leidas/count`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function marcarNotificacionLeida(id) {
+  const response = await fetch(`${API_BASE_URL}/api/notificaciones/${id}/leer`, {
+    method: "PUT",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
+export async function marcarTodasNotificacionesLeidas() {
+  const response = await fetch(`${API_BASE_URL}/api/notificaciones/leer-todas`, {
+    method: "PUT",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
+export async function agregarAdjuntosSolicitud(solicitudId, archivos) {
+  const formData = new FormData();
+  for (const archivo of archivos) {
+    formData.append("files", archivo);
+  }
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/adjuntos`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchAdjuntosTarea(tareaId) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/adjuntos`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function agregarAdjuntosTarea(tareaId, archivos) {
+  const formData = new FormData();
+  for (const archivo of archivos) {
+    formData.append("files", archivo);
+  }
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/adjuntos`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function descargarAdjuntoTarea(tareaId, adjuntoId, nombreArchivo) {
+  const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/adjuntos/${adjuntoId}/descargar`, {
+    headers: authHeaders(),
+  });
+  await lanzarSiError(response);
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
 }

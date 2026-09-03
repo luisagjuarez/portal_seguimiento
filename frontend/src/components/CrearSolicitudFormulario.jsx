@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ClienteAutocomplete from "./ClienteAutocomplete.jsx";
 import AdjuntosInput from "./AdjuntosInput.jsx";
+import { PRIORIDAD_INFO, NIVELES_PRIORIDAD } from "../constants/prioridad.js";
 import {
   crearSolicitudFormulario,
   fetchCanalesSolicitud,
@@ -17,7 +18,7 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
   const [descripcion, setDescripcion] = useState("");
   const [tipo, setTipo] = useState("");
   const [canal, setCanal] = useState("");
-  const [ordenPrioridad, setOrdenPrioridad] = useState("");
+  const [ordenPrioridad, setOrdenPrioridad] = useState(3);
   const [cliente, setCliente] = useState(null);
   const [adjuntos, setAdjuntos] = useState([]);
   const [enviando, setEnviando] = useState(false);
@@ -58,7 +59,7 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
         descripcion: descripcion.trim(),
         tipo,
         canal,
-        ordenPrioridad: ordenPrioridad || null,
+        ordenPrioridad,
         cliente,
         adjuntos,
       });
@@ -138,13 +139,14 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
         </label>
 
         <label>
-          Orden de prioridad (opcional)
-          <input
-            type="number"
-            min="1"
-            value={ordenPrioridad}
-            onChange={(event) => setOrdenPrioridad(event.target.value)}
-          />
+          Prioridad
+          <select value={ordenPrioridad} onChange={(event) => setOrdenPrioridad(Number(event.target.value))}>
+            {NIVELES_PRIORIDAD.map((nivel) => (
+              <option key={nivel} value={nivel}>
+                {nivel} - {PRIORIDAD_INFO[nivel].etiqueta}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

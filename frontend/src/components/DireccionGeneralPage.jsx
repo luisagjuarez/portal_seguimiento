@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
+import DireccionGeneralDetalleMetrica from "./DireccionGeneralDetalleMetrica.jsx";
 import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import { fetchDireccionGeneralKpis } from "../api.js";
+
+const ETIQUETA_POR_METRICA = {
+  en_proceso: "Solicitudes en proceso",
+  concluidas: "Solicitudes concluidas",
+  nuevas: "Nuevas solicitudes",
+};
 
 function primerDiaDelMes() {
   const hoy = new Date();
@@ -93,6 +100,7 @@ export default function DireccionGeneralPage() {
   const [kpis, setKpis] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [metricaSeleccionada, setMetricaSeleccionada] = useState(null);
 
   useEffect(() => {
     setCargando(true);
@@ -102,6 +110,23 @@ export default function DireccionGeneralPage() {
       .catch((err) => setError(err.message || "No se pudo cargar el tablero."))
       .finally(() => setCargando(false));
   }, [desde, hasta]);
+
+  if (metricaSeleccionada) {
+    return (
+      <div className="monitor-page">
+        <div className="solicitudes-encabezado">
+          <h2>Dirección General</h2>
+        </div>
+        <DireccionGeneralDetalleMetrica
+          metrica={metricaSeleccionada}
+          etiquetaMetrica={ETIQUETA_POR_METRICA[metricaSeleccionada]}
+          desde={desde}
+          hasta={hasta}
+          onVolver={() => setMetricaSeleccionada(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="monitor-page">
@@ -125,26 +150,38 @@ export default function DireccionGeneralPage() {
       {kpis && !cargando && (
         <>
           <div className="monitor-stats">
-            <div className="monitor-stat-tile">
+            <button
+              type="button"
+              className="monitor-stat-tile monitor-stat-tile--clicable"
+              onClick={() => setMetricaSeleccionada("en_proceso")}
+            >
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_en_proceso}</span>
               <span className="monitor-stat-etiqueta">Solicitudes en proceso</span>
-            </div>
+            </button>
             <div className="monitor-stat-tile">
               <span className="monitor-stat-valor">{kpis.totales.tareas_en_proceso}</span>
               <span className="monitor-stat-etiqueta">Tareas en proceso</span>
             </div>
-            <div className="monitor-stat-tile">
+            <button
+              type="button"
+              className="monitor-stat-tile monitor-stat-tile--clicable"
+              onClick={() => setMetricaSeleccionada("concluidas")}
+            >
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_concluidas_periodo}</span>
               <span className="monitor-stat-etiqueta">Solicitudes concluidas</span>
-            </div>
+            </button>
             <div className="monitor-stat-tile">
               <span className="monitor-stat-valor">{kpis.totales.tareas_concluidas_periodo}</span>
               <span className="monitor-stat-etiqueta">Tareas concluidas</span>
             </div>
-            <div className="monitor-stat-tile">
+            <button
+              type="button"
+              className="monitor-stat-tile monitor-stat-tile--clicable"
+              onClick={() => setMetricaSeleccionada("nuevas")}
+            >
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_nuevas_periodo}</span>
               <span className="monitor-stat-etiqueta">Nuevas solicitudes</span>
-            </div>
+            </button>
             <div className="monitor-stat-tile">
               <span className="monitor-stat-valor">{kpis.totales.tareas_nuevas_periodo}</span>
               <span className="monitor-stat-etiqueta">Nuevas tareas</span>

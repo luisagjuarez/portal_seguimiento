@@ -4,7 +4,7 @@ import SolicitudCard from "./SolicitudCard.jsx";
 import CrearSolicitudFormulario from "./CrearSolicitudFormulario.jsx";
 import { fetchEstatus, fetchSolicitudes } from "../api.js";
 
-export default function SolicitudesPage() {
+export default function SolicitudesPage({ usuarioActual }) {
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
   const [estatusCatalogo, setEstatusCatalogo] = useState([]);
@@ -12,6 +12,9 @@ export default function SolicitudesPage() {
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstatus, setFiltroEstatus] = useState("");
   const [ordenPor, setOrdenPor] = useState("");
+  // Por defecto cada quien ve solo las solicitudes en las que está involucrado (como
+  // solicitante, responsable de atención, o responsable de alguna tarea); "Todas" lo apaga.
+  const [soloMias, setSoloMias] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -20,7 +23,13 @@ export default function SolicitudesPage() {
   const cargarSolicitudes = () => {
     setCargando(true);
     setError(null);
-    fetchSolicitudes({ cliente: filtroCliente, nombre: filtroNombre, estatus: filtroEstatus, ordenPor })
+    fetchSolicitudes({
+      cliente: filtroCliente,
+      nombre: filtroNombre,
+      estatus: filtroEstatus,
+      ordenPor,
+      involucradoId: soloMias && usuarioActual ? usuarioActual.id : undefined,
+    })
       .then(setSolicitudes)
       .catch((err) => setError(err.message || "No se pudieron cargar las solicitudes."))
       .finally(() => setCargando(false));
@@ -38,7 +47,7 @@ export default function SolicitudesPage() {
     const timeoutId = setTimeout(cargarSolicitudes, 300);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroCliente, filtroNombre, filtroEstatus, ordenPor]);
+  }, [filtroCliente, filtroNombre, filtroEstatus, ordenPor, soloMias]);
 
   const alCrearSolicitud = (respuesta) => {
     setMostrarFormulario(false);
@@ -84,6 +93,10 @@ export default function SolicitudesPage() {
           <option value="tipo">Ordenar por: Tipo</option>
           <option value="cliente">Ordenar por: Cliente</option>
           <option value="prioridad">Ordenar por: Orden de prioridad</option>
+        </select>
+        <select value={soloMias ? "mias" : "todas"} onChange={(event) => setSoloMias(event.target.value === "mias")}>
+          <option value="mias">Ver: Mis solicitudes</option>
+          <option value="todas">Ver: Todas</option>
         </select>
       </div>
 

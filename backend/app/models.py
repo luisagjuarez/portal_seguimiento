@@ -34,7 +34,7 @@ class NuevaSolicitud:
     tipo: str
     status_cd: str
     canal_origen: str = "EMAIL"
-    orden_prioridad: str | None = None
+    orden_prioridad: int = 3
     # Nombre de canal elegido explícitamente por el usuario (formulario de Solicitudes);
     # si viene, tiene prioridad sobre canal_origen al resolver el FK en insert_solicitud.
     canal_nombre: str | None = None

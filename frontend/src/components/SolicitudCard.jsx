@@ -1,3 +1,6 @@
+import PrioridadBadge from "./PrioridadBadge.jsx";
+import VencimientoBadge from "./VencimientoBadge.jsx";
+
 function formatearFecha(iso) {
   try {
     return new Date(iso).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
@@ -30,9 +33,12 @@ export default function SolicitudCard({ solicitud, onSeleccionar }) {
       <p>
         <strong>Solicitante:</strong> {solicitud.solicitante || "Sin identificar"}
       </p>
-      {solicitud.orden_prioridad && (
+      <p>
+        <strong>Prioridad:</strong> <PrioridadBadge nivel={solicitud.orden_prioridad} />
+      </p>
+      {solicitud.fecha_entrega && (
         <p>
-          <strong>Prioridad:</strong> {solicitud.orden_prioridad}
+          <VencimientoBadge fechaEntrega={solicitud.fecha_entrega} codigoEstatus={solicitud.codigo_estatus} />
         </p>
       )}
       <p>
