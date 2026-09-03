@@ -25,8 +25,8 @@ from app.api.schemas import (
 )
 from app.auth.dependencies import (
     UsuarioActual,
-    get_current_user,
     require_autor_o_scrum_master,
+    require_no_externo,
     require_scrum_master,
 )
 from app.db import repository
@@ -72,7 +72,7 @@ def _notificar_menciones(cursor, texto: str, tarea: dict, usuario_actual: Usuari
 def listar_tareas(
     cliente: str = Query(default="", max_length=200),
     responsable_id: int | None = Query(default=None),
-    _: UsuarioActual = Depends(get_current_user),
+    _: UsuarioActual = Depends(require_no_externo),
 ) -> list[TareaTableroOut]:
     db_conn = get_connection()
     try:
@@ -84,7 +84,7 @@ def listar_tareas(
 
 
 @router.get("/tareas/{tarea_id}", response_model=TareaTableroOut)
-def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> TareaTableroOut:
+def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(require_no_externo)) -> TareaTableroOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -98,7 +98,7 @@ def obtener_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -
 
 @router.put("/tareas/{tarea_id}", response_model=TareaOut)
 def actualizar_tarea(
-    tarea_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: TareaCreateUpdate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> TareaOut:
     db_conn = get_connection()
     try:
@@ -169,7 +169,7 @@ def borrar_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(require_
 
 
 @router.get("/tareas/{tarea_id}/hito", response_model=HitoOut)
-def obtener_hito_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> HitoOut:
+def obtener_hito_tarea(tarea_id: int, _: UsuarioActual = Depends(require_no_externo)) -> HitoOut:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -183,7 +183,7 @@ def obtener_hito_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_use
 
 @router.post("/tareas/{tarea_id}/hito", response_model=HitoOut, status_code=201)
 def crear_hito_tarea(
-    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> HitoOut:
     db_conn = get_connection()
     try:
@@ -220,7 +220,7 @@ def crear_hito_tarea(
 
 @router.put("/tareas/{tarea_id}/hito", response_model=HitoOut)
 def actualizar_hito_tarea(
-    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: HitoCreateUpdate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> HitoOut:
     db_conn = get_connection()
     try:
@@ -254,7 +254,7 @@ def actualizar_hito_tarea(
 
 
 @router.delete("/tareas/{tarea_id}/hito", status_code=204)
-def borrar_hito_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)) -> None:
+def borrar_hito_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(require_no_externo)) -> None:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -277,7 +277,7 @@ def borrar_hito_tarea(tarea_id: int, usuario_actual: UsuarioActual = Depends(get
 
 
 @router.get("/tareas/{tarea_id}/comentarios", response_model=list[ComentarioOut])
-def listar_comentarios_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[ComentarioOut]:
+def listar_comentarios_tarea(tarea_id: int, _: UsuarioActual = Depends(require_no_externo)) -> list[ComentarioOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -289,7 +289,7 @@ def listar_comentarios_tarea(tarea_id: int, _: UsuarioActual = Depends(get_curre
 
 @router.post("/tareas/{tarea_id}/comentarios", response_model=ComentarioOut, status_code=201)
 def crear_comentario_tarea(
-    tarea_id: int, body: ComentarioCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: ComentarioCreateUpdate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> ComentarioOut:
     db_conn = get_connection()
     try:
@@ -322,7 +322,7 @@ def crear_comentario_tarea(
 
 
 @router.get("/tareas/{tarea_id}/enlaces", response_model=list[EnlaceTareaOut])
-def listar_enlaces_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[EnlaceTareaOut]:
+def listar_enlaces_tarea(tarea_id: int, _: UsuarioActual = Depends(require_no_externo)) -> list[EnlaceTareaOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -334,7 +334,7 @@ def listar_enlaces_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_u
 
 @router.post("/tareas/{tarea_id}/enlaces", response_model=EnlaceTareaOut, status_code=201)
 def crear_enlace_tarea(
-    tarea_id: int, body: EnlaceTareaCreate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: EnlaceTareaCreate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> EnlaceTareaOut:
     db_conn = get_connection()
     try:
@@ -371,7 +371,7 @@ def crear_enlace_tarea(
 
 @router.get("/tareas/{tarea_id}/por-hacer", response_model=list[PorHacerOut])
 def listar_por_hacer_tarea(
-    tarea_id: int, _: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, _: UsuarioActual = Depends(require_no_externo)
 ) -> list[PorHacerOut]:
     db_conn = get_connection()
     try:
@@ -384,7 +384,7 @@ def listar_por_hacer_tarea(
 
 @router.post("/tareas/{tarea_id}/por-hacer", response_model=PorHacerOut, status_code=201)
 def crear_por_hacer_tarea(
-    tarea_id: int, body: PorHacerCreate, usuario_actual: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, body: PorHacerCreate, usuario_actual: UsuarioActual = Depends(require_no_externo)
 ) -> PorHacerOut:
     db_conn = get_connection()
     try:
@@ -427,7 +427,7 @@ def crear_por_hacer_tarea(
 
 
 @router.get("/tareas/{tarea_id}/adjuntos", response_model=list[AdjuntoOut])
-def listar_adjuntos_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[AdjuntoOut]:
+def listar_adjuntos_tarea(tarea_id: int, _: UsuarioActual = Depends(require_no_externo)) -> list[AdjuntoOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -441,7 +441,7 @@ def listar_adjuntos_tarea(tarea_id: int, _: UsuarioActual = Depends(get_current_
 async def agregar_adjuntos_tarea(
     tarea_id: int,
     files: Annotated[list[UploadFile], File()] = [],
-    usuario_actual: UsuarioActual = Depends(get_current_user),
+    usuario_actual: UsuarioActual = Depends(require_no_externo),
 ) -> list[AdjuntoOut]:
     """Fase 1.21: adjuntos en tareas, desde cero (antes no existía nada) — mismo patrón que
     solicitudes, tanto al crear como para agregar después."""
@@ -478,7 +478,7 @@ async def agregar_adjuntos_tarea(
 
 @router.get("/tareas/{tarea_id}/adjuntos/{adjunto_id}/descargar")
 def descargar_adjunto_tarea(
-    tarea_id: int, adjunto_id: int, _: UsuarioActual = Depends(get_current_user)
+    tarea_id: int, adjunto_id: int, _: UsuarioActual = Depends(require_no_externo)
 ) -> FileResponse:
     db_conn = get_connection()
     try:

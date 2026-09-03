@@ -9,11 +9,12 @@ import {
   fetchTiposSolicitud,
 } from "../api.js";
 
-export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
+export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCancelar }) {
+  const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
   const [miembros, setMiembros] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [canales, setCanales] = useState([]);
-  const [solicitanteEmail, setSolicitanteEmail] = useState("");
+  const [solicitanteEmail, setSolicitanteEmail] = useState(esExterno ? usuarioActual.correo_electronico : "");
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [tipo, setTipo] = useState("");
@@ -25,9 +26,11 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchMiembrosEquipo()
-      .then(setMiembros)
-      .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
+    if (!esExterno) {
+      fetchMiembrosEquipo()
+        .then(setMiembros)
+        .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
+    }
     fetchTiposSolicitud()
       .then(setTipos)
       .catch(() => setError("No se pudo cargar el catálogo de tipos de solicitud."));
@@ -73,20 +76,26 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
 
   return (
     <form className="crear-solicitud-form" onSubmit={enviar}>
-      <label>
-        Solicitante
-        <select value={solicitanteEmail} onChange={(event) => setSolicitanteEmail(event.target.value)} required>
-          <option value="" disabled>
-            Selecciona un miembro del equipo...
-          </option>
-          {miembros.map((miembro) => (
-            <option key={miembro.id} value={miembro.correo_electronico || ""} disabled={!miembro.correo_electronico}>
-              {miembro.nombre_completo}
-              {!miembro.correo_electronico ? " (sin correo registrado)" : ""}
+      {!esExterno && (
+        <label>
+          Solicitante
+          <select value={solicitanteEmail} onChange={(event) => setSolicitanteEmail(event.target.value)} required>
+            <option value="" disabled>
+              Selecciona un miembro del equipo...
             </option>
-          ))}
-        </select>
-      </label>
+            {miembros.map((miembro) => (
+              <option
+                key={miembro.id}
+                value={miembro.correo_electronico || ""}
+                disabled={!miembro.correo_electronico}
+              >
+                {miembro.nombre_completo}
+                {!miembro.correo_electronico ? " (sin correo registrado)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label>
         Título
@@ -123,32 +132,34 @@ export default function CrearSolicitudFormulario({ onCreada, onCancelar }) {
         </select>
       </label>
 
-      <div className="tarea-form-fila">
-        <label>
-          Canal
-          <select value={canal} onChange={(event) => setCanal(event.target.value)} required>
-            <option value="" disabled>
-              Selecciona un canal...
-            </option>
-            {canales.map((c) => (
-              <option key={c.id} value={c.canal}>
-                {c.canal}
+      {!esExterno && (
+        <div className="tarea-form-fila">
+          <label>
+            Canal
+            <select value={canal} onChange={(event) => setCanal(event.target.value)} required>
+              <option value="" disabled>
+                Selecciona un canal...
               </option>
-            ))}
-          </select>
-        </label>
+              {canales.map((c) => (
+                <option key={c.id} value={c.canal}>
+                  {c.canal}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label>
-          Prioridad
-          <select value={ordenPrioridad} onChange={(event) => setOrdenPrioridad(Number(event.target.value))}>
-            {NIVELES_PRIORIDAD.map((nivel) => (
-              <option key={nivel} value={nivel}>
-                {nivel} - {PRIORIDAD_INFO[nivel].etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          <label>
+            Prioridad
+            <select value={ordenPrioridad} onChange={(event) => setOrdenPrioridad(Number(event.target.value))}>
+              {NIVELES_PRIORIDAD.map((nivel) => (
+                <option key={nivel} value={nivel}>
+                  {nivel} - {PRIORIDAD_INFO[nivel].etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <div>
         <p className="crear-solicitud-etiqueta">Cliente (opcional)</p>

@@ -244,6 +244,11 @@ export async function fetchMiembrosEquipo() {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchInicioResumen() {
+  const response = await fetch(`${API_BASE_URL}/api/inicio/resumen`, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchMonitorKpis() {
   const response = await fetch(`${API_BASE_URL}/api/monitor/kpis`, { headers: authHeaders() });
   return parseJsonOrThrow(response);
@@ -321,6 +326,15 @@ export async function actualizarSolicitud(
       fecha_entrega: fechaEntrega || null,
       responsable_atencion_id: responsableAtencionId || null,
     }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarSolicitudExterna(id, { nombre, descripcion, cliente, tipo }) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}/mi-solicitud`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ nombre, descripcion, cliente, tipo }),
   });
   return parseJsonOrThrow(response);
 }
@@ -474,6 +488,15 @@ export async function fetchComentariosTarea(tareaId) {
 
 export async function crearComentarioTarea(tareaId, texto) {
   const response = await fetch(`${API_BASE_URL}/api/tareas/${tareaId}/comentarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ texto_comentario: texto }),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function crearComentarioSolicitud(solicitudId, texto) {
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${solicitudId}/comentarios`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ texto_comentario: texto }),

@@ -592,6 +592,7 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
         SELECT s.id, s.nombre, s.descripcion, c.nombre AS cliente, s.cliente AS cliente_id,
                t.tipo AS tipo, s.tipo AS tipo_id, s.codigo_estatus,
                e.descripcion AS estatus_descripcion, m.nombre_completo AS solicitante,
+               s.solicitante AS solicitante_id,
                s.orden_prioridad, cs.canal AS canal, s.canal AS canal_id,
                s.fecha_completado, s.fecha_entrega, s.responsable_atencion_id,
                ra.nombre_completo AS responsable_atencion,
@@ -612,7 +613,7 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
         return None
     columnas = [
         "id", "nombre", "descripcion", "cliente", "cliente_id", "tipo", "tipo_id",
-        "codigo_estatus", "estatus_descripcion", "solicitante", "orden_prioridad",
+        "codigo_estatus", "estatus_descripcion", "solicitante", "solicitante_id", "orden_prioridad",
         "canal", "canal_id", "fecha_completado", "fecha_entrega", "responsable_atencion_id",
         "responsable_atencion", "creado_en", "actualizado_en", "actualizado_por",
     ]
@@ -658,6 +659,39 @@ def update_solicitud(
             "fecha_completado": fecha_completado_final,
             "fecha_entrega": fecha_entrega,
             "responsable_atencion_id": responsable_atencion_id,
+            "id": solicitud_id,
+            "actor": actor,
+        },
+    )
+    return cursor.rowcount
+
+
+def update_solicitud_externo(
+    cursor,
+    solicitud_id: int,
+    *,
+    nombre: str,
+    descripcion: str,
+    cliente_id: int | None,
+    tipo_id: int | None,
+    actor: str,
+) -> int:
+    """Edición restringida para el rol EXTERNO (Fase de rol Externo): solo los mismos 4 campos
+    que ya puede llenar al crear la solicitud — nunca estatus/prioridad/fechas/responsable de
+    atención, esos los controla el equipo interno. El endpoint que llama a esto ya verificó
+    dueño y que la solicitud sigue en "EN ESPERA" antes de llegar aquí."""
+    cursor.execute(
+        """
+        UPDATE solicitudes
+        SET nombre = %(nombre)s, descripcion = %(descripcion)s, cliente = %(cliente)s,
+            tipo = %(tipo)s, actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
+        """,
+        {
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "cliente": cliente_id,
+            "tipo": tipo_id,
             "id": solicitud_id,
             "actor": actor,
         },
@@ -1954,3 +1988,106 @@ def marcar_todas_notificaciones_leidas(cursor, miembro_id: int) -> int:
         {"miembro_id": miembro_id},
     )
     return cursor.rowcount
+
+
+# Fase de dashboard de Inicio: no hay catálogo de prioridad en BD (son 5 niveles fijos, Fase
+# 1.17), así que el zero-fill de los 5 niveles se arma en Python en vez de con un LEFT JOIN.
+PRIORIDAD_DESCRIPCIONES = {1: "Crítica", 2: "Alta", 3: "Media", 4: "Baja", 5: "Trivial"}
+
+
+def get_resumen_solicitudes(
+    cursor, *, solicitante_id: int | None = None, responsable_atencion_id: int | None = None
+) -> dict:
+    """Resumen para el dashboard de Inicio: total, desglose por estatus y por prioridad de las
+    solicitudes activas, opcionalmente filtradas por quién es el solicitante o el responsable de
+    atención. El filtro va dentro del ON del LEFT JOIN de estatus (no en el WHERE) para no perder
+    el zero-fill de los estatus sin solicitudes."""
+    cursor.execute(
+        """
+        SELECT e.codigo, e.descripcion, count(s.id) AS total
+        FROM estatus e
+        LEFT JOIN solicitudes s ON s.codigo_estatus = e.codigo AND s.borrado_en IS NULL
+            AND (%(solicitante_id)s::bigint IS NULL OR s.solicitante = %(solicitante_id)s::bigint)
+            AND (
+                %(responsable_atencion_id)s::bigint IS NULL
+                OR s.responsable_atencion_id = %(responsable_atencion_id)s::bigint
+            )
+        GROUP BY e.codigo, e.descripcion, e.orden_visualizacion
+        ORDER BY e.orden_visualizacion
+        """,
+        {"solicitante_id": solicitante_id, "responsable_atencion_id": responsable_atencion_id},
+    )
+    por_estatus = [{"valor": row[0], "descripcion": row[1], "total": row[2]} for row in cursor.fetchall()]
+
+    condiciones = ["s.borrado_en IS NULL"]
+    parametros: dict = {}
+    if solicitante_id is not None:
+        condiciones.append("s.solicitante = %(solicitante_id)s")
+        parametros["solicitante_id"] = solicitante_id
+    if responsable_atencion_id is not None:
+        condiciones.append("s.responsable_atencion_id = %(responsable_atencion_id)s")
+        parametros["responsable_atencion_id"] = responsable_atencion_id
+    cursor.execute(
+        f"""
+        SELECT s.orden_prioridad, count(*) AS total
+        FROM solicitudes s
+        WHERE {' AND '.join(condiciones)}
+        GROUP BY s.orden_prioridad
+        """,
+        parametros,
+    )
+    conteos_prioridad = {row[0]: row[1] for row in cursor.fetchall()}
+    por_prioridad = [
+        {"valor": str(nivel), "descripcion": PRIORIDAD_DESCRIPCIONES[nivel], "total": conteos_prioridad.get(nivel, 0)}
+        for nivel in range(1, 6)
+    ]
+
+    return {
+        "total": sum(fila["total"] for fila in por_estatus),
+        "por_estatus": por_estatus,
+        "por_prioridad": por_prioridad,
+    }
+
+
+def get_resumen_tareas(cursor, *, responsable_id: int | None = None) -> dict:
+    """Resumen para el dashboard de Inicio: total, desglose por estatus de tarea y por
+    prioridad heredada de la solicitud, opcionalmente filtrado por responsable de la tarea."""
+    cursor.execute(
+        """
+        SELECT et.codigo, et.descripcion, count(t.id) AS total
+        FROM estatus_tarea et
+        LEFT JOIN tareas t ON t.codigo_estatus_tarea = et.codigo AND t.borrado_en IS NULL
+            AND (%(responsable_id)s::bigint IS NULL OR t.responsable_id = %(responsable_id)s::bigint)
+        GROUP BY et.codigo, et.descripcion, et.orden_visualizacion
+        ORDER BY et.orden_visualizacion
+        """,
+        {"responsable_id": responsable_id},
+    )
+    por_estatus = [{"valor": row[0], "descripcion": row[1], "total": row[2]} for row in cursor.fetchall()]
+
+    condiciones = ["t.borrado_en IS NULL"]
+    parametros: dict = {}
+    if responsable_id is not None:
+        condiciones.append("t.responsable_id = %(responsable_id)s")
+        parametros["responsable_id"] = responsable_id
+    cursor.execute(
+        f"""
+        SELECT s.orden_prioridad, count(*) AS total
+        FROM tareas t
+        JOIN solicitudes s ON s.id = t.solicitud_id
+        WHERE {' AND '.join(condiciones)}
+        GROUP BY s.orden_prioridad
+        """,
+        parametros,
+    )
+    conteos_prioridad = {row[0]: row[1] for row in cursor.fetchall()}
+    por_prioridad = [
+        {"valor": str(nivel), "descripcion": PRIORIDAD_DESCRIPCIONES[nivel], "total": conteos_prioridad.get(nivel, 0)}
+        for nivel in range(1, 6)
+    ]
+
+    return {
+        "total": sum(fila["total"] for fila in por_estatus),
+        "por_estatus": por_estatus,
+        "por_prioridad": por_prioridad,
+    }

@@ -16,6 +16,7 @@ from app.api.schemas import (
     ChatSolicitudRequest,
     ChatSolicitudResponse,
     ClienteSugerido,
+    ComentarioCreateUpdate,
     ComentarioOut,
     EnlaceTareaOut,
     HealthResponse,
@@ -23,12 +24,14 @@ from app.api.schemas import (
     SolicitudDetalle,
     SolicitudResumen,
     SolicitudUpdate,
+    SolicitudUpdateExterno,
     TareaCreateUpdate,
     TareaOut,
 )
 from app.auth.dependencies import (
     UsuarioActual,
     get_current_user,
+    require_no_externo,
     require_scrum_master,
     require_scrum_master_o_responsable_solicitud,
 )
@@ -81,6 +84,13 @@ def _crear_solicitud_con_adjuntos(
     return id_solicitud
 
 
+def _require_propia_si_externo(usuario_actual: UsuarioActual, solicitud: dict) -> None:
+    """El rol EXTERNO solo puede ver/tocar sus propias solicitudes (donde es el solicitante).
+    404 en vez de 403 para no confirmarle que un id ajeno existe."""
+    if usuario_actual.codigo_rol_scrum == "EXTERNO" and solicitud.get("solicitante_id") != usuario_actual.id:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse()
@@ -104,8 +114,13 @@ def listar_solicitudes(
     estatus: str = Query(default="", max_length=15),
     orden_por: str = Query(default="", max_length=20),
     involucrado_id: int | None = Query(default=None),
-    _: UsuarioActual = Depends(get_current_user),
+    usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> list[SolicitudResumen]:
+    # El rol EXTERNO nunca puede ver solicitudes ajenas: se ignora cualquier involucrado_id que
+    # mande el cliente y se fuerza el propio id, sin importar lo que venga en el query.
+    if usuario_actual.codigo_rol_scrum == "EXTERNO":
+        involucrado_id = usuario_actual.id
+
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -179,7 +194,9 @@ async def crear_solicitud_chat(
 
 
 @router.get("/solicitudes/{solicitud_id}", response_model=SolicitudDetalle)
-def obtener_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> SolicitudDetalle:
+def obtener_solicitud(
+    solicitud_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> SolicitudDetalle:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -188,6 +205,7 @@ def obtener_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_
         release_connection(db_conn)
     if fila is None:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _require_propia_si_externo(usuario_actual, fila)
     return SolicitudDetalle(**fila)
 
 
@@ -195,6 +213,9 @@ def obtener_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_
 def actualizar_solicitud(
     solicitud_id: int, body: SolicitudUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
 ) -> SolicitudDetalle:
+    if usuario_actual.codigo_rol_scrum == "EXTERNO":
+        raise HTTPException(status_code=403, detail="Usa PUT /solicitudes/{id}/mi-solicitud")
+
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -250,6 +271,51 @@ def actualizar_solicitud(
     return SolicitudDetalle(**fila)
 
 
+@router.put("/solicitudes/{solicitud_id}/mi-solicitud", response_model=SolicitudDetalle)
+def actualizar_mi_solicitud(
+    solicitud_id: int, body: SolicitudUpdateExterno, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> SolicitudDetalle:
+    """Edición restringida para quien creó la solicitud (pensada para el rol EXTERNO, pero el
+    chequeo es de dueño+estatus, no de rol): solo mientras sigue en "EN ESPERA"."""
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+
+        solicitud_antes = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud_antes is None or solicitud_antes["solicitante_id"] != usuario_actual.id:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        if solicitud_antes["codigo_estatus"] != "EN ESPERA":
+            raise HTTPException(
+                status_code=409, detail="Solo se puede editar mientras la solicitud está En espera"
+            )
+
+        cliente_resuelto = repository.get_or_create_cliente(cursor, body.cliente)
+        cliente_id = repository.find_cliente_id_by_name(cursor, cliente_resuelto) if cliente_resuelto else None
+        tipo_id = repository.find_tipo_id(cursor, body.tipo)
+
+        repository.update_solicitud_externo(
+            cursor,
+            solicitud_id,
+            nombre=body.nombre,
+            descripcion=body.descripcion,
+            cliente_id=cliente_id,
+            tipo_id=tipo_id,
+            actor=usuario_actual.usuario,
+        )
+        fila = repository.get_solicitud_by_id(cursor, solicitud_id)
+        db_conn.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        db_conn.rollback()
+        logger.exception("Error actualizando (externo) solicitud %s", solicitud_id)
+        raise HTTPException(status_code=500, detail="No se pudo actualizar la solicitud") from None
+    finally:
+        release_connection(db_conn)
+
+    return SolicitudDetalle(**fila)
+
+
 @router.delete("/solicitudes/{solicitud_id}", status_code=204)
 def borrar_solicitud(solicitud_id: int, usuario_actual: UsuarioActual = Depends(require_scrum_master)) -> None:
     db_conn = get_connection()
@@ -271,7 +337,7 @@ def borrar_solicitud(solicitud_id: int, usuario_actual: UsuarioActual = Depends(
 
 
 @router.get("/solicitudes/{solicitud_id}/tareas", response_model=list[TareaOut])
-def listar_tareas(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[TareaOut]:
+def listar_tareas(solicitud_id: int, _: UsuarioActual = Depends(require_no_externo)) -> list[TareaOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -283,21 +349,62 @@ def listar_tareas(solicitud_id: int, _: UsuarioActual = Depends(get_current_user
 
 @router.get("/solicitudes/{solicitud_id}/comentarios", response_model=list[ComentarioOut])
 def listar_comentarios_solicitud(
-    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+    solicitud_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)
 ) -> list[ComentarioOut]:
     """Agrega los comentarios de todas las tareas de la solicitud, para verlos de un
     vistazo desde el detalle de la solicitud (no solo entrando a cada tarea)."""
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        _require_propia_si_externo(usuario_actual, solicitud)
         filas = repository.list_comentarios_by_solicitud(cursor, solicitud_id)
     finally:
         release_connection(db_conn)
     return [ComentarioOut(**fila) for fila in filas]
 
 
+@router.post("/solicitudes/{solicitud_id}/comentarios", response_model=ComentarioOut, status_code=201)
+def crear_comentario_solicitud(
+    solicitud_id: int, body: ComentarioCreateUpdate, usuario_actual: UsuarioActual = Depends(get_current_user)
+) -> ComentarioOut:
+    """Comentario a nivel solicitud (no ligado a ninguna tarea) — pensado para el rol EXTERNO,
+    pero cualquier rol interno puede comentar cualquier solicitud, igual que ya pueden comentar
+    cualquier tarea. Ya aparece en `listar_comentarios_solicitud` sin cambios ahí."""
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        _require_propia_si_externo(usuario_actual, solicitud)
+
+        comentario_id = repository.insert_comentario(
+            cursor,
+            solicitud_id=solicitud_id,
+            tarea_id=None,
+            texto=body.texto_comentario,
+            actor=usuario_actual.usuario,
+        )
+        fila = repository.get_comentario_by_id(cursor, comentario_id)
+        db_conn.commit()
+    except HTTPException:
+        db_conn.rollback()
+        raise
+    except Exception:
+        db_conn.rollback()
+        logger.exception("Error creando comentario para solicitud %s", solicitud_id)
+        raise HTTPException(status_code=500, detail="No se pudo crear el comentario") from None
+    finally:
+        release_connection(db_conn)
+
+    return ComentarioOut(**fila)
+
+
 @router.get("/solicitudes/{solicitud_id}/hitos", response_model=list[HitoOut])
-def listar_hitos_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_current_user)) -> list[HitoOut]:
+def listar_hitos_solicitud(solicitud_id: int, _: UsuarioActual = Depends(require_no_externo)) -> list[HitoOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
@@ -309,7 +416,7 @@ def listar_hitos_solicitud(solicitud_id: int, _: UsuarioActual = Depends(get_cur
 
 @router.get("/solicitudes/{solicitud_id}/enlaces", response_model=list[EnlaceTareaOut])
 def listar_enlaces_solicitud(
-    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+    solicitud_id: int, _: UsuarioActual = Depends(require_no_externo)
 ) -> list[EnlaceTareaOut]:
     db_conn = get_connection()
     try:
@@ -322,11 +429,15 @@ def listar_enlaces_solicitud(
 
 @router.get("/solicitudes/{solicitud_id}/adjuntos", response_model=list[AdjuntoOut])
 def listar_adjuntos_solicitud(
-    solicitud_id: int, _: UsuarioActual = Depends(get_current_user)
+    solicitud_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)
 ) -> list[AdjuntoOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is None:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        _require_propia_si_externo(usuario_actual, solicitud)
         filas = repository.list_adjuntos_by_solicitud(cursor, solicitud_id)
     finally:
         release_connection(db_conn)
@@ -344,8 +455,10 @@ async def agregar_adjuntos_solicitud(
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        if repository.get_solicitud_by_id(cursor, solicitud_id) is None:
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is None:
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        _require_propia_si_externo(usuario_actual, solicitud)
 
         existentes = repository.count_adjuntos_by_solicitud(cursor, solicitud_id)
         disponibles = adjuntos_helpers.MAX_ADJUNTOS_POR_ENTIDAD - existentes
@@ -378,11 +491,14 @@ async def agregar_adjuntos_solicitud(
 
 @router.get("/solicitudes/{solicitud_id}/adjuntos/{adjunto_id}/descargar")
 def descargar_adjunto_solicitud(
-    solicitud_id: int, adjunto_id: int, _: UsuarioActual = Depends(get_current_user)
+    solicitud_id: int, adjunto_id: int, usuario_actual: UsuarioActual = Depends(get_current_user)
 ) -> FileResponse:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
+        solicitud = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if solicitud is not None:
+            _require_propia_si_externo(usuario_actual, solicitud)
         adjunto = repository.get_adjunto_de_solicitud(cursor, solicitud_id, adjunto_id)
     finally:
         release_connection(db_conn)

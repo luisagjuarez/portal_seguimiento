@@ -55,6 +55,14 @@ def require_scrum_master(usuario_actual: UsuarioActual = Depends(get_current_use
     return usuario_actual
 
 
+def require_no_externo(usuario_actual: UsuarioActual = Depends(get_current_user)) -> UsuarioActual:
+    """El rol EXTERNO no tiene acceso a nada a nivel tarea (Tablero, detalle de tarea, hitos,
+    enlaces, "por hacer", comentarios/adjuntos de tarea) — solo a sus propias solicitudes."""
+    if usuario_actual.codigo_rol_scrum == "EXTERNO":
+        raise HTTPException(status_code=403, detail="No autorizado para este recurso")
+    return usuario_actual
+
+
 def require_scrum_master_or_product_owner(
     usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> UsuarioActual:

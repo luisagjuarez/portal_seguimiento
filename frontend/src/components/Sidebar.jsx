@@ -8,8 +8,24 @@ const OPCIONES = [
   { ruta: "/tablero", etiqueta: "Tablero" },
 ];
 
-export default function Sidebar({ usuarioActual, esScrumMaster, puedeVerReportesGerenciales, onCerrarSesion }) {
-  let opciones = esScrumMaster ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }] : OPCIONES;
+const OPCIONES_EXTERNO = [
+  { ruta: "/", etiqueta: "Inicio" },
+  { ruta: "/chat", etiqueta: "Solicitud por Chat" },
+  { ruta: "/solicitudes", etiqueta: "Solicitudes" },
+];
+
+export default function Sidebar({
+  usuarioActual,
+  esScrumMaster,
+  esExterno,
+  puedeVerReportesGerenciales,
+  onCerrarSesion,
+}) {
+  let opciones = esExterno
+    ? OPCIONES_EXTERNO
+    : esScrumMaster
+      ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }]
+      : OPCIONES;
   if (puedeVerReportesGerenciales) {
     opciones = [
       ...opciones,

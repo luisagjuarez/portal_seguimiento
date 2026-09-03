@@ -394,6 +394,17 @@ button.peligro {
   color: #fff;
 }
 
+.boton-regresar {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--border-2);
+  color: var(--text);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
 button.enlace {
   background: transparent;
   color: var(--accent);
@@ -511,7 +522,7 @@ button:disabled {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
   width: 100%;
-  max-width: 640px;
+  max-width: 1100px;
 }
 
 .inicio-acciones {
@@ -519,6 +530,28 @@ button:disabled {
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 1rem;
+}
+
+.inicio-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.inicio-bloque {
+  margin: 0;
+}
+
+.inicio-prioridad-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.inicio-prioridad-pildora {
+  font-size: 0.75rem;
 }
 
 .solicitudes-encabezado {

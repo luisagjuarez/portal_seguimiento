@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdjuntosInput from "./AdjuntosInput.jsx";
+import BotonRegresar from "./BotonRegresar.jsx";
 import ComentarioItem from "./ComentarioItem.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import ComentarioSolicitudFormulario from "./ComentarioSolicitudFormulario.jsx";
+import EditarSolicitudExternoFormulario from "./EditarSolicitudExternoFormulario.jsx";
 import EditarSolicitudFormulario from "./EditarSolicitudFormulario.jsx";
 import EnlaceTareaItem from "./EnlaceTareaItem.jsx";
 import PrioridadBadge from "./PrioridadBadge.jsx";
@@ -49,6 +52,7 @@ function formatearFechaCorta(iso) {
 }
 
 export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
+  const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
   const navigate = useNavigate();
   const { id } = useParams();
   const solicitudId = Number(id);
@@ -75,26 +79,39 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
   const [tareaABorrar, setTareaABorrar] = useState(null);
   const [borrandoTarea, setBorrandoTarea] = useState(false);
 
-  const [pestanaActiva, setPestanaActiva] = useState("tareas");
+  const [pestanaActiva, setPestanaActiva] = useState(esExterno ? "adjuntos" : "tareas");
 
   const cargarDetalle = () => {
     setCargando(true);
     setError(null);
-    Promise.all([
-      fetchSolicitudDetalle(solicitudId),
-      fetchTareas(solicitudId),
-      fetchComentariosSolicitud(solicitudId),
-      fetchHitosSolicitud(solicitudId),
-      fetchEnlacesSolicitud(solicitudId),
-      fetchAdjuntosSolicitud(solicitudId),
-    ])
-      .then(([detalle, listaTareas, listaComentarios, listaHitos, listaEnlaces, listaAdjuntos]) => {
-        setSolicitud(detalle);
-        setTareas(listaTareas);
-        setComentarios(listaComentarios);
-        setHitos(listaHitos);
-        setEnlaces(listaEnlaces);
-        setAdjuntos(listaAdjuntos);
+    // El rol Externo no tiene acceso a nada a nivel tarea (Tareas/Hitos/Enlaces): esas 3
+    // llamadas ni se hacen, para no romper el Promise.all con el 403 que devolverían.
+    const promesas = esExterno
+      ? [fetchSolicitudDetalle(solicitudId), fetchComentariosSolicitud(solicitudId), fetchAdjuntosSolicitud(solicitudId)]
+      : [
+          fetchSolicitudDetalle(solicitudId),
+          fetchTareas(solicitudId),
+          fetchComentariosSolicitud(solicitudId),
+          fetchHitosSolicitud(solicitudId),
+          fetchEnlacesSolicitud(solicitudId),
+          fetchAdjuntosSolicitud(solicitudId),
+        ];
+    Promise.all(promesas)
+      .then((resultados) => {
+        if (esExterno) {
+          const [detalle, listaComentarios, listaAdjuntos] = resultados;
+          setSolicitud(detalle);
+          setComentarios(listaComentarios);
+          setAdjuntos(listaAdjuntos);
+        } else {
+          const [detalle, listaTareas, listaComentarios, listaHitos, listaEnlaces, listaAdjuntos] = resultados;
+          setSolicitud(detalle);
+          setTareas(listaTareas);
+          setComentarios(listaComentarios);
+          setHitos(listaHitos);
+          setEnlaces(listaEnlaces);
+          setAdjuntos(listaAdjuntos);
+        }
       })
       .catch((err) => setError(err.message || "No se pudo cargar el detalle de la solicitud."))
       .finally(() => setCargando(false));
@@ -176,9 +193,7 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
     return (
       <div>
         <p className="error-text">{error}</p>
-        <button type="button" className="secundario" onClick={onRegresar}>
-          ← Regresar
-        </button>
+        <BotonRegresar onClick={onRegresar}>Regresar</BotonRegresar>
       </div>
     );
   }
@@ -191,9 +206,7 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
 
   return (
     <div className="solicitud-detalle-page">
-      <button type="button" className="secundario" onClick={onRegresar}>
-        ← Regresar
-      </button>
+      <BotonRegresar onClick={onRegresar}>Regresar</BotonRegresar>
 
       {error && <p className="error-text">{error}</p>}
 
@@ -238,26 +251,33 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
         <p className="solicitud-fecha">Creada: {formatearFecha(solicitud.creado_en)}</p>
 
         <div className="resumen-acciones">
-          <button type="button" onClick={() => setMostrarEditar(true)}>
-            Editar Solicitud
-          </button>
+          {(!esExterno || solicitud.codigo_estatus === "EN ESPERA") && (
+            <button type="button" onClick={() => setMostrarEditar(true)}>
+              Editar Solicitud
+            </button>
+          )}
           {esScrumMaster && (
             <button type="button" className="peligro" onClick={() => setMostrarConfirmarBorrarSolicitud(true)}>
               Borrar Solicitud
             </button>
           )}
         </div>
+        {esExterno && solicitud.codigo_estatus !== "EN ESPERA" && (
+          <p className="adjuntos-ayuda">Solo puedes editar la solicitud mientras está En espera.</p>
+        )}
       </div>
 
       <div className="solicitud-detalle-tareas">
         <div className="tabs-nav">
           {[
             { key: "adjuntos", label: "Adjuntos", total: adjuntos.length },
-            { key: "tareas", label: "Tareas", total: tareas.length },
+            !esExterno && { key: "tareas", label: "Tareas", total: tareas.length },
             { key: "comentarios", label: "Comentarios", total: comentarios.length },
-            { key: "hitos", label: "Hitos", total: hitos.length },
-            { key: "enlaces", label: "Enlaces de tareas", total: enlaces.length },
-          ].map((pestana) => (
+            !esExterno && { key: "hitos", label: "Hitos", total: hitos.length },
+            !esExterno && { key: "enlaces", label: "Enlaces de tareas", total: enlaces.length },
+          ]
+            .filter(Boolean)
+            .map((pestana) => (
             <button
               key={pestana.key}
               type="button"
@@ -344,6 +364,12 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
 
         {pestanaActiva === "comentarios" && (
           <>
+            {esExterno && (
+              <ComentarioSolicitudFormulario
+                solicitudId={solicitudId}
+                onGuardado={(comentario) => setComentarios((actuales) => [...actuales, comentario])}
+              />
+            )}
             {comentarios.length === 0 && <p>Ninguna tarea de esta solicitud tiene comentarios todavía.</p>}
             <div className="comentario-lista">
               {comentarios.map((comentario) => (
@@ -386,11 +412,19 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
         <div className="modal-overlay" onClick={() => setMostrarEditar(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <h3>Editar solicitud</h3>
-            <EditarSolicitudFormulario
-              solicitud={solicitud}
-              onActualizada={alActualizarSolicitud}
-              onCancelar={() => setMostrarEditar(false)}
-            />
+            {esExterno ? (
+              <EditarSolicitudExternoFormulario
+                solicitud={solicitud}
+                onActualizada={alActualizarSolicitud}
+                onCancelar={() => setMostrarEditar(false)}
+              />
+            ) : (
+              <EditarSolicitudFormulario
+                solicitud={solicitud}
+                onActualizada={alActualizarSolicitud}
+                onCancelar={() => setMostrarEditar(false)}
+              />
+            )}
           </div>
         </div>
       )}

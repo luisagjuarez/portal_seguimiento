@@ -7,6 +7,7 @@ from app.api.routes_auth import router as auth_router
 from app.api.routes_catalogos import router as catalogos_router
 from app.api.routes_comentarios import router as comentarios_router
 from app.api.routes_direccion_general import router as direccion_general_router
+from app.api.routes_inicio import router as inicio_router
 from app.api.routes_monitor import router as monitor_router
 from app.api.routes_notificaciones import router as notificaciones_router
 from app.api.routes_solicitudes import router as solicitudes_router
@@ -34,3 +35,4 @@ app.include_router(direccion_general_router)
 app.include_router(auth_router)
 app.include_router(usuarios_router)
 app.include_router(notificaciones_router)
+app.include_router(inicio_router)

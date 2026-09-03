@@ -5,6 +5,7 @@ import CrearSolicitudFormulario from "./CrearSolicitudFormulario.jsx";
 import { fetchEstatus, fetchSolicitudes } from "../api.js";
 
 export default function SolicitudesPage({ usuarioActual }) {
+  const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
   const [estatusCatalogo, setEstatusCatalogo] = useState([]);
@@ -94,10 +95,15 @@ export default function SolicitudesPage({ usuarioActual }) {
           <option value="cliente">Ordenar por: Cliente</option>
           <option value="prioridad">Ordenar por: Orden de prioridad</option>
         </select>
-        <select value={soloMias ? "mias" : "todas"} onChange={(event) => setSoloMias(event.target.value === "mias")}>
-          <option value="mias">Ver: Mis solicitudes</option>
-          <option value="todas">Ver: Todas</option>
-        </select>
+        {!esExterno && (
+          <select
+            value={soloMias ? "mias" : "todas"}
+            onChange={(event) => setSoloMias(event.target.value === "mias")}
+          >
+            <option value="mias">Ver: Mis solicitudes</option>
+            <option value="todas">Ver: Todas</option>
+          </select>
+        )}
       </div>
 
       {error && <p className="error-text">{error}</p>}
@@ -119,6 +125,7 @@ export default function SolicitudesPage({ usuarioActual }) {
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <h3>Nueva solicitud</h3>
             <CrearSolicitudFormulario
+              usuarioActual={usuarioActual}
               onCreada={alCrearSolicitud}
               onCancelar={() => setMostrarFormulario(false)}
             />

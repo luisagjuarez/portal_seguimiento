@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BotonRegresar from "./BotonRegresar.jsx";
 import PieChart from "./PieChart.jsx";
 import { fetchDireccionGeneralDetalleSolicitudes } from "../api.js";
 
@@ -55,9 +56,7 @@ export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetric
 
   return (
     <div className="direccion-general-detalle">
-      <button type="button" className="secundario" onClick={onVolver}>
-        ← Volver
-      </button>
+      <BotonRegresar onClick={onVolver}>Volver</BotonRegresar>
 
       {cargando && <p>Cargando...</p>}
       {error && <p className="error-text">{error}</p>}

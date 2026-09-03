@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdjuntosInput from "./AdjuntosInput.jsx";
+import BotonRegresar from "./BotonRegresar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import HitoFormulario from "./HitoFormulario.jsx";
 import ComentarioFormulario from "./ComentarioFormulario.jsx";
@@ -225,9 +226,7 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
     return (
       <div>
         <p className="error-text">{error}</p>
-        <button type="button" className="secundario" onClick={onRegresar}>
-          ← Regresar
-        </button>
+        <BotonRegresar onClick={onRegresar}>Regresar</BotonRegresar>
       </div>
     );
   }
@@ -236,9 +235,7 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
 
   return (
     <div className="solicitud-detalle-page">
-      <button type="button" className="secundario" onClick={onRegresar}>
-        ← Regresar
-      </button>
+      <BotonRegresar onClick={onRegresar}>Regresar</BotonRegresar>
 
       {error && <p className="error-text">{error}</p>}
 

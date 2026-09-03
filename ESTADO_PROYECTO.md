@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-03 (Fases 1.16-1.21 aprobadas y desplegadas en TEST; falta pasada visual del usuario en TEST)
+Última actualización: 2026-09-03 (Fases 1.16-1.21 aprobadas y desplegadas en TEST; botones Regresar/Volver, dashboard de Inicio y rol Externo implementados y verificados por tests/curl, falta pasada visual y deploy a TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -23,7 +23,23 @@
 [~] Fase 1.19 (extraoficial) — Filtros por defecto "mis tareas"/"mis solicitudes" en Tablero y Solicitudes — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
 [~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 3 ajustes tras la pasada visual (auto-notificación, permiso de creación de tareas para el responsable de atención, y navegación por teclado en el picker de menciones) verificados por 180 tests de backend y aprobados visualmente por el usuario; desplegado en TEST (2026-09-03); falta verificación e2e con curl/navegador de los 2 ajustes de permisos/notificaciones y la pasada visual del usuario en TEST
 [~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
+[~] Fase 1.22 (extraoficial) — Botones "Regresar"/"Volver" más chicos con ícono, dashboard de indicadores en Inicio (por rol: TEAM/Externo ven lo propio, Product Owner/Scrum Master ven totales) y nuevo rol EXTERNO (solicitantes externos con acceso muy limitado) — implementado y verificado por 198 tests de backend + curl e2e contra la BD real (2026-09-03); falta la pasada visual del usuario y el deploy a TEST
 ```
+
+**2026-09-03 — Fase 1.22, botones Regresar/Volver + dashboard de Inicio + rol Externo (modo
+plan):** trabajado en modo plan (`/home/lg/.claude/plans/glimmering-skipping-iverson.md`, 3
+agentes Explore en paralelo antes de diseñar). Nuevo componente `BotonRegresar.jsx` corrige el
+ancho de los 5 botones de regresar/volver del portal. Nuevo `GET /api/inicio/resumen` alimenta un
+dashboard en la página Inicio (antes un saludo estático): totales de solicitudes/tareas por
+estatus y prioridad, con vista distinta para TEAM/Externo (lo propio) vs. Product Owner/Scrum
+Master (org-wide). Nuevo rol `EXTERNO` en el catálogo `roles_scrum` para solicitantes externos al
+equipo: pueden crear solicitudes (chat o formulario), ver y editar solo las propias mientras
+están "En espera", adjuntar archivos y comentar a nivel solicitud — todas las reglas nuevas
+(`require_no_externo`, chequeos de dueño 404, edición restringida 409 fuera de "En espera")
+verificadas en el backend, no solo ocultas en el frontend. 198 tests de backend en verde (14
+nuevos) y verificación e2e con `curl` contra la BD real (cuenta de prueba creada y borrada al
+terminar). Detalle completo en `00_ARCHIVOS/BITACORAS/2026-09-03.md`. **Falta la pasada visual
+del usuario y el deploy a TEST** (incluye correr `015_rol_externo.sql` allá).
 
 **2026-09-03 — Pasada visual del usuario (Fases 1.16-1.21) y dos ajustes de
 notificaciones/permisos:** el usuario recorrió el checklist de verificación visual pendiente
@@ -731,6 +747,17 @@ y el canal de correo se sigue verificando ahí (última prueba: solicitud id=58,
 Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
+
+**⭐ Verificar visualmente y desplegar a TEST la Fase 1.22** (botones Regresar/Volver, dashboard
+de Inicio, rol Externo — 2026-09-03). Implementada y verificada por 198 tests de backend + curl
+e2e contra la BD real (cuenta de prueba creada/borrada), pero **sin pasada visual todavía** y sin
+desplegar a TEST. El deploy incluye correr `backend/sql/015_rol_externo.sql` en la BD de TEST.
+Checklist sugerido: botones más chicos y a la izquierda con ícono en las 3 vistas; dashboard de
+Inicio con datos reales para un usuario TEAM y uno Scrum Master; crear un usuario de prueba con
+rol Externo desde "Usuarios", iniciar sesión con él y recorrer el flujo completo (nav reducido,
+crear solicitud por chat y por formulario, ver el dashboard, editar mientras "En espera", que deje
+de poder editar tras cambiar de estatus, adjuntar archivo, comentar, y confirmar que no ve
+Tablero/Monitor/Dirección General/Usuarios ni las solicitudes de otros).
 
 **⭐ Verificar visualmente en TEST las Fases 1.16 a 1.21** (2026-09-03). Ya desplegadas
 (commit `f98475b`, push a `origin/master`, `git stash`/`pull`/`stash pop` en `t_apex` sin

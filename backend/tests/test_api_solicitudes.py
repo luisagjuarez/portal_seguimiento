@@ -394,6 +394,7 @@ def _fake_solicitud_detalle(solicitud_id=1):
         "codigo_estatus": "EN ESPERA",
         "estatus_descripcion": "En espera",
         "solicitante": "Ramon Rosales",
+        "solicitante_id": 1,
         "orden_prioridad": 3,
         "canal": "Formulario",
         "canal_id": 3,
@@ -762,6 +763,7 @@ def test_listar_tareas(monkeypatch):
 def test_listar_comentarios_solicitud(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     fake_comentario = {
         "id": 1,
         "solicitud_id": 1,
@@ -842,6 +844,7 @@ def test_listar_enlaces_solicitud(monkeypatch):
 def test_listar_adjuntos_solicitud(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     fake_adjunto = {
         "id": 1,
         "nombre_archivo": "captura.png",
@@ -862,6 +865,7 @@ def test_listar_adjuntos_solicitud(monkeypatch):
 def test_descargar_adjunto_solicitud_success(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
 
     archivo = tmp_path / "captura.png"
     archivo.write_bytes(b"contenido-fake-png")
@@ -888,6 +892,7 @@ def test_descargar_adjunto_solicitud_success(monkeypatch, tmp_path):
 def test_descargar_adjunto_solicitud_404_si_no_pertenece(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     monkeypatch.setattr(
         routes.repository, "get_adjunto_de_solicitud", lambda cursor, solicitud_id, adjunto_id: None
     )
@@ -900,6 +905,7 @@ def test_descargar_adjunto_solicitud_404_si_no_pertenece(monkeypatch):
 def test_descargar_adjunto_solicitud_404_si_falta_en_disco(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
     ruta_inexistente = str(tmp_path / "no-existe.png")
     monkeypatch.setattr(
         routes.repository,

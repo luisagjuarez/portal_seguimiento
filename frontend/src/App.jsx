@@ -88,6 +88,7 @@ export default function App() {
   };
 
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
+  const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
   const puedeVerReportesGerenciales = ["SCRUM MASTER", "PRODUCT OWNER"].includes(
     usuarioActual?.codigo_rol_scrum,
   );
@@ -95,7 +96,7 @@ export default function App() {
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
   const puedeMostrarSidebar = usuarioActual && !debeCambiarPassword;
-  const pantallaCentrada = pantallaSinSidebar || location.pathname === "/" || location.pathname === "/chat";
+  const pantallaCentrada = pantallaSinSidebar || location.pathname === "/chat";
 
   return (
     <div className="app-layout">
@@ -103,6 +104,7 @@ export default function App() {
         <Sidebar
           usuarioActual={usuarioActual}
           esScrumMaster={esScrumMaster}
+          esExterno={esExterno}
           puedeVerReportesGerenciales={puedeVerReportesGerenciales}
           onCerrarSesion={cerrarSesion}
         />
@@ -150,7 +152,10 @@ export default function App() {
                 path="/solicitudes/:id"
                 element={<SolicitudDetallePage esScrumMaster={esScrumMaster} usuarioActual={usuarioActual} />}
               />
-              <Route path="/tablero" element={<TableroPage usuarioActual={usuarioActual} />} />
+              <Route
+                path="/tablero"
+                element={esExterno ? <Navigate to="/" replace /> : <TableroPage usuarioActual={usuarioActual} />}
+              />
               <Route
                 path="/monitor"
                 element={puedeVerReportesGerenciales ? <MonitorPage /> : <Navigate to="/" replace />}
@@ -163,7 +168,13 @@ export default function App() {
               />
               <Route
                 path="/tareas/:id"
-                element={<TareaDetallePage usuarioActual={usuarioActual} esScrumMaster={esScrumMaster} />}
+                element={
+                  esExterno ? (
+                    <Navigate to="/" replace />
+                  ) : (
+                    <TareaDetallePage usuarioActual={usuarioActual} esScrumMaster={esScrumMaster} />
+                  )
+                }
               />
               <Route
                 path="/usuarios"

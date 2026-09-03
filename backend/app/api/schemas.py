@@ -82,6 +82,7 @@ class SolicitudDetalle(BaseModel):
     codigo_estatus: str
     estatus_descripcion: str | None
     solicitante: str | None
+    solicitante_id: int | None
     orden_prioridad: int
     canal: str | None
     canal_id: int | None
@@ -128,6 +129,16 @@ class SolicitudUpdate(BaseModel):
                     "estatus Planeado"
                 )
         return self
+
+
+class SolicitudUpdateExterno(BaseModel):
+    """Edición restringida para el rol EXTERNO: los mismos 4 campos que ya puede llenar al
+    crear la solicitud, nada de estatus/prioridad/fechas/responsable de atención."""
+
+    nombre: str = Field(min_length=1, max_length=500)
+    descripcion: str = Field(min_length=1)
+    cliente: str | None = Field(default=None, max_length=100)
+    tipo: str = Field(min_length=1, max_length=100)
 
 
 class EstatusTareaOut(BaseModel):
@@ -215,6 +226,26 @@ class MonitorKpisOut(BaseModel):
     carga_por_responsable: list[CargaResponsableOut]
     distribucion_estatus: list[DistribucionEstatusOut]
     cumplimiento: CumplimientoOut
+
+
+class ResumenPorValor(BaseModel):
+    valor: str
+    descripcion: str
+    total: int
+
+
+class ResumenBloque(BaseModel):
+    total: int
+    por_estatus: list[ResumenPorValor]
+    por_prioridad: list[ResumenPorValor]
+
+
+class InicioResumenOut(BaseModel):
+    mis_solicitudes: ResumenBloque | None = None
+    solicitudes_responsable: ResumenBloque | None = None
+    mis_tareas: ResumenBloque | None = None
+    solicitudes_totales: ResumenBloque | None = None
+    tareas_totales: ResumenBloque | None = None
 
 
 class DireccionGeneralTotalesOut(BaseModel):
