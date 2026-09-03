@@ -43,6 +43,7 @@ def _fake_tarea(tarea_id=1):
         "responsable": "Ramon Rosales",
         "solicitud_prioridad": 3,
         "solicitud_fecha_entrega": None,
+        "solicitud_codigo_estatus": "EN PROGRESO",
         "codigo_estatus_tarea": "COMPLETADO",
         "estatus_tarea_descripcion": "Completado",
         "fecha_inicio": date(2026, 8, 23),

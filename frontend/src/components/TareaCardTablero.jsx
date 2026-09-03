@@ -22,7 +22,7 @@ export default function TareaCardTablero({ tarea, onAbrir }) {
     >
       <div className="tarea-card-tablero-encabezado">
         <h4>{tarea.nombre}</h4>
-        <PrioridadBadge nivel={tarea.solicitud_prioridad} />
+        <PrioridadBadge nivel={tarea.solicitud_prioridad} codigoEstatus={tarea.solicitud_codigo_estatus} />
       </div>
       <p className="tarea-card-tablero-referencia">
         {tarea.solicitud_nombre}

@@ -719,6 +719,7 @@ def list_tareas(
         SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
                t.nombre, t.descripcion, t.responsable_id, m.nombre_completo AS responsable,
                s.orden_prioridad AS solicitud_prioridad, s.fecha_entrega AS solicitud_fecha_entrega,
+               s.codigo_estatus AS solicitud_codigo_estatus,
                t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
                t.fecha_inicio, t.fecha_fin, t.fecha_inicio_real, t.fecha_fin_real,
                t.horas_estimadas, t.horas_reales, t.creado_en, t.actualizado_en
@@ -736,6 +737,7 @@ def list_tareas(
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
         "responsable_id", "responsable", "solicitud_prioridad", "solicitud_fecha_entrega",
+        "solicitud_codigo_estatus",
         "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin",
         "fecha_inicio_real", "fecha_fin_real", "horas_estimadas", "horas_reales",
         "creado_en", "actualizado_en",
@@ -1171,6 +1173,7 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
         SELECT t.id, t.solicitud_id, t.nombre, t.descripcion, t.responsable_id,
                m.nombre_completo AS responsable, s.orden_prioridad AS solicitud_prioridad,
                s.fecha_entrega AS solicitud_fecha_entrega,
+               s.codigo_estatus AS solicitud_codigo_estatus,
                t.codigo_estatus_tarea,
                et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
                t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
@@ -1186,7 +1189,8 @@ def list_tareas_by_solicitud(cursor, solicitud_id: int) -> list[dict]:
     )
     columnas = [
         "id", "solicitud_id", "nombre", "descripcion", "responsable_id", "responsable",
-        "solicitud_prioridad", "solicitud_fecha_entrega", "codigo_estatus_tarea",
+        "solicitud_prioridad", "solicitud_fecha_entrega", "solicitud_codigo_estatus",
+        "codigo_estatus_tarea",
         "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin", "fecha_inicio_real",
         "fecha_fin_real", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]
@@ -1300,6 +1304,7 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
                t.nombre, t.descripcion, t.responsable_id,
                m.nombre_completo AS responsable, s.orden_prioridad AS solicitud_prioridad,
                s.fecha_entrega AS solicitud_fecha_entrega,
+               s.codigo_estatus AS solicitud_codigo_estatus,
                t.codigo_estatus_tarea,
                et.descripcion AS estatus_tarea_descripcion, t.fecha_inicio, t.fecha_fin,
                t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
@@ -1319,7 +1324,7 @@ def get_tarea_by_id(cursor, tarea_id: int) -> dict | None:
     columnas = [
         "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
         "responsable_id", "responsable", "solicitud_prioridad", "solicitud_fecha_entrega",
-        "codigo_estatus_tarea",
+        "solicitud_codigo_estatus", "codigo_estatus_tarea",
         "estatus_tarea_descripcion", "fecha_inicio", "fecha_fin", "fecha_inicio_real",
         "fecha_fin_real", "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
     ]

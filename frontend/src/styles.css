@@ -868,6 +868,10 @@ button:disabled {
 .prioridad-4 { background: #0288d1; }
 .prioridad-5 { background: #757575; }
 
+/* Solicitud ya Completada: la prioridad deja de comunicar urgencia, mismo color fijo en
+   modo claro y oscuro que el resto del semáforo. */
+.prioridad-completada { background: #e0e0e0; color: #7a7a7a; }
+
 /* Semáforo de vencimiento (Fase 1.18): distinto del de prioridad, indica qué tan cerca está
    la fecha de entrega de la solicitud. Reusa los tokens de tema ya existentes. */
 .vencimiento-badge {

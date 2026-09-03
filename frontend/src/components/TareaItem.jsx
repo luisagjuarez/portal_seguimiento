@@ -23,7 +23,7 @@ export default function TareaItem({ tarea, onEditar, onBorrar, onAbrirDetalle })
         {tarea.descripcion && <p>{tarea.descripcion}</p>}
         <p className="tarea-item-meta">
           <span>Responsable: {tarea.responsable || "Sin asignar"}</span>
-          <PrioridadBadge nivel={tarea.solicitud_prioridad} />
+          <PrioridadBadge nivel={tarea.solicitud_prioridad} codigoEstatus={tarea.solicitud_codigo_estatus} />
           <VencimientoBadge
             fechaEntrega={tarea.solicitud_fecha_entrega}
             codigoEstatus={tarea.codigo_estatus_tarea}

@@ -216,7 +216,8 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
           <strong>Canal:</strong> {solicitud.canal || "Sin definir"}
         </p>
         <p>
-          <strong>Prioridad:</strong> <PrioridadBadge nivel={solicitud.orden_prioridad} />
+          <strong>Prioridad:</strong>{" "}
+          <PrioridadBadge nivel={solicitud.orden_prioridad} codigoEstatus={solicitud.codigo_estatus} />
         </p>
         {solicitud.responsable_atencion && (
           <p>

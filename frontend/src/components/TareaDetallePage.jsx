@@ -246,7 +246,7 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
         <div className="solicitudes-encabezado">
           <h2>{tarea.nombre}</h2>
           <div className="tarea-detalle-badges">
-            <PrioridadBadge nivel={tarea.solicitud_prioridad} />
+            <PrioridadBadge nivel={tarea.solicitud_prioridad} codigoEstatus={tarea.solicitud_codigo_estatus} />
             <VencimientoBadge
               fechaEntrega={tarea.solicitud_fecha_entrega}
               codigoEstatus={tarea.codigo_estatus_tarea}

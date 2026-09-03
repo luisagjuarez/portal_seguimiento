@@ -144,6 +144,7 @@ class TareaOut(BaseModel):
     responsable: str | None
     solicitud_prioridad: int
     solicitud_fecha_entrega: date | None
+    solicitud_codigo_estatus: str
     codigo_estatus_tarea: str
     estatus_tarea_descripcion: str | None
     fecha_inicio: date
