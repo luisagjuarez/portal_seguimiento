@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-03 (Fases 1.17-1.21 con pasada visual del usuario; dos ajustes de notificaciones/permisos aplicados, falta verificación e2e con curl/navegador)
+Última actualización: 2026-09-03 (Fases 1.16-1.21 aprobadas y desplegadas en TEST; falta pasada visual del usuario en TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -17,12 +17,12 @@
 [x] Fase 1.13 (extraoficial) — Reglas de permisos más finas por rol (borrar solo Scrum Master, editar/borrar propio en comentarios/hitos/"por hacer") ✅ implementado y verificado end-to-end (2026-08-27)
 [x] Fase 1.14 (extraoficial) — Publicar el portal bajo el subpath /dovela_control ✅ implementado y verificado end-to-end en local y TEST (2026-08-27)
 [x] Fase 1.15 (extraoficial) — Tablero de Dirección General (KPIs por rango de fechas, desglosados por cliente/tipo/área/estatus) ✅ implementado, verificado en navegador y desplegado en TEST (2026-09-01)
-[~] Fase 1.16 (extraoficial) — Subvistas de detalle por métrica en Dirección General (mosaico + pies por cliente/área + tabla de solicitudes) — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
-[~] Fase 1.17 (extraoficial) — Semáforo de prioridad (1-5) heredado en tareas — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
-[~] Fase 1.18 (extraoficial) — Fecha de entrega + responsable de atención (obligatorios desde "Planeado") + semáforo de vencimiento — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
-[~] Fase 1.19 (extraoficial) — Filtros por defecto "mis tareas"/"mis solicitudes" en Tablero y Solicitudes — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
-[~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 2 ajustes tras la pasada visual (auto-notificación y permiso de creación de tareas, ver entrada 2026-09-03) verificados por 180 tests de backend; falta verificación e2e con curl/navegador de esos 2 ajustes y el deploy a TEST
-[~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); falta el deploy a TEST
+[~] Fase 1.16 (extraoficial) — Subvistas de detalle por métrica en Dirección General (mosaico + pies por cliente/área + tabla de solicitudes) — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
+[~] Fase 1.17 (extraoficial) — Semáforo de prioridad (1-5) heredado en tareas — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
+[~] Fase 1.18 (extraoficial) — Fecha de entrega + responsable de atención (obligatorios desde "Planeado") + semáforo de vencimiento — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
+[~] Fase 1.19 (extraoficial) — Filtros por defecto "mis tareas"/"mis solicitudes" en Tablero y Solicitudes — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
+[~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 3 ajustes tras la pasada visual (auto-notificación, permiso de creación de tareas para el responsable de atención, y navegación por teclado en el picker de menciones) verificados por 180 tests de backend y aprobados visualmente por el usuario; desplegado en TEST (2026-09-03); falta verificación e2e con curl/navegador de los 2 ajustes de permisos/notificaciones y la pasada visual del usuario en TEST
+[~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
 ```
 
 **2026-09-03 — Pasada visual del usuario (Fases 1.16-1.21) y dos ajustes de
@@ -732,15 +732,18 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
-**⭐ Verificar e2e con curl/navegador los 2 ajustes del 2026-09-03** (auto-notificación y permiso
-de creación de tareas para el responsable de atención) contra la BD real — hoy solo están
-verificados por los 180 tests de backend (mocks de repositorio), no se hizo la pasada con curl
-contra la BD real por no tener credenciales de prueba a mano en esa sesión.
+**⭐ Verificar visualmente en TEST las Fases 1.16 a 1.21** (2026-09-03). Ya desplegadas
+(commit `f98475b`, push a `origin/master`, `git stash`/`pull`/`stash pop` en `t_apex` sin
+conflictos, las 4 migraciones SQL nuevas —`011` a `014`— corridas contra la BD de TEST y
+verificadas por `psql`, contenedores `api`/`backend`/`frontend` reconstruidos y respondiendo
+200 por `curl`). Falta la pasada visual del usuario en
+`https://apps.stofactura.com/dovela_control/` — solo se verificó que los contenedores levantan,
+no el flujo completo en ese ambiente.
 
-**⭐ Desplegar a TEST las Fases 1.16 a 1.21.** Las 6 sub-fases (subvistas de Dirección General +
-las 5 del flujo Solicitud-Tarea) ya están implementadas y **verificadas visualmente por el
-usuario** (2026-09-03); falta el deploy (mismo procedimiento que la Fase 1.15: push,
-`git stash`/`pull`/`stash pop` en `t_apex`, rebuild de `api`/`backend`/`frontend`).
+**⭐ Verificar e2e con curl/navegador los 2 ajustes de permisos/notificaciones del 2026-09-03**
+(auto-notificación y permiso de creación de tareas para el responsable de atención) contra la
+BD real — hoy solo están verificados por los 180 tests de backend (mocks de repositorio), no se
+hizo la pasada con curl contra la BD real por no tener credenciales de prueba a mano.
 
 0. **⭐ Verificar en navegador la migración a rutas reales (2026-08-25).** El código ya está
    escrito y el build pasa, pero falta el recorrido visual completo (navegar por el sidebar,
