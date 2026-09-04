@@ -370,12 +370,10 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
 
         {pestanaActiva === "comentarios" && (
           <>
-            {esExterno && (
-              <ComentarioSolicitudFormulario
-                solicitudId={solicitudId}
-                onGuardado={(comentario) => setComentarios((actuales) => [...actuales, comentario])}
-              />
-            )}
+            <ComentarioSolicitudFormulario
+              solicitudId={solicitudId}
+              onGuardado={(comentario) => setComentarios((actuales) => [...actuales, comentario])}
+            />
             {comentarios.length === 0 && <p>Ninguna tarea de esta solicitud tiene comentarios todavía.</p>}
             <div className="comentario-lista">
               {comentarios.map((comentario) => (
