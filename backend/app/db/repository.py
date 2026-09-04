@@ -2141,3 +2141,21 @@ def get_resumen_tareas(cursor, *, responsable_id: int | None = None) -> dict:
         "por_estatus": por_estatus,
         "por_prioridad": por_prioridad,
     }
+
+
+def get_solicitudes_por_area(cursor) -> list[dict]:
+    """Cuadro "Solicitudes por área" del dashboard de Inicio (solo Scrum Master/Product Owner):
+    conteo de todas las solicitudes activas agrupadas por el área (perfil) de su responsable de
+    atención. "Sin área responsable" agrupa tanto a las que todavía no tienen responsable
+    asignado como a un responsable sin perfil capturado (mismo resultado con un LEFT JOIN)."""
+    cursor.execute(
+        """
+        SELECT coalesce(ra.perfil, 'Sin área responsable') AS area, count(*) AS total
+        FROM solicitudes s
+        LEFT JOIN miembros_equipo ra ON ra.id = s.responsable_atencion_id
+        WHERE s.borrado_en IS NULL
+        GROUP BY coalesce(ra.perfil, 'Sin área responsable')
+        ORDER BY total DESC
+        """
+    )
+    return [{"area": row[0], "total": row[1]} for row in cursor.fetchall()]

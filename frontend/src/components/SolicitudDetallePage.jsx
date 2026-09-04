@@ -212,7 +212,7 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
 
       <div className="solicitud-detalle-info">
         <div className="solicitudes-encabezado">
-          <h2>{solicitud.nombre}</h2>
+          <h2>Solicitud: {solicitud.nombre}</h2>
           <span className="solicitud-estatus">{solicitud.estatus_descripcion || solicitud.codigo_estatus}</span>
         </div>
         <p>{solicitud.descripcion}</p>

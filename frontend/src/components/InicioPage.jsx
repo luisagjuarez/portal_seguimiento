@@ -33,6 +33,27 @@ function BloqueResumen({ titulo, bloque }) {
   );
 }
 
+function BloquePorArea({ bloque }) {
+  const max = Math.max(1, ...bloque.map((f) => f.total));
+  const total = bloque.reduce((suma, f) => suma + f.total, 0);
+
+  return (
+    <div className="monitor-section inicio-bloque">
+      <h3>Solicitudes por área ({total})</h3>
+
+      {bloque.map((fila) => (
+        <div className="monitor-bar-row" key={fila.valor}>
+          <span className="monitor-bar-etiqueta">{fila.descripcion}</span>
+          <div className="monitor-bar-track">
+            <div className="monitor-bar-fill" style={{ width: `${(fila.total / max) * 100}%` }} />
+          </div>
+          <span className="monitor-bar-valor">{fila.total}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function InicioPage({ usuarioActual }) {
   const navigate = useNavigate();
   const [resumen, setResumen] = useState(null);
@@ -69,6 +90,7 @@ export default function InicioPage({ usuarioActual }) {
             <BloqueResumen titulo="Solicitudes totales" bloque={resumen.solicitudes_totales} />
           )}
           {resumen.tareas_totales && <BloqueResumen titulo="Tareas totales" bloque={resumen.tareas_totales} />}
+          {resumen.solicitudes_por_area && <BloquePorArea bloque={resumen.solicitudes_por_area} />}
           {resumen.mis_solicitudes && (
             <BloqueResumen titulo="Mis solicitudes" bloque={resumen.mis_solicitudes} />
           )}

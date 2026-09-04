@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.api.schemas import InicioResumenOut, ResumenBloque
+from app.api.schemas import InicioResumenOut, ResumenBloque, ResumenPorValor
 from app.auth.dependencies import UsuarioActual, get_current_user
 from app.db import repository
 from app.db.connection import get_connection, release_connection
@@ -24,6 +24,10 @@ def obtener_resumen_inicio(usuario_actual: UsuarioActual = Depends(get_current_u
             return InicioResumenOut(
                 solicitudes_totales=ResumenBloque(**repository.get_resumen_solicitudes(cursor)),
                 tareas_totales=ResumenBloque(**repository.get_resumen_tareas(cursor)),
+                solicitudes_por_area=[
+                    ResumenPorValor(valor=fila["area"], descripcion=fila["area"], total=fila["total"])
+                    for fila in repository.get_solicitudes_por_area(cursor)
+                ],
             )
         # Punto 2 (2026-09-04): un Externo nunca es responsable de atención ni de tareas, así
         # que solo ve el resumen de sus propias solicitudes (los otros 2 bloques ni se piden).

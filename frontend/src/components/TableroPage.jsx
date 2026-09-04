@@ -85,7 +85,7 @@ export default function TableroPage({ usuarioActual }) {
   return (
     <div className="tablero-page">
       <div className="solicitudes-encabezado">
-        <h2>Tablero</h2>
+        <h2>Tablero de tareas</h2>
       </div>
 
       <div className="solicitudes-filtros">

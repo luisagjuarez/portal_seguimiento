@@ -5,7 +5,7 @@ const OPCIONES = [
   { ruta: "/", etiqueta: "Inicio" },
   { ruta: "/chat", etiqueta: "Solicitud por Chat" },
   { ruta: "/solicitudes", etiqueta: "Solicitudes" },
-  { ruta: "/tablero", etiqueta: "Tablero" },
+  { ruta: "/tablero", etiqueta: "Tablero de tareas" },
 ];
 
 const OPCIONES_EXTERNO = [

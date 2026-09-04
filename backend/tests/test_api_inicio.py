@@ -49,11 +49,19 @@ def _limpiar_override():
     del app.dependency_overrides[get_current_user]
 
 
+def _fake_solicitudes_por_area():
+    return [
+        {"area": "Desarrollador", "total": 5},
+        {"area": "Sin área responsable", "total": 2},
+    ]
+
+
 def test_resumen_inicio_scrum_master_ve_totales(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: None)
     monkeypatch.setattr(routes.repository, "get_resumen_solicitudes", lambda cursor, **kwargs: _fake_resumen())
     monkeypatch.setattr(routes.repository, "get_resumen_tareas", lambda cursor, **kwargs: _fake_resumen())
+    monkeypatch.setattr(routes.repository, "get_solicitudes_por_area", lambda cursor: _fake_solicitudes_por_area())
 
     _con_usuario(_usuario("SCRUM MASTER"))
     try:
@@ -68,6 +76,10 @@ def test_resumen_inicio_scrum_master_ve_totales(monkeypatch):
     assert body["mis_solicitudes"] is None
     assert body["solicitudes_responsable"] is None
     assert body["mis_tareas"] is None
+    assert body["solicitudes_por_area"] == [
+        {"valor": "Desarrollador", "descripcion": "Desarrollador", "total": 5},
+        {"valor": "Sin área responsable", "descripcion": "Sin área responsable", "total": 2},
+    ]
 
 
 def test_resumen_inicio_product_owner_ve_totales(monkeypatch):
@@ -75,6 +87,7 @@ def test_resumen_inicio_product_owner_ve_totales(monkeypatch):
     monkeypatch.setattr(routes, "release_connection", lambda conn: None)
     monkeypatch.setattr(routes.repository, "get_resumen_solicitudes", lambda cursor, **kwargs: _fake_resumen())
     monkeypatch.setattr(routes.repository, "get_resumen_tareas", lambda cursor, **kwargs: _fake_resumen())
+    monkeypatch.setattr(routes.repository, "get_solicitudes_por_area", lambda cursor: _fake_solicitudes_por_area())
 
     _con_usuario(_usuario("PRODUCT OWNER"))
     try:
@@ -86,6 +99,7 @@ def test_resumen_inicio_product_owner_ve_totales(monkeypatch):
     body = response.json()
     assert body["solicitudes_totales"] is not None
     assert body["mis_solicitudes"] is None
+    assert body["solicitudes_por_area"] is not None
 
 
 def test_resumen_inicio_team_ve_sus_propios_bloques(monkeypatch):
@@ -119,6 +133,7 @@ def test_resumen_inicio_team_ve_sus_propios_bloques(monkeypatch):
     assert body["mis_solicitudes"]["total"] == 3
     assert body["solicitudes_responsable"]["total"] == 3
     assert body["mis_tareas"]["total"] == 3
+    assert body["solicitudes_por_area"] is None
     assert llamadas_solicitudes == [{"solicitante_id": 7}, {"responsable_atencion_id": 7}]
     assert llamadas_tareas == [{"responsable_id": 7}]
 
@@ -153,5 +168,6 @@ def test_resumen_inicio_externo_ve_solo_mis_solicitudes(monkeypatch):
     assert body["mis_tareas"] is None
     assert body["solicitudes_totales"] is None
     assert body["tareas_totales"] is None
+    assert body["solicitudes_por_area"] is None
     assert llamadas_solicitudes == [{"solicitante_id": 9}]
     assert llamadas_tareas == []

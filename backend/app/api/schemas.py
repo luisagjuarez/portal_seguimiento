@@ -250,6 +250,7 @@ class InicioResumenOut(BaseModel):
     mis_tareas: ResumenBloque | None = None
     solicitudes_totales: ResumenBloque | None = None
     tareas_totales: ResumenBloque | None = None
+    solicitudes_por_area: list[ResumenPorValor] | None = None
 
 
 class DireccionGeneralTotalesOut(BaseModel):
