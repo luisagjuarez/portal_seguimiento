@@ -21,6 +21,7 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
   const [canal, setCanal] = useState("");
   const [ordenPrioridad, setOrdenPrioridad] = useState(3);
   const [cliente, setCliente] = useState(null);
+  const [srEbs, setSrEbs] = useState("");
   const [adjuntos, setAdjuntos] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
@@ -64,6 +65,7 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
         canal,
         ordenPrioridad,
         cliente,
+        srEbs: srEbs.trim() || null,
         adjuntos,
       });
       onCreada(respuesta);
@@ -166,6 +168,13 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
         <ClienteAutocomplete onSelect={setCliente} onSkip={() => setCliente(null)} />
         {cliente && <p className="crear-solicitud-cliente-elegido">Cliente elegido: {cliente}</p>}
       </div>
+
+      {!esExterno && (
+        <label>
+          SR de EBS (opcional)
+          <input type="text" value={srEbs} maxLength={100} onChange={(event) => setSrEbs(event.target.value)} />
+        </label>
+      )}
 
       <div>
         <p className="crear-solicitud-etiqueta">Adjuntos (opcional)</p>

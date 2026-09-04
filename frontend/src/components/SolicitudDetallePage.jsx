@@ -228,13 +228,19 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
         <p>
           <strong>Canal:</strong> {solicitud.canal || "Sin definir"}
         </p>
+        {solicitud.sr_ebs && (
+          <p>
+            <strong>SR de EBS:</strong> {solicitud.sr_ebs}
+          </p>
+        )}
         <p>
           <strong>Prioridad:</strong>{" "}
           <PrioridadBadge nivel={solicitud.orden_prioridad} codigoEstatus={solicitud.codigo_estatus} />
         </p>
         {solicitud.responsable_atencion && (
           <p>
-            <strong>Responsable de atención:</strong> {solicitud.responsable_atencion}
+            <strong>Responsable de atención:</strong> {solicitud.responsable_atencion} (
+            {solicitud.responsable_atencion_area})
           </p>
         )}
         {solicitud.fecha_entrega && (

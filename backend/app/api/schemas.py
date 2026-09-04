@@ -68,6 +68,7 @@ class SolicitudResumen(BaseModel):
     orden_prioridad: int
     fecha_entrega: date | None
     responsable_atencion: str | None
+    responsable_atencion_area: str
     creado_en: datetime
 
 
@@ -90,6 +91,8 @@ class SolicitudDetalle(BaseModel):
     fecha_entrega: date | None
     responsable_atencion_id: int | None
     responsable_atencion: str | None
+    responsable_atencion_area: str
+    sr_ebs: str | None
     creado_en: datetime
     actualizado_en: datetime
     actualizado_por: str
@@ -111,6 +114,7 @@ class SolicitudUpdate(BaseModel):
     fecha_completado: date | None = None
     fecha_entrega: date | None = None
     responsable_atencion_id: int | None = None
+    sr_ebs: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def _fecha_completado_obligatoria_si_completado(self) -> "SolicitudUpdate":

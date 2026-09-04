@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 from pydantic import EmailStr
 
-from app.api import adjuntos_helpers
+from app.api import adjuntos_helpers, menciones_helpers
 from app.api.schemas import (
     AdjuntoOut,
     ChatSolicitudRequest,
@@ -112,6 +112,7 @@ def listar_solicitudes(
     cliente: str = Query(default="", max_length=200),
     nombre: str = Query(default="", max_length=200),
     estatus: str = Query(default="", max_length=15),
+    area: str = Query(default="", max_length=200),
     orden_por: str = Query(default="", max_length=20),
     involucrado_id: int | None = Query(default=None),
     usuario_actual: UsuarioActual = Depends(get_current_user),
@@ -129,6 +130,7 @@ def listar_solicitudes(
             cliente=cliente or None,
             nombre=nombre or None,
             estatus=estatus or None,
+            area=area or None,
             orden_por=orden_por or None,
             involucrado_id=involucrado_id,
         )
@@ -221,6 +223,10 @@ def actualizar_solicitud(
         cursor = db_conn.cursor()
 
         solicitud_antes = repository.get_solicitud_by_id(cursor, solicitud_id)
+        if body.responsable_atencion_id and repository.es_miembro_externo(cursor, body.responsable_atencion_id):
+            raise HTTPException(
+                status_code=422, detail="Un usuario Externo no puede ser responsable de atención de una solicitud"
+            )
 
         cliente_resuelto = repository.get_or_create_cliente(cursor, body.cliente)
         cliente_id = repository.find_cliente_id_by_name(cursor, cliente_resuelto) if cliente_resuelto else None
@@ -240,6 +246,7 @@ def actualizar_solicitud(
             fecha_completado=body.fecha_completado,
             fecha_entrega=body.fecha_entrega,
             responsable_atencion_id=body.responsable_atencion_id,
+            sr_ebs=body.sr_ebs,
             actor=usuario_actual.usuario,
         )
         if filas_afectadas == 0:
@@ -388,6 +395,19 @@ def crear_comentario_solicitud(
             texto=body.texto_comentario,
             actor=usuario_actual.usuario,
         )
+        # Punto 6 (2026-09-04): a nivel solicitud sí se puede arrobar a un Externo
+        # (excluir_externos=False), a diferencia de los comentarios de tarea.
+        destinatarios_ids = menciones_helpers.resolver_destinatarios_mencion(cursor, body.texto_comentario)
+        mensaje = f"Te mencionaron en un comentario de la solicitud '{solicitud['nombre']}'"
+        for destinatario_id in destinatarios_ids:
+            repository.insert_notificacion(
+                cursor,
+                destinatario_id,
+                tipo="MENCION_COMENTARIO",
+                mensaje=mensaje,
+                entidad_tipo="SOLICITUD",
+                entidad_id=solicitud_id,
+            )
         fila = repository.get_comentario_by_id(cursor, comentario_id)
         db_conn.commit()
     except HTTPException:
@@ -533,6 +553,8 @@ def crear_tarea(
         require_scrum_master_o_responsable_solicitud(
             usuario_actual, solicitud.get("responsable_atencion_id")
         )
+        if body.responsable_id and repository.es_miembro_externo(cursor, body.responsable_id):
+            raise HTTPException(status_code=422, detail="Un usuario Externo no puede ser responsable de una tarea")
 
         tarea_id = repository.insert_tarea(
             cursor,
@@ -558,6 +580,12 @@ def crear_tarea(
                 entidad_tipo="TAREA",
                 entidad_id=tarea_id,
             )
+        # Punto 4 (2026-09-04): si la tarea nace directamente en "En progreso", la solicitud
+        # pasa sola a En progreso (mismo criterio que al iniciar una ya existente); la guarda
+        # WHERE codigo_estatus='PLANEADO' de marcar_solicitud_en_progreso evita tocarla si no
+        # aplica.
+        if body.codigo_estatus_tarea == "EN PROGRESO":
+            repository.marcar_solicitud_en_progreso(cursor, solicitud_id, actor=usuario_actual.usuario)
         fila = repository.get_tarea_by_id(cursor, tarea_id)
         db_conn.commit()
     except HTTPException:
@@ -582,6 +610,7 @@ async def crear_solicitud_formulario(
     canal: Annotated[str, Form(min_length=1, max_length=100)],
     cliente: Annotated[str | None, Form(max_length=100)] = None,
     orden_prioridad: Annotated[int, Form(ge=1, le=5)] = 3,
+    sr_ebs: Annotated[str | None, Form(max_length=100)] = None,
     files: Annotated[list[UploadFile], File()] = [],
     usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> ChatSolicitudResponse:
@@ -611,6 +640,7 @@ async def crear_solicitud_formulario(
             canal_origen="FORMULARIO",
             canal_nombre=canal,
             orden_prioridad=orden_prioridad,
+            sr_ebs=sr_ebs,
         )
 
         id_solicitud = _crear_solicitud_con_adjuntos(

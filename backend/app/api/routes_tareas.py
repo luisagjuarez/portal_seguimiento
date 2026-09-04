@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api import adjuntos_helpers
+from app.api import adjuntos_helpers, menciones_helpers
 from app.api.schemas import (
     AdjuntoOut,
     ComentarioCreateUpdate,
@@ -36,25 +35,14 @@ from app.storage import save_attachment
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
-_PATRON_MENCION = re.compile(r"@(\w+)")
-
 
 def _notificar_menciones(cursor, texto: str, tarea: dict, usuario_actual: UsuarioActual) -> None:
-    """Fase 1.20: @usuario notifica a ese miembro (si tiene acceso activo); @todos notifica a
-    todo el equipo con acceso activo. No se notifica dos veces al mismo destinatario, incluido
-    quien escribió el comentario si se menciona a sí mismo."""
-    tokens = {m.group(1) for m in _PATRON_MENCION.finditer(texto)}
-    if not tokens:
+    """Fase 1.20; Punto 6 (2026-09-04): a nivel tarea un Externo nunca puede ser mencionado
+    (`excluir_externos=True`), ni por @usuario directo ni dentro de @todos — solo puede ser
+    arrobado en comentarios a nivel solicitud (`routes_solicitudes.py`)."""
+    destinatarios_ids = menciones_helpers.resolver_destinatarios_mencion(cursor, texto, excluir_externos=True)
+    if not destinatarios_ids:
         return
-
-    destinatarios_ids: set[int] = set()
-    for token in tokens:
-        if token.upper() == "TODOS":
-            destinatarios_ids.update(repository.list_miembros_activos_ids(cursor))
-            continue
-        miembro = repository.find_miembro_activo_by_usuario(cursor, token)
-        if miembro:
-            destinatarios_ids.add(miembro["id"])
 
     mensaje = f"Te mencionaron en un comentario de la tarea '{tarea['nombre']}'"
     for destinatario_id in destinatarios_ids:
@@ -104,6 +92,9 @@ def actualizar_tarea(
     try:
         cursor = db_conn.cursor()
         tarea_antes = repository.get_tarea_by_id(cursor, tarea_id)
+        if body.responsable_id and repository.es_miembro_externo(cursor, body.responsable_id):
+            raise HTTPException(status_code=422, detail="Un usuario Externo no puede ser responsable de una tarea")
+
         filas_afectadas = repository.update_tarea(
             cursor,
             tarea_id,
@@ -133,6 +124,17 @@ def actualizar_tarea(
                 entidad_tipo="TAREA",
                 entidad_id=tarea_id,
             )
+
+        # Punto 4 (2026-09-04): al "inicializarse" una tarea (pasar de Por hacer a En progreso)
+        # la solicitud pasa sola a En progreso, pero solo si seguía en Planeado (el UPDATE de
+        # marcar_solicitud_en_progreso trae esa guarda en el WHERE, así que no hace falta
+        # condicional extra aquí sobre el estatus de la solicitud).
+        if (
+            tarea_antes is not None
+            and tarea_antes.get("codigo_estatus_tarea") == "POR HACER"
+            and body.codigo_estatus_tarea == "EN PROGRESO"
+        ):
+            repository.marcar_solicitud_en_progreso(cursor, tarea_antes["solicitud_id"], actor=usuario_actual.usuario)
 
         fila = repository.get_tarea_by_id(cursor, tarea_id)
         db_conn.commit()
@@ -392,6 +394,10 @@ def crear_por_hacer_tarea(
         tarea = repository.get_tarea_by_id(cursor, tarea_id)
         if tarea is None:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        if body.responsable_id and repository.es_miembro_externo(cursor, body.responsable_id):
+            raise HTTPException(
+                status_code=422, detail="Un usuario Externo no puede ser responsable de un 'por hacer'"
+            )
 
         item_id = repository.insert_por_hacer(
             cursor,

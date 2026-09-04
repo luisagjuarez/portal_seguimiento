@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-03 (Fase 1.22 aprobada visualmente y desplegada en TEST; 6 puntos nuevos pedidos para la próxima sesión, ver Pendientes)
+Última actualización: 2026-09-04 (6 puntos de seguimiento del rol Externo/Solicitudes implementados y verificados por tests/curl; falta pasada visual y deploy a TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -23,7 +23,8 @@
 [~] Fase 1.19 (extraoficial) — Filtros por defecto "mis tareas"/"mis solicitudes" en Tablero y Solicitudes — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
 [~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 3 ajustes tras la pasada visual (auto-notificación, permiso de creación de tareas para el responsable de atención, y navegación por teclado en el picker de menciones) verificados por 180 tests de backend y aprobados visualmente por el usuario; desplegado en TEST (2026-09-03); falta verificación e2e con curl/navegador de los 2 ajustes de permisos/notificaciones y la pasada visual del usuario en TEST
 [~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
-[~] Fase 1.22 (extraoficial) — Botones "Regresar"/"Volver" más chicos con ícono, dashboard de indicadores en Inicio (por rol: TEAM/Externo ven lo propio, Product Owner/Scrum Master ven totales) y nuevo rol EXTERNO (solicitantes externos con acceso muy limitado) — implementado y verificado por 198 tests de backend + curl e2e contra la BD real (2026-09-03); falta la pasada visual del usuario y el deploy a TEST
+[~] Fase 1.22 (extraoficial) — Botones "Regresar"/"Volver" más chicos con ícono, dashboard de indicadores en Inicio (por rol: TEAM/Externo ven lo propio, Product Owner/Scrum Master ven totales) y nuevo rol EXTERNO (solicitantes externos con acceso muy limitado) — implementado, verificado por 198 tests de backend + curl e2e, aprobado visualmente por el usuario ("Ya lo veo Bien" tras corregir un 500 real en el dashboard) y desplegado en TEST (2026-09-03); falta la pasada visual del usuario en TEST
+[~] Fase 1.23 (extraoficial) — 6 puntos de seguimiento: bloquear asignar trabajo a un Externo (tarea/responsable de atención/"por hacer"), dashboard de Inicio del Externo solo con sus solicitudes, área del responsable en Solicitudes (vista + búsqueda), auto-transición de la solicitud a "En progreso" al iniciar su primera tarea, campo "SR de EBS", y menciones @ restringidas (Externo solo arrobable a nivel solicitud, nunca a nivel tarea) — implementado y verificado por 213 tests de backend + curl e2e contra la BD real (2026-09-04); falta la pasada visual del usuario y el deploy a TEST
 ```
 
 **2026-09-03 — Fase 1.22, botones Regresar/Volver + dashboard de Inicio + rol Externo (modo
@@ -748,26 +749,19 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
-**⭐ Pedido el 2026-09-03 para la próxima sesión (todavía sin implementar) — 6 puntos:**
-1. Regla: no se debe poder asignar una tarea (`responsable_id`) a un usuario con rol Externo.
-2. El dashboard de Inicio (Fase 1.22) para el rol Externo debe mostrar **solo** el resumen de
-   sus propias solicitudes (`mis_solicitudes`) — no los bloques `solicitudes_responsable`/
-   `mis_tareas` que hoy se le muestran también (siempre en cero para este rol, pero no deberían
-   aparecer en absoluto).
-3. En la vista/listado de Solicitudes, agregar el área (`miembros_equipo.perfil`) del
-   responsable de atención de la solicitud, y que también se pueda buscar/filtrar por esa área.
-4. Regla y funcionalidad nueva: una vez que una solicitud llegó a estatus "Planeado", al
-   inicializarse (arrancar) una tarea de esa solicitud, la solicitud debe pasar automáticamente
-   a estatus "En progreso". **Pendiente de precisar mañana**: qué dispara exactamente
-   "inicializar" una tarea (¿cambio de `codigo_estatus_tarea` a "EN PROGRESO"?, ¿capturar
-   `fecha_inicio_real`?).
-5. Nuevo campo a nivel Solicitud: "SR de EBS" — agregarlo al formulario de creación/edición y
-   mostrarlo en el detalle de la solicitud. **Pendiente de precisar mañana**: tipo de dato
-   (¿texto libre, numérico?), si es obligatorio y desde qué estatus, y si aplica también para
-   Externos al crear.
-6. Para el rol Externo: solo se le puede arrobar (`@usuario`) en comentarios a nivel Solicitud,
-   nunca en comentarios a nivel Tarea (que hoy no tienen picker de menciones a nivel solicitud
-   todavía — ver Fase 1.22, `ComentarioSolicitudFormulario.jsx` es solo texto plano por ahora).
+**⭐ Verificar visualmente y desplegar a TEST la Fase 1.23** (los 6 puntos del 2026-09-03/04:
+bloquear asignar trabajo a un Externo, dashboard de Inicio del Externo solo con sus solicitudes,
+área del responsable en Solicitudes, auto-transición a "En progreso", campo "SR de EBS", y
+menciones @ restringidas). Implementada y verificada por 213 tests de backend + curl e2e contra
+la BD real (cuenta Externo real `DOVELA_MM`, datos de prueba borrados al terminar), pero **sin
+pasada visual todavía** y sin desplegar a TEST. El deploy incluye correr
+`backend/sql/016_sr_ebs_solicitud.sql` en la BD de TEST. Checklist sugerido: intentar asignar una
+tarea/responsable de atención a un usuario Externo y confirmar el error; dashboard de Inicio de
+un Externo sin los bloques de responsable/tareas; filtrar Solicitudes por área; planear una
+solicitud, crear y arrancar una tarea, confirmar que la solicitud pasa sola a "En progreso";
+capturar un "SR de EBS" al crear/editar una solicitud y verlo en el detalle; mencionar a un
+Externo en un comentario de solicitud (sí notifica) y confirmar que no aparece en el picker de
+menciones de un comentario de tarea.
 
 **⭐ Verificar visualmente y desplegar a TEST la Fase 1.22** (botones Regresar/Volver, dashboard
 de Inicio, rol Externo — 2026-09-03). Implementada, verificada por 198 tests de backend + curl

@@ -67,6 +67,8 @@ def _fake_solicitud(solicitante_id=9, codigo_estatus="EN ESPERA"):
         "fecha_entrega": None,
         "responsable_atencion_id": None,
         "responsable_atencion": None,
+        "responsable_atencion_area": "Sin área",
+        "sr_ebs": None,
         "creado_en": datetime(2026, 9, 3, tzinfo=timezone.utc),
         "actualizado_en": datetime(2026, 9, 3, tzinfo=timezone.utc),
         "actualizado_por": "EXT_CLIENTE",
@@ -315,6 +317,96 @@ def test_crear_comentario_solicitud_success(monkeypatch):
     finally:
         _limpiar_override()
     assert response.json()["tarea_id"] is None
+
+
+def test_crear_comentario_solicitud_menciona_sin_excluir_externos(monkeypatch):
+    """Punto 6 (2026-09-04): a nivel solicitud sí se puede arrobar a un Externo — la resolución
+    de menciones se pide con excluir_externos=False (a diferencia de comentarios de tarea)."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes_solicitudes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes_solicitudes, "release_connection", lambda conn: None)
+    monkeypatch.setattr(
+        routes_solicitudes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud(solicitante_id=1)
+    )
+    monkeypatch.setattr(routes_solicitudes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(
+        routes_solicitudes.repository,
+        "get_comentario_by_id",
+        lambda cursor, id: {
+            "id": id,
+            "solicitud_id": 1,
+            "tarea_id": None,
+            "tarea_nombre": None,
+            "texto_comentario": "@EXT_CLIENTE ya casi está",
+            "creado_en": datetime(2026, 9, 4, tzinfo=timezone.utc),
+            "creado_por": "DOVELA_LG",
+            "creado_por_nombre": "Luis Gómez",
+            "actualizado_en": datetime(2026, 9, 4, tzinfo=timezone.utc),
+            "actualizado_por": "DOVELA_LG",
+        },
+    )
+
+    llamadas = []
+
+    def _fake_find(cursor, usuario, excluir_externos=False):
+        llamadas.append(excluir_externos)
+        return {"id": 9, "nombre_completo": "Cliente Externo"} if usuario == "EXT_CLIENTE" else None
+
+    monkeypatch.setattr(routes_solicitudes.repository, "find_miembro_activo_by_usuario", _fake_find)
+
+    notificaciones = []
+    monkeypatch.setattr(
+        routes_solicitudes.repository,
+        "insert_notificacion",
+        lambda cursor, destinatario_id, **kwargs: notificaciones.append(destinatario_id),
+    )
+
+    response = client.post("/api/solicitudes/1/comentarios", json={"texto_comentario": "@EXT_CLIENTE ya casi está"})
+
+    assert response.status_code == 201
+    assert llamadas == [False]
+    assert notificaciones == [9]
+
+
+def test_crear_comentario_solicitud_todos_nunca_incluye_externos(monkeypatch):
+    """@todos siempre significa "todo el equipo interno", incluso a nivel solicitud — nunca
+    debe blastear a un cliente Externo solo por estar activo."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes_solicitudes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes_solicitudes, "release_connection", lambda conn: None)
+    monkeypatch.setattr(
+        routes_solicitudes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud(solicitante_id=1)
+    )
+    monkeypatch.setattr(routes_solicitudes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(
+        routes_solicitudes.repository,
+        "get_comentario_by_id",
+        lambda cursor, id: {
+            "id": 1,
+            "solicitud_id": 1,
+            "tarea_id": None,
+            "tarea_nombre": None,
+            "texto_comentario": "@todos revisen esto",
+            "creado_en": datetime(2026, 9, 4, tzinfo=timezone.utc),
+            "creado_por": "DOVELA_LG",
+            "creado_por_nombre": "Luis Gómez",
+            "actualizado_en": datetime(2026, 9, 4, tzinfo=timezone.utc),
+            "actualizado_por": "DOVELA_LG",
+        },
+    )
+
+    llamadas = []
+    monkeypatch.setattr(
+        routes_solicitudes.repository,
+        "list_miembros_activos_ids",
+        lambda cursor, excluir_externos=False: (llamadas.append(excluir_externos), [1, 2, 6])[1],
+    )
+    monkeypatch.setattr(routes_solicitudes.repository, "insert_notificacion", lambda cursor, *args, **kwargs: 1)
+
+    response = client.post("/api/solicitudes/1/comentarios", json={"texto_comentario": "@todos revisen esto"})
+
+    assert response.status_code == 201
+    assert llamadas == [True]
 
 
 def test_crear_comentario_solicitud_404_si_externo_no_es_propia(monkeypatch):

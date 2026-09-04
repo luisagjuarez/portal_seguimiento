@@ -25,7 +25,7 @@ def test_listar_miembros_equipo(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "list_miembros",
-        lambda cursor: [
+        lambda cursor, excluir_externos=False: [
             {"id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
         ],
     )

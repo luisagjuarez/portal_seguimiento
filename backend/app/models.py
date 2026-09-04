@@ -38,3 +38,6 @@ class NuevaSolicitud:
     # Nombre de canal elegido explícitamente por el usuario (formulario de Solicitudes);
     # si viene, tiene prioridad sobre canal_origen al resolver el FK en insert_solicitud.
     canal_nombre: str | None = None
+    # Punto 5 (2026-09-04): número de Service Request del EBS de Oracle, solo lo llena el
+    # equipo interno vía formulario — nunca lo pide el chat/correo ni el rol Externo.
+    sr_ebs: str | None = None

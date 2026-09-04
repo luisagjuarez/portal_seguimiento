@@ -2,6 +2,7 @@ import pytest
 
 from app.api.app import app
 from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master
+from app.db import repository
 
 USUARIO_DE_PRUEBA = UsuarioActual(
     id=1,
@@ -25,3 +26,12 @@ def usuario_autenticado_de_prueba():
     yield
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(require_scrum_master, None)
+
+
+@pytest.fixture(autouse=True)
+def nadie_es_externo_por_default(monkeypatch):
+    """Punto 1 (2026-09-04): la mayoría de los tests que asignan un responsable_id/
+    responsable_atencion_id no están probando la regla "un Externo no puede ser responsable" —
+    por default nadie es Externo, así no hace falta mockear `es_miembro_externo` uno por uno.
+    Los tests que sí prueban esa regla lo sobrescriben puntualmente con `monkeypatch`."""
+    monkeypatch.setattr(repository, "es_miembro_externo", lambda cursor, miembro_id: False)

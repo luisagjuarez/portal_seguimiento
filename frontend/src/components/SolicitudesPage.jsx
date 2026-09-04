@@ -12,6 +12,7 @@ export default function SolicitudesPage({ usuarioActual }) {
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstatus, setFiltroEstatus] = useState("");
+  const [filtroArea, setFiltroArea] = useState("");
   const [ordenPor, setOrdenPor] = useState("");
   // Por defecto cada quien ve solo las solicitudes en las que está involucrado (como
   // solicitante, responsable de atención, o responsable de alguna tarea); "Todas" lo apaga.
@@ -28,6 +29,7 @@ export default function SolicitudesPage({ usuarioActual }) {
       cliente: filtroCliente,
       nombre: filtroNombre,
       estatus: filtroEstatus,
+      area: filtroArea,
       ordenPor,
       involucradoId: soloMias && usuarioActual ? usuarioActual.id : undefined,
     })
@@ -48,7 +50,7 @@ export default function SolicitudesPage({ usuarioActual }) {
     const timeoutId = setTimeout(cargarSolicitudes, 300);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroCliente, filtroNombre, filtroEstatus, ordenPor, soloMias]);
+  }, [filtroCliente, filtroNombre, filtroEstatus, filtroArea, ordenPor, soloMias]);
 
   const alCrearSolicitud = (respuesta) => {
     setMostrarFormulario(false);
@@ -79,6 +81,12 @@ export default function SolicitudesPage({ usuarioActual }) {
           placeholder="Filtrar por nombre de la solicitud..."
           value={filtroNombre}
           onChange={(event) => setFiltroNombre(event.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Filtrar por área del responsable..."
+          value={filtroArea}
+          onChange={(event) => setFiltroArea(event.target.value)}
         />
         <select value={filtroEstatus} onChange={(event) => setFiltroEstatus(event.target.value)}>
           <option value="">Todos los estatus</option>

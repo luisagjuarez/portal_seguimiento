@@ -1,10 +1,22 @@
-import { useState } from "react";
-import { crearComentarioSolicitud } from "../api.js";
+import { useEffect, useState } from "react";
+import MencionesTextarea from "./MencionesTextarea.jsx";
+import { crearComentarioSolicitud, fetchMiembrosEquipo } from "../api.js";
 
 export default function ComentarioSolicitudFormulario({ solicitudId, onGuardado }) {
   const [texto, setTexto] = useState("");
+  const [miembros, setMiembros] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // A diferencia de los comentarios de tarea, a nivel solicitud sí se puede arrobar a un
+    // Externo (Punto 6, 2026-09-04) — no se excluye del picker.
+    fetchMiembrosEquipo()
+      .then(setMiembros)
+      .catch(() => {
+        /* si falla, el picker simplemente no aparece — escribir @usuario a mano sigue funcionando */
+      });
+  }, []);
 
   const enviar = async (event) => {
     event.preventDefault();
@@ -30,8 +42,11 @@ export default function ComentarioSolicitudFormulario({ solicitudId, onGuardado 
     <form className="crear-solicitud-form" onSubmit={enviar}>
       <label className="comentario-formulario-campo">
         Nuevo comentario
-        <textarea rows={3} value={texto} onChange={(event) => setTexto(event.target.value)} required />
+        <MencionesTextarea texto={texto} setTexto={setTexto} miembros={miembros} rows={3} />
       </label>
+      <p className="comentario-formulario-ayuda">
+        Escribe @usuario para mencionar a alguien, o @todos para notificar a todo el equipo.
+      </p>
 
       {error && <p className="error-text">{error}</p>}
 

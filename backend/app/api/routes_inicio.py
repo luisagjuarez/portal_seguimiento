@@ -25,6 +25,14 @@ def obtener_resumen_inicio(usuario_actual: UsuarioActual = Depends(get_current_u
                 solicitudes_totales=ResumenBloque(**repository.get_resumen_solicitudes(cursor)),
                 tareas_totales=ResumenBloque(**repository.get_resumen_tareas(cursor)),
             )
+        # Punto 2 (2026-09-04): un Externo nunca es responsable de atención ni de tareas, así
+        # que solo ve el resumen de sus propias solicitudes (los otros 2 bloques ni se piden).
+        if usuario_actual.codigo_rol_scrum == "EXTERNO":
+            return InicioResumenOut(
+                mis_solicitudes=ResumenBloque(
+                    **repository.get_resumen_solicitudes(cursor, solicitante_id=usuario_actual.id)
+                ),
+            )
         return InicioResumenOut(
             mis_solicitudes=ResumenBloque(
                 **repository.get_resumen_solicitudes(cursor, solicitante_id=usuario_actual.id)

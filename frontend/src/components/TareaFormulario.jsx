@@ -38,7 +38,7 @@ export default function TareaFormulario({ solicitudId, tareaInicial, onGuardada,
   const esEdicion = Boolean(tareaInicial);
 
   useEffect(() => {
-    fetchMiembrosEquipo()
+    fetchMiembrosEquipo(true)
       .then(setMiembros)
       .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
     fetchEstatusTarea()

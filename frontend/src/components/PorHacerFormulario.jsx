@@ -12,7 +12,7 @@ export default function PorHacerFormulario({ tareaId, itemInicial, onGuardado, o
   const esEdicion = Boolean(itemInicial);
 
   useEffect(() => {
-    fetchMiembrosEquipo()
+    fetchMiembrosEquipo(true)
       .then(setMiembros)
       .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
   }, []);

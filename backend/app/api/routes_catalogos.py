@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.schemas import (
     CanalSolicitudOut,
@@ -17,11 +17,11 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/miembros-equipo", response_model=list[MiembroEquipoOut])
-def listar_miembros_equipo() -> list[MiembroEquipoOut]:
+def listar_miembros_equipo(excluir_externos: bool = Query(default=False)) -> list[MiembroEquipoOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        miembros = repository.list_miembros(cursor)
+        miembros = repository.list_miembros(cursor, excluir_externos=excluir_externos)
     finally:
         release_connection(db_conn)
     return [MiembroEquipoOut(**m) for m in miembros]

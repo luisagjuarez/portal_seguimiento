@@ -220,11 +220,12 @@ export async function crearSolicitudChat({ solicitanteEmail, titulo, descripcion
   return parseJsonOrThrow(response);
 }
 
-export async function fetchSolicitudes({ cliente, nombre, estatus, ordenPor, involucradoId } = {}) {
+export async function fetchSolicitudes({ cliente, nombre, estatus, area, ordenPor, involucradoId } = {}) {
   const url = new URL(`${API_BASE_URL}/api/solicitudes`);
   if (cliente) url.searchParams.set("cliente", cliente);
   if (nombre) url.searchParams.set("nombre", nombre);
   if (estatus) url.searchParams.set("estatus", estatus);
+  if (area) url.searchParams.set("area", area);
   if (ordenPor) url.searchParams.set("orden_por", ordenPor);
   if (involucradoId) url.searchParams.set("involucrado_id", involucradoId);
   const response = await fetch(url, { headers: authHeaders() });
@@ -239,8 +240,12 @@ export async function fetchTareasTablero({ cliente, responsableId } = {}) {
   return parseJsonOrThrow(response);
 }
 
-export async function fetchMiembrosEquipo() {
-  const response = await fetch(`${API_BASE_URL}/api/miembros-equipo`);
+export async function fetchMiembrosEquipo(excluirExternos = false) {
+  const url = new URL(`${API_BASE_URL}/api/miembros-equipo`);
+  if (excluirExternos) {
+    url.searchParams.set("excluir_externos", "true");
+  }
+  const response = await fetch(url);
   return parseJsonOrThrow(response);
 }
 
@@ -309,6 +314,7 @@ export async function actualizarSolicitud(
     fechaCompletado,
     fechaEntrega,
     responsableAtencionId,
+    srEbs,
   },
 ) {
   const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
@@ -325,6 +331,7 @@ export async function actualizarSolicitud(
       fecha_completado: fechaCompletado || null,
       fecha_entrega: fechaEntrega || null,
       responsable_atencion_id: responsableAtencionId || null,
+      sr_ebs: srEbs || null,
     }),
   });
   return parseJsonOrThrow(response);
@@ -643,6 +650,7 @@ export async function crearSolicitudFormulario({
   canal,
   ordenPrioridad,
   cliente,
+  srEbs,
   adjuntos,
 }) {
   const formData = new FormData();
@@ -654,6 +662,9 @@ export async function crearSolicitudFormulario({
   formData.append("orden_prioridad", ordenPrioridad);
   if (cliente) {
     formData.append("cliente", cliente);
+  }
+  if (srEbs) {
+    formData.append("sr_ebs", srEbs);
   }
   for (const archivo of adjuntos || []) {
     formData.append("files", archivo);

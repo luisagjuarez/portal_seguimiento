@@ -34,6 +34,7 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
     solicitud.responsable_atencion_id || "",
   );
   const [cliente, setCliente] = useState(solicitud.cliente || null);
+  const [srEbs, setSrEbs] = useState(solicitud.sr_ebs || "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
 
@@ -47,7 +48,7 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
     fetchEstatus()
       .then(setEstatusCatalogo)
       .catch(() => setError("No se pudo cargar el catálogo de estatus."));
-    fetchMiembrosEquipo()
+    fetchMiembrosEquipo(true)
       .then(setMiembros)
       .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
   }, []);
@@ -90,6 +91,7 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
         fechaCompletado: codigoEstatus === "COMPLETADO" ? fechaCompletado : null,
         fechaEntrega: requiereFechaEntrega ? fechaEntrega : null,
         responsableAtencionId: requiereFechaEntrega ? Number(responsableAtencionId) : null,
+        srEbs: srEbs.trim() || null,
       });
       onActualizada(actualizada);
     } catch (err) {
@@ -220,6 +222,11 @@ export default function EditarSolicitudFormulario({ solicitud, onActualizada, on
         <ClienteAutocomplete onSelect={setCliente} onSkip={() => setCliente(null)} />
         {cliente && <p className="crear-solicitud-cliente-elegido">Cliente elegido: {cliente}</p>}
       </div>
+
+      <label>
+        SR de EBS (opcional)
+        <input type="text" value={srEbs} maxLength={100} onChange={(event) => setSrEbs(event.target.value)} />
+      </label>
 
       {error && <p className="error-text">{error}</p>}
 

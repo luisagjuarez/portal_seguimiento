@@ -187,7 +187,9 @@ def test_listar_solicitudes(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
+    def _fake_list_solicitudes(
+        cursor, cliente=None, nombre=None, estatus=None, area=None, orden_por=None, involucrado_id=None
+    ):
         filtros_recibidos.update(
             {"cliente": cliente, "nombre": nombre, "estatus": estatus, "orden_por": orden_por}
         )
@@ -203,6 +205,7 @@ def test_listar_solicitudes(monkeypatch):
                 "orden_prioridad": 3,
                 "fecha_entrega": None,
                 "responsable_atencion": None,
+                "responsable_atencion_area": "Sin área",
                 "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
             }
         ]
@@ -229,7 +232,9 @@ def test_listar_solicitudes_ordenadas(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
+    def _fake_list_solicitudes(
+        cursor, cliente=None, nombre=None, estatus=None, area=None, orden_por=None, involucrado_id=None
+    ):
         filtros_recibidos.update({"orden_por": orden_por})
         return []
 
@@ -248,7 +253,9 @@ def test_listar_solicitudes_filtra_por_involucrado(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_solicitudes(cursor, cliente=None, nombre=None, estatus=None, orden_por=None, involucrado_id=None):
+    def _fake_list_solicitudes(
+        cursor, cliente=None, nombre=None, estatus=None, area=None, orden_por=None, involucrado_id=None
+    ):
         filtros_recibidos.update({"involucrado_id": involucrado_id})
         return []
 
@@ -258,6 +265,27 @@ def test_listar_solicitudes_filtra_por_involucrado(monkeypatch):
 
     assert response.status_code == 200
     assert filtros_recibidos == {"involucrado_id": 6}
+
+
+def test_listar_solicitudes_filtra_por_area(monkeypatch):
+    """Punto 3 (2026-09-04): filtro por área (perfil) del responsable de atención."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    filtros_recibidos = {}
+
+    def _fake_list_solicitudes(
+        cursor, cliente=None, nombre=None, estatus=None, area=None, orden_por=None, involucrado_id=None
+    ):
+        filtros_recibidos.update({"area": area})
+        return []
+
+    monkeypatch.setattr(routes.repository, "list_solicitudes", _fake_list_solicitudes)
+
+    response = client.get("/api/solicitudes", params={"area": "Infraestructura"})
+
+    assert response.status_code == 200
+    assert filtros_recibidos == {"area": "Infraestructura"}
 
 
 def test_crear_solicitud_formulario_success(monkeypatch, tmp_path):
@@ -316,6 +344,103 @@ def test_crear_solicitud_formulario_orden_prioridad_default(monkeypatch, tmp_pat
 
     assert response.status_code == 201
     assert solicitudes_creadas["orden_prioridad"] == 3
+
+
+def test_crear_solicitud_formulario_pasa_sr_ebs(monkeypatch, tmp_path):
+    """Punto 5 (2026-09-04): sr_ebs es opcional, y si se manda viaja hasta insert_solicitud."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+
+    solicitudes_creadas = {}
+
+    def _fake_insert_solicitud(cursor, solicitud, **kwargs):
+        solicitudes_creadas["sr_ebs"] = solicitud.sr_ebs
+        return 789
+
+    monkeypatch.setattr(routes.repository, "insert_solicitud", _fake_insert_solicitud)
+    monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
+    monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud capturada por formulario.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "sr_ebs": "SR-12345",
+        },
+    )
+
+    assert response.status_code == 201
+    assert solicitudes_creadas["sr_ebs"] == "SR-12345"
+
+
+def test_crear_solicitud_formulario_sin_sr_ebs_no_es_obligatorio(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+
+    solicitudes_creadas = {}
+
+    def _fake_insert_solicitud(cursor, solicitud, **kwargs):
+        solicitudes_creadas["sr_ebs"] = solicitud.sr_ebs
+        return 789
+
+    monkeypatch.setattr(routes.repository, "insert_solicitud", _fake_insert_solicitud)
+    monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
+    monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud capturada por formulario.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+        },
+    )
+
+    assert response.status_code == 201
+    assert solicitudes_creadas["sr_ebs"] is None
+
+
+def test_actualizar_solicitud_pasa_sr_ebs_al_repositorio(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "find_cliente_id_by_name", lambda cursor, nombre: 10)
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "find_canal_id_by_name", lambda cursor, canal: 3)
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+
+    kwargs_recibidos = {}
+
+    def _fake_update_solicitud(cursor, id, **kwargs):
+        kwargs_recibidos.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(routes.repository, "update_solicitud", _fake_update_solicitud)
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "EN ESPERA",
+            "sr_ebs": "SR-99999",
+        },
+    )
+
+    assert response.status_code == 200
+    assert kwargs_recibidos["sr_ebs"] == "SR-99999"
 
 
 def test_crear_solicitud_formulario_rechaza_prioridad_fuera_de_rango():
@@ -402,6 +527,8 @@ def _fake_solicitud_detalle(solicitud_id=1):
         "fecha_entrega": None,
         "responsable_atencion_id": None,
         "responsable_atencion": None,
+        "responsable_atencion_area": "Sin área",
+        "sr_ebs": None,
         "creado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_en": datetime(2026, 8, 21, tzinfo=timezone.utc),
         "actualizado_por": "dovela_control",
@@ -455,6 +582,30 @@ def test_actualizar_solicitud_success(monkeypatch):
 
     assert response.status_code == 200
     assert fake_conn.committed is True
+
+
+def test_actualizar_solicitud_422_si_responsable_atencion_es_externo(monkeypatch):
+    """Punto 1 (2026-09-04): un Externo no puede ser responsable de atención de una solicitud."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "es_miembro_externo", lambda cursor, id: id == 10)
+
+    response = client.put(
+        "/api/solicitudes/1",
+        json={
+            "nombre": "Reporte de gastos",
+            "descripcion": "Detalle",
+            "cliente": "Chantilly",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "codigo_estatus": "PLANEADO",
+            "fecha_entrega": "2026-09-15",
+            "responsable_atencion_id": 10,
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_actualizar_solicitud_planeado_requiere_fecha_entrega_y_responsable():
@@ -1007,6 +1158,72 @@ def test_crear_tarea_success(monkeypatch):
     assert response.status_code == 201
     assert response.json()["nombre"] == "Levantar requerimientos"
     assert fake_conn.committed is True
+
+
+def test_crear_tarea_422_si_responsable_es_externo(monkeypatch):
+    """Punto 1 (2026-09-04): un Externo no puede ser responsable de una tarea."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "es_miembro_externo", lambda cursor, id: id == 10)
+
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={"nombre": "Levantar requerimientos", "responsable_id": 10},
+    )
+
+    assert response.status_code == 422
+
+
+def test_crear_tarea_marca_solicitud_en_progreso_si_nace_en_progreso(monkeypatch):
+    """Punto 4 (2026-09-04): si la tarea nace directamente en "En progreso", también dispara
+    el intento de pasar la solicitud a "En progreso" (la guarda de "seguía en Planeado" vive en
+    el UPDATE de marcar_solicitud_en_progreso, no aquí)."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+
+    llamadas = []
+    monkeypatch.setattr(
+        routes.repository,
+        "marcar_solicitud_en_progreso",
+        lambda cursor, solicitud_id, actor: llamadas.append(solicitud_id),
+    )
+
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={"nombre": "Levantar requerimientos", "codigo_estatus_tarea": "EN PROGRESO"},
+    )
+
+    assert response.status_code == 201
+    assert llamadas == [1]
+
+
+def test_crear_tarea_no_marca_solicitud_si_nace_por_hacer(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_solicitud_by_id", lambda cursor, id: _fake_solicitud_detalle(id))
+    monkeypatch.setattr(routes.repository, "insert_tarea", lambda cursor, id, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+
+    llamadas = []
+    monkeypatch.setattr(
+        routes.repository,
+        "marcar_solicitud_en_progreso",
+        lambda cursor, solicitud_id, actor: llamadas.append(solicitud_id),
+    )
+
+    response = client.post(
+        "/api/solicitudes/1/tareas",
+        json={"nombre": "Levantar requerimientos", "codigo_estatus_tarea": "POR HACER"},
+    )
+
+    assert response.status_code == 201
+    assert llamadas == []
 
 
 def test_crear_tarea_notifica_al_responsable(monkeypatch):

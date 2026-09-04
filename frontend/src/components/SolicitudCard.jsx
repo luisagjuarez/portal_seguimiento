@@ -33,6 +33,11 @@ export default function SolicitudCard({ solicitud, onSeleccionar }) {
       <p>
         <strong>Solicitante:</strong> {solicitud.solicitante || "Sin identificar"}
       </p>
+      {solicitud.responsable_atencion && (
+        <p>
+          <strong>Responsable:</strong> {solicitud.responsable_atencion} ({solicitud.responsable_atencion_area})
+        </p>
+      )}
       <p>
         <strong>Prioridad:</strong>{" "}
         <PrioridadBadge nivel={solicitud.orden_prioridad} codigoEstatus={solicitud.codigo_estatus} />

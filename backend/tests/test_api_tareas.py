@@ -131,6 +131,89 @@ def test_actualizar_tarea_success(monkeypatch):
     assert fake_conn.committed is True
 
 
+def test_actualizar_tarea_422_si_responsable_es_externo(monkeypatch):
+    """Punto 1 (2026-09-04): un Externo no puede ser responsable de una tarea."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "es_miembro_externo", lambda cursor, id: id == 10)
+
+    response = client.put(
+        "/api/tareas/1",
+        json={
+            "nombre": "Levantar requerimientos",
+            "descripcion": "Reunión con el cliente",
+            "responsable_id": 10,
+            "codigo_estatus_tarea": "POR HACER",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_actualizar_tarea_marca_solicitud_en_progreso_al_inicializarse(monkeypatch):
+    """Punto 4 (2026-09-04): al pasar de "Por hacer" a "En progreso", la solicitud (si seguía
+    en "Planeado") pasa sola a "En progreso"."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    tarea_por_hacer = _fake_tarea(1)
+    tarea_por_hacer["codigo_estatus_tarea"] = "POR HACER"
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: tarea_por_hacer)
+    monkeypatch.setattr(routes.repository, "update_tarea", lambda cursor, id, **kwargs: 1)
+
+    llamadas = []
+    monkeypatch.setattr(
+        routes.repository,
+        "marcar_solicitud_en_progreso",
+        lambda cursor, solicitud_id, actor: llamadas.append(solicitud_id),
+    )
+
+    response = client.put(
+        "/api/tareas/1",
+        json={
+            "nombre": "Levantar requerimientos",
+            "descripcion": "Reunión con el cliente",
+            "codigo_estatus_tarea": "EN PROGRESO",
+        },
+    )
+
+    assert response.status_code == 200
+    assert llamadas == [tarea_por_hacer["solicitud_id"]]
+
+
+def test_actualizar_tarea_no_marca_solicitud_si_no_venia_de_por_hacer(monkeypatch):
+    """Si la tarea ya no estaba en "Por hacer" (p. ej. pasa de "En revisión" a "En progreso"),
+    no se considera una "inicialización" y no se toca la solicitud."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    tarea_en_revision = _fake_tarea(1)
+    tarea_en_revision["codigo_estatus_tarea"] = "EN REVISION"
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: tarea_en_revision)
+    monkeypatch.setattr(routes.repository, "update_tarea", lambda cursor, id, **kwargs: 1)
+
+    llamadas = []
+    monkeypatch.setattr(
+        routes.repository,
+        "marcar_solicitud_en_progreso",
+        lambda cursor, solicitud_id, actor: llamadas.append(solicitud_id),
+    )
+
+    response = client.put(
+        "/api/tareas/1",
+        json={
+            "nombre": "Levantar requerimientos",
+            "descripcion": "Reunión con el cliente",
+            "codigo_estatus_tarea": "EN PROGRESO",
+        },
+    )
+
+    assert response.status_code == 200
+    assert llamadas == []
+
+
 def test_actualizar_tarea_pasa_fechas_y_horas_al_repositorio(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
@@ -610,6 +693,21 @@ def test_crear_por_hacer_tarea_success(monkeypatch):
     assert fake_conn.committed is True
 
 
+def test_crear_por_hacer_tarea_422_si_responsable_es_externo(monkeypatch):
+    """Punto 1 (2026-09-04): un Externo no puede ser responsable de un "por hacer"."""
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "es_miembro_externo", lambda cursor, id: id == 10)
+
+    response = client.post(
+        "/api/tareas/1/por-hacer",
+        json={"nombre": "Revisar checklist", "responsable_id": 10},
+    )
+
+    assert response.status_code == 422
+
+
 def test_crear_por_hacer_tarea_404_si_tarea_no_existe(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
@@ -685,7 +783,9 @@ def test_crear_comentario_tarea_notifica_mencion(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "find_miembro_activo_by_usuario",
-        lambda cursor, usuario: {"id": 6, "nombre_completo": "Ramon Rosales"} if usuario == "DOVELA_WA" else None,
+        lambda cursor, usuario, excluir_externos=False: (
+            {"id": 6, "nombre_completo": "Ramon Rosales"} if usuario == "DOVELA_WA" else None
+        ),
     )
 
     notificaciones = []
@@ -719,7 +819,9 @@ def test_crear_comentario_tarea_notifica_si_el_autor_se_menciona_a_si_mismo(monk
     monkeypatch.setattr(
         routes.repository,
         "find_miembro_activo_by_usuario",
-        lambda cursor, usuario: {"id": 1, "nombre_completo": "Luis Gómez"} if usuario == "DOVELA_LG" else None,
+        lambda cursor, usuario, excluir_externos=False: (
+            {"id": 1, "nombre_completo": "Luis Gómez"} if usuario == "DOVELA_LG" else None
+        ),
     )
 
     notificaciones = []
@@ -743,7 +845,7 @@ def test_crear_comentario_tarea_notifica_a_todos_con_arroba_todos(monkeypatch):
     monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
     monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
     monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
-    monkeypatch.setattr(routes.repository, "list_miembros_activos_ids", lambda cursor: [1, 2, 6, 9])
+    monkeypatch.setattr(routes.repository, "list_miembros_activos_ids", lambda cursor, excluir_externos=False: [1, 2, 6, 9])
 
     notificaciones = []
     monkeypatch.setattr(
@@ -778,6 +880,30 @@ def test_crear_comentario_tarea_sin_mencion_no_notifica(monkeypatch):
 
     assert response.status_code == 201
     assert notificaciones == []
+
+
+def test_crear_comentario_tarea_menciona_con_excluir_externos(monkeypatch):
+    """Punto 6 (2026-09-04): a nivel tarea la resolución de menciones se pide siempre con
+    excluir_externos=True — un Externo nunca puede quedar como destinatario ahí."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_tarea_by_id", lambda cursor, id: _fake_tarea(id))
+    monkeypatch.setattr(routes.repository, "insert_comentario", lambda cursor, **kwargs: 1)
+    monkeypatch.setattr(routes.repository, "get_comentario_by_id", lambda cursor, id: _fake_comentario(id))
+
+    llamadas = []
+
+    def _fake_find(cursor, usuario, excluir_externos=False):
+        llamadas.append(excluir_externos)
+        return None
+
+    monkeypatch.setattr(routes.repository, "find_miembro_activo_by_usuario", _fake_find)
+
+    response = client.post("/api/tareas/1/comentarios", json={"texto_comentario": "@DOVELA_MM_EXTERNO hola"})
+
+    assert response.status_code == 201
+    assert llamadas == [True]
 
 
 def test_actualizar_tarea_notifica_si_cambia_el_responsable(monkeypatch):

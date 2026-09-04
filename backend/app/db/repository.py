@@ -137,10 +137,10 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") 
         """
         INSERT INTO solicitudes
             (nombre, descripcion, solicitante, cliente, tipo, codigo_estatus, canal,
-             orden_prioridad, creado_en, creado_por, actualizado_en, actualizado_por)
+             orden_prioridad, sr_ebs, creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES
             (%(nombre)s, %(descripcion)s, %(solicitante)s, %(cliente)s, %(tipo)s,
-             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, now(), %(actor)s,
+             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, %(sr_ebs)s, now(), %(actor)s,
              now(), %(actor)s)
         RETURNING id
         """,
@@ -153,6 +153,7 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") 
             "codigo_estatus": solicitud.status_cd,
             "canal": canal_id,
             "orden_prioridad": solicitud.orden_prioridad,
+            "sr_ebs": solicitud.sr_ebs,
             "actor": actor,
         },
     )
@@ -316,15 +317,28 @@ def mark_email_processed(cursor, message_id: str, id_solicitud: int | None) -> N
     )
 
 
-def list_miembros(cursor) -> list[dict]:
+def list_miembros(cursor, excluir_externos: bool = False) -> list[dict]:
+    condiciones = ["borrado_en IS NULL"]
+    if excluir_externos:
+        condiciones.append("(codigo_rol_scrum IS NULL OR codigo_rol_scrum != 'EXTERNO')")
     cursor.execute(
-        "SELECT id, usuario, nombre_completo, correo_electronico FROM miembros_equipo "
-        "WHERE borrado_en IS NULL ORDER BY nombre_completo"
+        f"SELECT id, usuario, nombre_completo, correo_electronico FROM miembros_equipo "
+        f"WHERE {' AND '.join(condiciones)} ORDER BY nombre_completo"
     )
     return [
         {"id": row[0], "usuario": row[1], "nombre_completo": row[2], "correo_electronico": row[3]}
         for row in cursor.fetchall()
     ]
+
+
+def es_miembro_externo(cursor, miembro_id: int) -> bool:
+    """Punto 1 (2026-09-04): un Externo nunca puede ser responsable de tarea, responsable de
+    atención de una solicitud, ni responsable de un "por hacer" — solo puede trabajar sus
+    propias solicitudes. Devuelve False (no bloquea) si el id ni siquiera existe; el 404 de "no
+    encontrado" ya lo maneja cada endpoint por separado al validar el resto del body."""
+    cursor.execute("SELECT codigo_rol_scrum FROM miembros_equipo WHERE id = %(id)s", {"id": miembro_id})
+    row = cursor.fetchone()
+    return row is not None and row[0] == "EXTERNO"
 
 
 def get_miembro_by_usuario(cursor, usuario: str) -> dict | None:
@@ -596,6 +610,8 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
                s.orden_prioridad, cs.canal AS canal, s.canal AS canal_id,
                s.fecha_completado, s.fecha_entrega, s.responsable_atencion_id,
                ra.nombre_completo AS responsable_atencion,
+               coalesce(ra.perfil, 'Sin área') AS responsable_atencion_area,
+               s.sr_ebs,
                s.creado_en, s.actualizado_en, s.actualizado_por
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
@@ -615,7 +631,8 @@ def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
         "id", "nombre", "descripcion", "cliente", "cliente_id", "tipo", "tipo_id",
         "codigo_estatus", "estatus_descripcion", "solicitante", "solicitante_id", "orden_prioridad",
         "canal", "canal_id", "fecha_completado", "fecha_entrega", "responsable_atencion_id",
-        "responsable_atencion", "creado_en", "actualizado_en", "actualizado_por",
+        "responsable_atencion", "responsable_atencion_area", "sr_ebs",
+        "creado_en", "actualizado_en", "actualizado_por",
     ]
     return dict(zip(columnas, row))
 
@@ -634,6 +651,7 @@ def update_solicitud(
     fecha_entrega,
     responsable_atencion_id: int | None,
     actor: str,
+    sr_ebs: str | None = None,
 ) -> int:
     # fecha_completado solo tiene sentido si el estatus es Completado: si se cambia a
     # cualquier otro estatus, se limpia sin importar qué haya llegado en el body.
@@ -645,7 +663,7 @@ def update_solicitud(
             tipo = %(tipo)s, canal = %(canal)s, codigo_estatus = %(codigo_estatus)s,
             orden_prioridad = %(orden_prioridad)s, fecha_completado = %(fecha_completado)s,
             fecha_entrega = %(fecha_entrega)s, responsable_atencion_id = %(responsable_atencion_id)s,
-            actualizado_en = now(), actualizado_por = %(actor)s
+            sr_ebs = %(sr_ebs)s, actualizado_en = now(), actualizado_por = %(actor)s
         WHERE id = %(id)s AND borrado_en IS NULL
         """,
         {
@@ -659,6 +677,7 @@ def update_solicitud(
             "fecha_completado": fecha_completado_final,
             "fecha_entrega": fecha_entrega,
             "responsable_atencion_id": responsable_atencion_id,
+            "sr_ebs": sr_ebs,
             "id": solicitud_id,
             "actor": actor,
         },
@@ -695,6 +714,22 @@ def update_solicitud_externo(
             "id": solicitud_id,
             "actor": actor,
         },
+    )
+    return cursor.rowcount
+
+
+def marcar_solicitud_en_progreso(cursor, solicitud_id: int, actor: str) -> int:
+    """Punto 4 (2026-09-04): al inicializarse una tarea (pasar a "En progreso"), la solicitud
+    pasa sola a "En progreso" — pero solo si seguía en "Planeado". La condición va en el WHERE
+    (no antes, en un SELECT aparte) para que sea atómica y para que el caller pueda llamarla sin
+    condicional propio: si la solicitud ya no está en Planeado, simplemente no afecta filas."""
+    cursor.execute(
+        """
+        UPDATE solicitudes
+        SET codigo_estatus = 'EN PROGRESO', actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND codigo_estatus = 'PLANEADO' AND borrado_en IS NULL
+        """,
+        {"id": solicitud_id, "actor": actor},
     )
     return cursor.rowcount
 
@@ -1832,6 +1867,7 @@ def list_solicitudes(
     cliente: str | None = None,
     nombre: str | None = None,
     estatus: str | None = None,
+    area: str | None = None,
     orden_por: str | None = None,
     involucrado_id: int | None = None,
     limit: int = 100,
@@ -1840,7 +1876,9 @@ def list_solicitudes(
     catálogos (no solo ids) vía LEFT JOIN. Por default, más recientes primero; `orden_por`
     permite ordenar por estatus/tipo/cliente/prioridad (ver _ORDEN_SOLICITUDES).
     `involucrado_id` (Fase 1.19) filtra a las solicitudes donde ese miembro participa: como
-    solicitante, como responsable de atención, o como responsable de alguna de sus tareas."""
+    solicitante, como responsable de atención, o como responsable de alguna de sus tareas.
+    `area` (Punto 3, 2026-09-04) filtra por el área/perfil del responsable de atención (mismo
+    campo `miembros_equipo.perfil` que ya usa Dirección General)."""
     condiciones = ["s.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
@@ -1852,6 +1890,9 @@ def list_solicitudes(
     if estatus:
         condiciones.append("s.codigo_estatus = %(estatus)s")
         parametros["estatus"] = estatus
+    if area:
+        condiciones.append("coalesce(ra.perfil, 'Sin área') ILIKE %(area)s")
+        parametros["area"] = f"%{area}%"
     if involucrado_id:
         condiciones.append(
             "(s.solicitante = %(involucrado_id)s OR s.responsable_atencion_id = %(involucrado_id)s "
@@ -1867,7 +1908,8 @@ def list_solicitudes(
         SELECT s.id, s.nombre, c.nombre AS cliente, t.tipo AS tipo,
                s.codigo_estatus, e.descripcion AS estatus_descripcion,
                m.nombre_completo AS solicitante, s.orden_prioridad,
-               s.fecha_entrega, ra.nombre_completo AS responsable_atencion, s.creado_en
+               s.fecha_entrega, ra.nombre_completo AS responsable_atencion,
+               coalesce(ra.perfil, 'Sin área') AS responsable_atencion_area, s.creado_en
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN tipos_solicitud t ON t.id = s.tipo
@@ -1882,7 +1924,8 @@ def list_solicitudes(
     )
     columnas = [
         "id", "nombre", "cliente", "tipo", "codigo_estatus", "estatus_descripcion",
-        "solicitante", "orden_prioridad", "fecha_entrega", "responsable_atencion", "creado_en",
+        "solicitante", "orden_prioridad", "fecha_entrega", "responsable_atencion",
+        "responsable_atencion_area", "creado_en",
     ]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
@@ -1892,14 +1935,17 @@ def list_solicitudes(
 # ---------------------------------------------------------------------------------
 
 
-def find_miembro_activo_by_usuario(cursor, usuario: str) -> dict | None:
+def find_miembro_activo_by_usuario(cursor, usuario: str, excluir_externos: bool = False) -> dict | None:
     """Resuelve una mención @usuario en un comentario: solo miembros con acceso activo (no
-    tiene sentido notificar a alguien dado de baja o sin acceso)."""
+    tiene sentido notificar a alguien dado de baja o sin acceso). `excluir_externos` (Punto 6,
+    2026-09-04): a nivel tarea un Externo nunca puede ser mencionado, solo a nivel solicitud."""
+    condicion_externo = "AND codigo_rol_scrum != 'EXTERNO'" if excluir_externos else ""
     cursor.execute(
-        """
+        f"""
         SELECT id, nombre_completo
         FROM miembros_equipo
         WHERE usuario ILIKE %(usuario)s AND acceso_activo = true AND borrado_en IS NULL
+        {condicion_externo}
         """,
         {"usuario": usuario},
     )
@@ -1909,9 +1955,13 @@ def find_miembro_activo_by_usuario(cursor, usuario: str) -> dict | None:
     return {"id": row[0], "nombre_completo": row[1]}
 
 
-def list_miembros_activos_ids(cursor) -> list[int]:
-    """Usado para "@todos": todos los miembros con acceso activo."""
-    cursor.execute("SELECT id FROM miembros_equipo WHERE acceso_activo = true AND borrado_en IS NULL")
+def list_miembros_activos_ids(cursor, excluir_externos: bool = False) -> list[int]:
+    """Usado para "@todos": todos los miembros con acceso activo. `excluir_externos` (Punto 6,
+    2026-09-04): a nivel tarea "@todos" nunca debe incluir a los Externos."""
+    condicion_externo = "AND codigo_rol_scrum != 'EXTERNO'" if excluir_externos else ""
+    cursor.execute(
+        f"SELECT id FROM miembros_equipo WHERE acceso_activo = true AND borrado_en IS NULL {condicion_externo}"
+    )
     return [row[0] for row in cursor.fetchall()]
 
 

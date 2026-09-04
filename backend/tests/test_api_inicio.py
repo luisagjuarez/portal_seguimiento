@@ -123,11 +123,22 @@ def test_resumen_inicio_team_ve_sus_propios_bloques(monkeypatch):
     assert llamadas_tareas == [{"responsable_id": 7}]
 
 
-def test_resumen_inicio_externo_ve_los_mismos_bloques_que_team(monkeypatch):
+def test_resumen_inicio_externo_ve_solo_mis_solicitudes(monkeypatch):
+    """Punto 2 (2026-09-04): a diferencia de TEAM, un Externo solo recibe mis_solicitudes — los
+    otros 2 bloques ni se piden (siempre serían 0, un Externo nunca es responsable de nada)."""
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: None)
-    monkeypatch.setattr(routes.repository, "get_resumen_solicitudes", lambda cursor, **kwargs: _fake_resumen())
-    monkeypatch.setattr(routes.repository, "get_resumen_tareas", lambda cursor, **kwargs: _fake_resumen())
+
+    llamadas_solicitudes = []
+    llamadas_tareas = []
+    monkeypatch.setattr(
+        routes.repository,
+        "get_resumen_solicitudes",
+        lambda cursor, **kwargs: (llamadas_solicitudes.append(kwargs), _fake_resumen())[1],
+    )
+    monkeypatch.setattr(
+        routes.repository, "get_resumen_tareas", lambda cursor, **kwargs: (llamadas_tareas.append(kwargs), _fake_resumen())[1]
+    )
 
     _con_usuario(_usuario("EXTERNO", id=9))
     try:
@@ -138,4 +149,9 @@ def test_resumen_inicio_externo_ve_los_mismos_bloques_que_team(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["mis_solicitudes"] is not None
+    assert body["solicitudes_responsable"] is None
+    assert body["mis_tareas"] is None
     assert body["solicitudes_totales"] is None
+    assert body["tareas_totales"] is None
+    assert llamadas_solicitudes == [{"solicitante_id": 9}]
+    assert llamadas_tareas == []
