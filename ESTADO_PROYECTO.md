@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-03 (Fases 1.16-1.21 aprobadas y desplegadas en TEST; botones Regresar/Volver, dashboard de Inicio y rol Externo implementados y verificados por tests/curl, falta pasada visual y deploy a TEST)
+Última actualización: 2026-09-03 (Fase 1.22 aprobada visualmente y desplegada en TEST; 6 puntos nuevos pedidos para la próxima sesión, ver Pendientes)
 
 ## Dónde vamos en el roadmap
 
@@ -748,16 +748,32 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
+**⭐ Pedido el 2026-09-03 para la próxima sesión (todavía sin implementar) — 6 puntos:**
+1. Regla: no se debe poder asignar una tarea (`responsable_id`) a un usuario con rol Externo.
+2. El dashboard de Inicio (Fase 1.22) para el rol Externo debe mostrar **solo** el resumen de
+   sus propias solicitudes (`mis_solicitudes`) — no los bloques `solicitudes_responsable`/
+   `mis_tareas` que hoy se le muestran también (siempre en cero para este rol, pero no deberían
+   aparecer en absoluto).
+3. En la vista/listado de Solicitudes, agregar el área (`miembros_equipo.perfil`) del
+   responsable de atención de la solicitud, y que también se pueda buscar/filtrar por esa área.
+4. Regla y funcionalidad nueva: una vez que una solicitud llegó a estatus "Planeado", al
+   inicializarse (arrancar) una tarea de esa solicitud, la solicitud debe pasar automáticamente
+   a estatus "En progreso". **Pendiente de precisar mañana**: qué dispara exactamente
+   "inicializar" una tarea (¿cambio de `codigo_estatus_tarea` a "EN PROGRESO"?, ¿capturar
+   `fecha_inicio_real`?).
+5. Nuevo campo a nivel Solicitud: "SR de EBS" — agregarlo al formulario de creación/edición y
+   mostrarlo en el detalle de la solicitud. **Pendiente de precisar mañana**: tipo de dato
+   (¿texto libre, numérico?), si es obligatorio y desde qué estatus, y si aplica también para
+   Externos al crear.
+6. Para el rol Externo: solo se le puede arrobar (`@usuario`) en comentarios a nivel Solicitud,
+   nunca en comentarios a nivel Tarea (que hoy no tienen picker de menciones a nivel solicitud
+   todavía — ver Fase 1.22, `ComentarioSolicitudFormulario.jsx` es solo texto plano por ahora).
+
 **⭐ Verificar visualmente y desplegar a TEST la Fase 1.22** (botones Regresar/Volver, dashboard
-de Inicio, rol Externo — 2026-09-03). Implementada y verificada por 198 tests de backend + curl
-e2e contra la BD real (cuenta de prueba creada/borrada), pero **sin pasada visual todavía** y sin
-desplegar a TEST. El deploy incluye correr `backend/sql/015_rol_externo.sql` en la BD de TEST.
-Checklist sugerido: botones más chicos y a la izquierda con ícono en las 3 vistas; dashboard de
-Inicio con datos reales para un usuario TEAM y uno Scrum Master; crear un usuario de prueba con
-rol Externo desde "Usuarios", iniciar sesión con él y recorrer el flujo completo (nav reducido,
-crear solicitud por chat y por formulario, ver el dashboard, editar mientras "En espera", que deje
-de poder editar tras cambiar de estatus, adjuntar archivo, comentar, y confirmar que no ve
-Tablero/Monitor/Dirección General/Usuarios ni las solicitudes de otros).
+de Inicio, rol Externo — 2026-09-03). Implementada, verificada por 198 tests de backend + curl
+e2e contra la BD real, **aprobada visualmente por el usuario en local** y **desplegada en TEST**
+(incluye la migración `015_rol_externo.sql` ya corrida allá). Falta solo la pasada visual del
+usuario específicamente en TEST (`https://apps.stofactura.com/dovela_control/`).
 
 **⭐ Verificar visualmente en TEST las Fases 1.16 a 1.21** (2026-09-03). Ya desplegadas
 (commit `f98475b`, push a `origin/master`, `git stash`/`pull`/`stash pop` en `t_apex` sin
