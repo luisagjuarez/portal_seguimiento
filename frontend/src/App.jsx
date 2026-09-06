@@ -7,6 +7,7 @@ import SolicitudesPage from "./components/SolicitudesPage.jsx";
 import SolicitudDetallePage from "./components/SolicitudDetallePage.jsx";
 import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
+import CargaEquipoPage from "./components/CargaEquipoPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
 import MonitorPage from "./components/MonitorPage.jsx";
 import DireccionGeneralPage from "./components/DireccionGeneralPage.jsx";
@@ -155,6 +156,10 @@ export default function App() {
               <Route
                 path="/tablero"
                 element={esExterno ? <Navigate to="/" replace /> : <TableroPage usuarioActual={usuarioActual} />}
+              />
+              <Route
+                path="/carga-equipo"
+                element={esExterno ? <Navigate to="/" replace /> : <CargaEquipoPage />}
               />
               <Route
                 path="/monitor"

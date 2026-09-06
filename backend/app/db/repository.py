@@ -2159,3 +2159,127 @@ def get_solicitudes_por_area(cursor) -> list[dict]:
         """
     )
     return [{"area": row[0], "total": row[1]} for row in cursor.fetchall()]
+
+
+_COLUMNAS_TAREA_CARGA_EQUIPO = [
+    "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "descripcion",
+    "responsable_id", "responsable", "solicitud_prioridad", "solicitud_fecha_entrega",
+    "solicitud_codigo_estatus", "codigo_estatus_tarea", "estatus_tarea_descripcion",
+    "fecha_inicio", "fecha_fin", "fecha_inicio_real", "fecha_fin_real",
+    "horas_estimadas", "horas_reales", "creado_en", "actualizado_en",
+]
+
+
+def get_carga_equipo(cursor) -> list[dict]:
+    """Vista "Carga del equipo": para cada miembro con rol Team o Scrum Master, hasta 3
+    próximas tareas (En progreso primero, luego Por hacer, ambas ordenadas por prioridad y
+    fecha de inicio planeada) agrupadas por área (perfil). Un miembro sin tareas activas
+    aparece con `tareas=[]` (LEFT JOIN desde miembros_equipo, no desde tareas) para que se vea
+    que no tiene nada asignado."""
+    cursor.execute(
+        """
+        WITH tareas_rankeadas AS (
+            SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
+                   t.nombre, t.descripcion, t.responsable_id,
+                   s.orden_prioridad AS solicitud_prioridad,
+                   s.fecha_entrega AS solicitud_fecha_entrega,
+                   s.codigo_estatus AS solicitud_codigo_estatus,
+                   t.codigo_estatus_tarea, t.fecha_inicio, t.fecha_fin,
+                   t.fecha_inicio_real, t.fecha_fin_real, t.horas_estimadas, t.horas_reales,
+                   t.creado_en, t.actualizado_en,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY t.responsable_id
+                       ORDER BY CASE t.codigo_estatus_tarea WHEN 'EN PROGRESO' THEN 0 ELSE 1 END,
+                                s.orden_prioridad ASC, t.fecha_inicio ASC, t.id ASC
+                   ) AS rn
+            FROM tareas t
+            JOIN solicitudes s ON s.id = t.solicitud_id
+            LEFT JOIN clientes c ON c.id = s.cliente
+            WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea IN ('EN PROGRESO', 'POR HACER')
+        )
+        SELECT coalesce(m.perfil, 'Sin área') AS area, m.id AS miembro_id, m.usuario,
+               m.nombre_completo,
+               tr.id, tr.solicitud_id, tr.solicitud_nombre, tr.cliente, tr.nombre,
+               tr.descripcion, tr.responsable_id, m.nombre_completo AS responsable,
+               tr.solicitud_prioridad, tr.solicitud_fecha_entrega, tr.solicitud_codigo_estatus,
+               tr.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
+               tr.fecha_inicio, tr.fecha_fin, tr.fecha_inicio_real, tr.fecha_fin_real,
+               tr.horas_estimadas, tr.horas_reales, tr.creado_en, tr.actualizado_en
+        FROM miembros_equipo m
+        LEFT JOIN tareas_rankeadas tr ON tr.responsable_id = m.id AND tr.rn <= 3
+        LEFT JOIN estatus_tarea et ON et.codigo = tr.codigo_estatus_tarea
+        WHERE m.acceso_activo = true AND m.borrado_en IS NULL
+          AND m.codigo_rol_scrum IN ('TEAM', 'SCRUM MASTER')
+        ORDER BY area, m.nombre_completo, tr.rn
+        """
+    )
+
+    areas: dict[str, dict] = {}
+    for row in cursor.fetchall():
+        area, miembro_id, usuario, nombre_completo = row[0], row[1], row[2], row[3]
+        tarea_id = row[4]
+        area_dict = areas.setdefault(area, {"area": area, "miembros": {}})
+        miembro = area_dict["miembros"].setdefault(
+            miembro_id,
+            {"id": miembro_id, "usuario": usuario, "nombre_completo": nombre_completo, "tareas": []},
+        )
+        if tarea_id is not None:
+            miembro["tareas"].append(dict(zip(_COLUMNAS_TAREA_CARGA_EQUIPO, row[4:])))
+
+    return [
+        {"area": area_dict["area"], "miembros": list(area_dict["miembros"].values())}
+        for area_dict in areas.values()
+    ]
+
+
+def list_miembros_sin_tarea_en_progreso(cursor) -> list[int]:
+    """Miembros activos (Team o Scrum Master) sin ninguna tarea EN PROGRESO — usado por el
+    chequeo periódico de la vista "Carga del equipo" para notificar."""
+    cursor.execute(
+        """
+        SELECT m.id
+        FROM miembros_equipo m
+        WHERE m.acceso_activo = true AND m.borrado_en IS NULL
+          AND m.codigo_rol_scrum IN ('TEAM', 'SCRUM MASTER')
+          AND NOT EXISTS (
+              SELECT 1 FROM tareas t
+              WHERE t.responsable_id = m.id AND t.borrado_en IS NULL
+                AND t.codigo_estatus_tarea = 'EN PROGRESO'
+          )
+        """
+    )
+    return [row[0] for row in cursor.fetchall()]
+
+
+def sincronizar_alertas_sin_tarea_activa(cursor) -> list[int]:
+    """Dedup de la notificación "sin tarea en progreso" (chequeo cada 10 min): solo notifica
+    la primera vez que un miembro se queda sin tarea En progreso (marca en
+    `alertas_sin_tarea_activa`); no vuelve a notificar mientras la marca siga puesta. En cuanto
+    el miembro vuelve a tener una tarea En progreso, se borra la marca para permitir notificar
+    de nuevo si en el futuro se vuelve a quedar sin nada. Devuelve los ids recién notificados."""
+    sin_tarea_ids = set(list_miembros_sin_tarea_en_progreso(cursor))
+
+    cursor.execute("SELECT miembro_id FROM alertas_sin_tarea_activa")
+    ya_marcados_ids = {row[0] for row in cursor.fetchall()}
+
+    resueltos_ids = ya_marcados_ids - sin_tarea_ids
+    if resueltos_ids:
+        cursor.execute(
+            "DELETE FROM alertas_sin_tarea_activa WHERE miembro_id = ANY(%(ids)s)",
+            {"ids": list(resueltos_ids)},
+        )
+
+    nuevos_ids = sin_tarea_ids - ya_marcados_ids
+    for miembro_id in nuevos_ids:
+        insert_notificacion(
+            cursor,
+            miembro_id,
+            tipo="SIN_TAREA_EN_PROGRESO",
+            mensaje="No tienes ninguna tarea En progreso asignada.",
+        )
+        cursor.execute(
+            "INSERT INTO alertas_sin_tarea_activa (miembro_id) VALUES (%(miembro_id)s)",
+            {"miembro_id": miembro_id},
+        )
+
+    return list(nuevos_ids)

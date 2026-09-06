@@ -267,6 +267,11 @@ export async function fetchDireccionGeneralKpis(desde, hasta) {
   return parseJsonOrThrow(response);
 }
 
+export async function fetchCargaEquipo() {
+  const response = await fetch(`${API_BASE_URL}/api/carga-equipo`, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
 export async function fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta) {
   const url = new URL(`${API_BASE_URL}/api/direccion-general/detalle-solicitudes`);
   url.searchParams.set("metrica", metrica);

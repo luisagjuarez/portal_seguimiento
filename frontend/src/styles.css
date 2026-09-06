@@ -1309,3 +1309,71 @@ button:disabled {
   border-bottom: 1px solid var(--divider);
   font-size: 0.9rem;
 }
+
+.tabla-usuarios-wrap {
+  overflow-x: auto;
+}
+
+.carga-equipo-leyenda {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.carga-equipo-area {
+  margin-bottom: 2rem;
+}
+
+.carga-equipo-area h3 {
+  margin-bottom: 0.5rem;
+}
+
+.carga-equipo-th-centrado {
+  text-align: center;
+}
+
+.carga-equipo-sin-tarea {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.tarea-carga-box {
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.tarea-carga-box h3 {
+  font-size: 0.95rem;
+}
+
+.miembro-carga-box {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 200px;
+}
+
+.miembro-carga-box-icono {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.miembro-carga-box-datos {
+  display: flex;
+  flex-direction: column;
+}
+
+.miembro-carga-box-usuario {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.miembro-carga-box-nombre {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

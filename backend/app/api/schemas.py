@@ -471,3 +471,15 @@ class NotificacionesNoLeidasCountOut(BaseModel):
 class ChangePasswordRequest(BaseModel):
     password_actual: str = Field(min_length=1, max_length=255)
     password_nueva: str = Field(min_length=8, max_length=255)
+
+
+class CargaEquipoMiembroOut(BaseModel):
+    id: int
+    usuario: str
+    nombre_completo: str
+    tareas: list[TareaTableroOut]
+
+
+class CargaEquipoAreaOut(BaseModel):
+    area: str
+    miembros: list[CargaEquipoMiembroOut]
