@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-04 (6 puntos de seguimiento del rol Externo/Solicitudes implementados y verificados por tests/curl; falta pasada visual y deploy a TEST)
+Última actualización: 2026-09-06 (nueva vista "Tareas en proceso" implementada, verificada por tests/curl y desplegada en TEST; falta la pasada visual del usuario en TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -24,7 +24,8 @@
 [~] Fase 1.20 (extraoficial) — Notificaciones in-app + menciones @ en comentarios — implementado y verificado visualmente por el usuario (2026-09-03); con 3 ajustes tras la pasada visual (auto-notificación, permiso de creación de tareas para el responsable de atención, y navegación por teclado en el picker de menciones) verificados por 180 tests de backend y aprobados visualmente por el usuario; desplegado en TEST (2026-09-03); falta verificación e2e con curl/navegador de los 2 ajustes de permisos/notificaciones y la pasada visual del usuario en TEST
 [~] Fase 1.21 (extraoficial) — Agregar adjuntos a una solicitud ya creada + adjuntos en tareas (desde cero) — implementado y verificado visualmente por el usuario (2026-09-03); desplegado en TEST (2026-09-03); falta la pasada visual del usuario en ese ambiente
 [~] Fase 1.22 (extraoficial) — Botones "Regresar"/"Volver" más chicos con ícono, dashboard de indicadores en Inicio (por rol: TEAM/Externo ven lo propio, Product Owner/Scrum Master ven totales) y nuevo rol EXTERNO (solicitantes externos con acceso muy limitado) — implementado, verificado por 198 tests de backend + curl e2e, aprobado visualmente por el usuario ("Ya lo veo Bien" tras corregir un 500 real en el dashboard) y desplegado en TEST (2026-09-03); falta la pasada visual del usuario en TEST
-[~] Fase 1.23 (extraoficial) — 6 puntos de seguimiento: bloquear asignar trabajo a un Externo (tarea/responsable de atención/"por hacer"), dashboard de Inicio del Externo solo con sus solicitudes, área del responsable en Solicitudes (vista + búsqueda), auto-transición de la solicitud a "En progreso" al iniciar su primera tarea, campo "SR de EBS", y menciones @ restringidas (Externo solo arrobable a nivel solicitud, nunca a nivel tarea) — implementado y verificado por 213 tests de backend + curl e2e contra la BD real (2026-09-04); falta la pasada visual del usuario y el deploy a TEST
+[~] Fase 1.23 (extraoficial) — 6 puntos de seguimiento: bloquear asignar trabajo a un Externo (tarea/responsable de atención/"por hacer"), dashboard de Inicio del Externo solo con sus solicitudes, área del responsable en Solicitudes (vista + búsqueda), auto-transición de la solicitud a "En progreso" al iniciar su primera tarea, campo "SR de EBS", y menciones @ restringidas (Externo solo arrobable a nivel solicitud, nunca a nivel tarea) — implementado y verificado por 213 tests de backend + curl e2e contra la BD real (2026-09-04); desplegado en TEST (2026-09-04); falta la pasada visual del usuario en TEST
+[~] Fase 1.24 (extraoficial) — Vista "Tareas en proceso": carga del equipo en vivo por área, agrupada por perfil, con las próximas 3 tareas de cada miembro Team/Scrum Master (En progreso primero, luego Por hacer, por prioridad y fecha de inicio), refresco automático cada 5 min + botón manual, deep link al Tablero filtrado por responsable, y notificación (dedup, una sola vez) cada 10 min a quien se quede sin tarea En progreso — implementado y verificado por 225 tests de backend + curl e2e contra la BD real (2026-09-06); desplegado en TEST (2026-09-06); falta la pasada visual del usuario en TEST
 ```
 
 **2026-09-03 — Fase 1.22, botones Regresar/Volver + dashboard de Inicio + rol Externo (modo
@@ -748,6 +749,22 @@ y el canal de correo se sigue verificando ahí (última prueba: solicitud id=58,
 Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
+
+**⭐ Verificar visualmente en TEST la Fase 1.24, "Tareas en proceso"** (2026-09-06). Implementada,
+verificada por 225 tests de backend + curl e2e contra la BD real, y **desplegada en TEST**
+(incluye la migración `017_alertas_sin_tarea_activa.sql` ya corrida allá). El usuario dio su visto
+bueno de la UI directamente en su propio navegador durante la sesión de implementación (sin
+navegador conducido por Claude — la extensión de Chrome no se pudo conectar en toda la sesión) y
+pidió el deploy con base en eso. Falta la pasada visual específicamente en
+`https://apps.stofactura.com/dovela_control/` — checklist sugerido: la tabla agrupada por área,
+las cajas de tarea con toda la info (nombre, solicitud, cliente, fechas, horas, prioridad), clic
+en una caja abre el detalle de tarea, clic en el miembro abre el Tablero ya filtrado por ese
+responsable, botón "Actualizar ahora" y la leyenda de última actualización alineados a la derecha,
+títulos de columna centrados, y confirmar que un Externo no ve la página ni el link del sidebar.
+La notificación de "sin tarea En progreso" corre cada 10 min en el proceso `api` — para verla en
+vivo en TEST hace falta que algún miembro Team/Scrum Master real se quede sin ninguna tarea En
+progreso y esperar el ciclo (o pedir que se dispare manualmente, ver
+`repository.sincronizar_alertas_sin_tarea_activa`).
 
 **⭐ Verificar visualmente y desplegar a TEST la Fase 1.23** (los 6 puntos del 2026-09-03/04:
 bloquear asignar trabajo a un Externo, dashboard de Inicio del Externo solo con sus solicitudes,
