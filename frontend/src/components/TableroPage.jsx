@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import TableroColumna from "./TableroColumna.jsx";
-import FiltroMultiple from "./FiltroMultiple.jsx";
 import {
   actualizarTarea,
   fetchClientes,
@@ -33,20 +32,19 @@ export default function TableroPage({ usuarioActual }) {
   const [miembros, setMiembros] = useState([]);
   const [areas, setAreas] = useState([]);
   const [clientesCatalogo, setClientesCatalogo] = useState([]);
-  const [filtroClientes, setFiltroClientes] = useState([]);
+  const [filtroCliente, setFiltroCliente] = useState("");
   const [area, setArea] = useState("");
   // Por defecto, cada quien ve solo sus propias tareas; solo Product Owner ve todas por
   // default (necesita la vista completa del equipo) — Scrum Master también arranca en las
   // suyas. "Todos los responsables" sigue disponible para cualquiera que quiera cambiarlo
-  // manualmente (multi-selectivo, acotado por el área seleccionada). Si se llega con
-  // ?responsable=<id> en la URL (deep link desde "Carga del equipo"), ese valor manda sobre
-  // el default de rol.
-  const [filtroResponsables, setFiltroResponsables] = useState(() => {
+  // manualmente (acotado por el área seleccionada). Si se llega con ?responsable=<id> en la
+  // URL (deep link desde "Carga del equipo"), ese valor manda sobre el default de rol.
+  const [filtroResponsable, setFiltroResponsable] = useState(() => {
     const responsableUrl = searchParams.get("responsable");
-    if (responsableUrl) return [responsableUrl];
+    if (responsableUrl) return responsableUrl;
     return usuarioActual && !ROLES_VEN_TODAS_POR_DEFAULT.has(usuarioActual.codigo_rol_scrum)
-      ? [String(usuarioActual.id)]
-      : [];
+      ? String(usuarioActual.id)
+      : "";
   });
   // Puntos 1-2 (2026-09-07): delimitan fecha_fin_real y solo aplican a tareas Completadas —
   // el resto se muestra siempre. Por defecto, los últimos 8 días hasta hoy.
@@ -63,7 +61,13 @@ export default function TableroPage({ usuarioActual }) {
   const cargarTareas = () => {
     setCargando(true);
     setError(null);
-    fetchTareasTablero({ clientes: filtroClientes, responsableIds: filtroResponsables, area, desde, hasta })
+    fetchTareasTablero({
+      clientes: filtroCliente ? [filtroCliente] : [],
+      responsableIds: filtroResponsable ? [filtroResponsable] : [],
+      area,
+      desde,
+      hasta,
+    })
       .then(setTareas)
       .catch((err) => setError(err.message || "No se pudieron cargar las tareas."))
       .finally(() => setCargando(false));
@@ -86,12 +90,12 @@ export default function TableroPage({ usuarioActual }) {
       .catch(() => setClientesCatalogo([]));
   }, []);
 
-  // Si cambia el área, se quitan de la selección los responsables que ya no pertenecen a ella.
+  // Si cambia el área y el responsable elegido ya no pertenece a ella, se limpia la selección.
   useEffect(() => {
-    setFiltroResponsables((actuales) => {
-      const idsVisibles = new Set(miembrosFiltrados.map((m) => String(m.id)));
-      const filtrados = actuales.filter((id) => idsVisibles.has(id));
-      return filtrados.length === actuales.length ? actuales : filtrados;
+    setFiltroResponsable((actual) => {
+      if (!actual) return actual;
+      const sigueVisible = miembrosFiltrados.some((m) => String(m.id) === actual);
+      return sigueVisible ? actual : "";
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [area, miembros]);
@@ -100,7 +104,7 @@ export default function TableroPage({ usuarioActual }) {
     const timeoutId = setTimeout(cargarTareas, 300);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroClientes, filtroResponsables, area, desde, hasta]);
+  }, [filtroCliente, filtroResponsable, area, desde, hasta]);
 
   const alTerminarDrag = async (event) => {
     const { active, over } = event;
@@ -158,18 +162,22 @@ export default function TableroPage({ usuarioActual }) {
             </option>
           ))}
         </select>
-        <FiltroMultiple
-          etiqueta="Responsable"
-          opciones={miembrosFiltrados.map((m) => ({ id: m.id, etiqueta: m.nombre_completo }))}
-          valor={filtroResponsables}
-          onCambiar={setFiltroResponsables}
-        />
-        <FiltroMultiple
-          etiqueta="Cliente"
-          opciones={clientesCatalogo.map((c) => ({ id: c, etiqueta: c }))}
-          valor={filtroClientes}
-          onCambiar={setFiltroClientes}
-        />
+        <select value={filtroResponsable} onChange={(e) => setFiltroResponsable(e.target.value)}>
+          <option value="">Todos los responsables</option>
+          {miembrosFiltrados.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.nombre_completo}
+            </option>
+          ))}
+        </select>
+        <select value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)}>
+          <option value="">Todos los clientes</option>
+          {clientesCatalogo.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <p className="error-text">{error}</p>}

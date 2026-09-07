@@ -313,61 +313,9 @@ header {
   color: var(--text-muted);
 }
 
-/* Filtro multi-selectivo genérico, checklist siempre visible (Tablero de tareas: Responsable
-   y Cliente, Puntos 4-5 2026-09-07) */
-.filtro-multiple-wrap {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-2);
-  border-radius: 8px;
-  padding: 0.5rem 0.6rem;
-  min-width: 170px;
-  max-width: 220px;
-}
-
-.filtro-multiple-encabezado {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 0.35rem;
-}
-
-.filtro-multiple-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 130px;
-  overflow-y: auto;
-}
-
-.filtro-multiple-vacio {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.filtro-multiple-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 400;
-}
-
 /* .solicitudes-filtros input fuerza flex:1/min-width:200px en TODO <input> descendiente
-   (pensado para el buscador de texto) — sin este reset, los checkboxes del panel y los
-   inputs de fecha del rango quedan estirados y deformes. */
-.filtro-multiple-item input {
-  flex: none;
-  min-width: 0;
-  width: auto;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-}
-
+   (pensado para el buscador de texto) — sin este reset, los inputs de fecha del rango
+   (Tablero de tareas, Dirección General) quedan estirados. */
 .solicitudes-filtros .direccion-general-rango input {
   flex: none;
   min-width: 0;
