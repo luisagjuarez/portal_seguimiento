@@ -159,15 +159,13 @@ export default function TableroPage({ usuarioActual }) {
           ))}
         </select>
         <FiltroMultiple
-          etiqueta="Responsable de la tarea"
-          etiquetaTodos="Todos los responsables"
+          etiqueta="Responsable"
           opciones={miembrosFiltrados.map((m) => ({ id: m.id, etiqueta: m.nombre_completo }))}
           valor={filtroResponsables}
           onCambiar={setFiltroResponsables}
         />
         <FiltroMultiple
           etiqueta="Cliente"
-          etiquetaTodos="Todos los clientes"
           opciones={clientesCatalogo.map((c) => ({ id: c, etiqueta: c }))}
           valor={filtroClientes}
           onCambiar={setFiltroClientes}
