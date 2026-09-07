@@ -4,7 +4,7 @@ import SolicitudCard from "./SolicitudCard.jsx";
 import CrearSolicitudFormulario from "./CrearSolicitudFormulario.jsx";
 import { fetchEstatus, fetchSolicitudes } from "../api.js";
 
-const ROLES_VEN_TODAS_POR_DEFAULT = new Set(["SCRUM MASTER", "PRODUCT OWNER"]);
+const ROLES_VEN_TODAS_POR_DEFAULT = new Set(["PRODUCT OWNER"]);
 
 export default function SolicitudesPage({ usuarioActual }) {
   const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
@@ -18,7 +18,8 @@ export default function SolicitudesPage({ usuarioActual }) {
   const [ordenPor, setOrdenPor] = useState("");
   // Por defecto cada quien ve solo las solicitudes en las que está involucrado (como
   // solicitante, responsable de atención, o responsable de alguna tarea); "Todas" lo apaga.
-  // Scrum Master y Product Owner ven todas por default (necesitan la vista completa).
+  // Solo Product Owner ve todas por default (necesita la vista completa); Scrum Master
+  // también arranca en "mías", igual que el resto del equipo.
   const [soloMias, setSoloMias] = useState(!ROLES_VEN_TODAS_POR_DEFAULT.has(usuarioActual?.codigo_rol_scrum));
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);

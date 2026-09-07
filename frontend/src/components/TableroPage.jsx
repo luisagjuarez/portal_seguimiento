@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import TableroColumna from "./TableroColumna.jsx";
 import { actualizarTarea, fetchEstatusTarea, fetchMiembrosEquipo, fetchTareasTablero } from "../api.js";
 
-const ROLES_VEN_TODAS_POR_DEFAULT = new Set(["SCRUM MASTER", "PRODUCT OWNER"]);
+const ROLES_VEN_TODAS_POR_DEFAULT = new Set(["PRODUCT OWNER"]);
 
 export default function TableroPage({ usuarioActual }) {
   const navigate = useNavigate();
@@ -13,11 +13,11 @@ export default function TableroPage({ usuarioActual }) {
   const [estatusTarea, setEstatusTarea] = useState([]);
   const [miembros, setMiembros] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
-  // Por defecto, cada quien ve solo sus propias tareas; Scrum Master y Product Owner ven
-  // todas por default (necesitan la vista completa del equipo). "Todos los responsables"
-  // sigue disponible para cualquiera que quiera cambiarlo manualmente. Si se llega con
-  // ?responsable=<id> en la URL (deep link desde "Carga del equipo"), ese valor manda sobre
-  // el default de rol.
+  // Por defecto, cada quien ve solo sus propias tareas; solo Product Owner ve todas por
+  // default (necesita la vista completa del equipo) — Scrum Master también arranca en las
+  // suyas. "Todos los responsables" sigue disponible para cualquiera que quiera cambiarlo
+  // manualmente. Si se llega con ?responsable=<id> en la URL (deep link desde "Carga del
+  // equipo"), ese valor manda sobre el default de rol.
   const [filtroResponsable, setFiltroResponsable] = useState(() => {
     const responsableUrl = searchParams.get("responsable");
     if (responsableUrl) return responsableUrl;
