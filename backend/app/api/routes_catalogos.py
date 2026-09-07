@@ -80,3 +80,14 @@ def listar_roles_scrum() -> list[RolScrumOut]:
     finally:
         release_connection(db_conn)
     return [RolScrumOut(**r) for r in roles]
+
+
+@router.get("/perfiles-equipo", response_model=list[str])
+def listar_perfiles_equipo() -> list[str]:
+    db_conn = get_connection()
+    try:
+        cursor = db_conn.cursor()
+        perfiles = repository.list_perfiles_equipo(cursor)
+    finally:
+        release_connection(db_conn)
+    return perfiles

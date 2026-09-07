@@ -92,3 +92,14 @@ def test_listar_estatus_tarea(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == [{"codigo": "POR HACER", "descripcion": "Por hacer"}]
+
+
+def test_listar_perfiles_equipo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "list_perfiles_equipo", lambda cursor: ["Desarrollador", "Sistemas"])
+
+    response = client.get("/api/perfiles-equipo")
+
+    assert response.status_code == 200
+    assert response.json() == ["Desarrollador", "Sistemas"]

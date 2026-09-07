@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api")
 def obtener_direccion_general_kpis(
     desde: date = Query(...),
     hasta: date = Query(...),
+    area: str | None = Query(default=None),
     _: UsuarioActual = Depends(require_scrum_master_or_product_owner),
 ) -> DireccionGeneralKpisOut:
     if hasta < desde:
@@ -28,12 +29,12 @@ def obtener_direccion_general_kpis(
     try:
         cursor = db_conn.cursor()
         kpis = DireccionGeneralKpisOut(
-            totales=repository.get_direccion_general_totales(cursor, desde, hasta),
-            por_cliente=repository.list_direccion_general_por_cliente(cursor, desde, hasta),
-            por_tipo=repository.list_direccion_general_por_tipo(cursor, desde, hasta),
-            por_area=repository.list_direccion_general_por_area(cursor, desde, hasta),
-            solicitudes_por_estatus=repository.list_distribucion_estatus_solicitud(cursor),
-            tareas_por_estatus=repository.list_distribucion_estatus(cursor),
+            totales=repository.get_direccion_general_totales(cursor, desde, hasta, area),
+            por_cliente=repository.list_direccion_general_por_cliente(cursor, desde, hasta, area),
+            por_tipo=repository.list_direccion_general_por_tipo(cursor, desde, hasta, area),
+            por_area=repository.list_direccion_general_por_area(cursor, desde, hasta, area),
+            solicitudes_por_estatus=repository.list_distribucion_estatus_solicitud(cursor, area),
+            tareas_por_estatus=repository.list_distribucion_estatus(cursor, area),
         )
     finally:
         release_connection(db_conn)
@@ -48,6 +49,7 @@ def obtener_direccion_general_detalle_solicitudes(
     metrica: Literal["en_proceso", "concluidas", "nuevas"] = Query(...),
     desde: date = Query(...),
     hasta: date = Query(...),
+    area: str | None = Query(default=None),
     _: UsuarioActual = Depends(require_scrum_master_or_product_owner),
 ) -> list[SolicitudDireccionGeneralOut]:
     if hasta < desde:
@@ -56,7 +58,9 @@ def obtener_direccion_general_detalle_solicitudes(
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas = repository.list_direccion_general_detalle_solicitudes(cursor, metrica, desde, hasta)
+        filas = repository.list_direccion_general_detalle_solicitudes(
+            cursor, metrica, desde, hasta, area
+        )
     finally:
         release_connection(db_conn)
     return filas

@@ -22,7 +22,7 @@ export default function RecuperarPasswordPage({ onVolverALogin }) {
   };
 
   return (
-    <div className="inicio-page">
+    <div className="inicio-page auth-page">
       <h2>Recuperar contraseña</h2>
 
       {enviado ? (

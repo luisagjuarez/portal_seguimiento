@@ -32,7 +32,7 @@ export default function ResetPasswordPage({ token, onListo }) {
   };
 
   return (
-    <div className="inicio-page">
+    <div className="inicio-page auth-page">
       <h2>Restablecer contraseña</h2>
 
       {listo ? (

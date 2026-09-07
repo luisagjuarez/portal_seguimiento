@@ -9,7 +9,6 @@ import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
 import CargaEquipoPage from "./components/CargaEquipoPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
-import MonitorPage from "./components/MonitorPage.jsx";
 import DireccionGeneralPage from "./components/DireccionGeneralPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
@@ -160,10 +159,6 @@ export default function App() {
               <Route
                 path="/carga-equipo"
                 element={esExterno ? <Navigate to="/" replace /> : <CargaEquipoPage />}
-              />
-              <Route
-                path="/monitor"
-                element={puedeVerReportesGerenciales ? <MonitorPage /> : <Navigate to="/" replace />}
               />
               <Route
                 path="/direccion-general"

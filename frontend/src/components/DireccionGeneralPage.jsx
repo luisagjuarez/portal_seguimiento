@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import DireccionGeneralDetalleMetrica from "./DireccionGeneralDetalleMetrica.jsx";
 import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
-import { fetchDireccionGeneralKpis } from "../api.js";
+import { fetchDireccionGeneralKpis, fetchPerfilesEquipo } from "../api.js";
 
 const ETIQUETA_POR_METRICA = {
   en_proceso: "Solicitudes en proceso",
@@ -97,19 +97,27 @@ function TablaEstatus({ titulo, filas, codigoClave, claseBadge }) {
 export default function DireccionGeneralPage() {
   const [desde, setDesde] = useState(primerDiaDelMes);
   const [hasta, setHasta] = useState(hoyISO);
+  const [area, setArea] = useState("");
+  const [areas, setAreas] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [metricaSeleccionada, setMetricaSeleccionada] = useState(null);
 
   useEffect(() => {
+    fetchPerfilesEquipo()
+      .then(setAreas)
+      .catch(() => setAreas([]));
+  }, []);
+
+  useEffect(() => {
     setCargando(true);
     setError(null);
-    fetchDireccionGeneralKpis(desde, hasta)
+    fetchDireccionGeneralKpis(desde, hasta, area || undefined)
       .then(setKpis)
       .catch((err) => setError(err.message || "No se pudo cargar el tablero."))
       .finally(() => setCargando(false));
-  }, [desde, hasta]);
+  }, [desde, hasta, area]);
 
   if (metricaSeleccionada) {
     return (
@@ -122,6 +130,7 @@ export default function DireccionGeneralPage() {
           etiquetaMetrica={ETIQUETA_POR_METRICA[metricaSeleccionada]}
           desde={desde}
           hasta={hasta}
+          area={area}
           onVolver={() => setMetricaSeleccionada(null)}
         />
       </div>
@@ -140,6 +149,17 @@ export default function DireccionGeneralPage() {
           <label>
             Hasta
             <input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} />
+          </label>
+          <label>
+            Área responsable
+            <select value={area} onChange={(e) => setArea(e.target.value)}>
+              <option value="">Todas</option>
+              {areas.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </div>

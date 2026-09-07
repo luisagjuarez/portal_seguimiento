@@ -47,31 +47,33 @@ def _fake_grupo(grupo_id, grupo):
 def _mockear_repository(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: None)
-    monkeypatch.setattr(routes.repository, "get_direccion_general_totales", lambda cursor, desde, hasta: _fake_totales())
+    monkeypatch.setattr(
+        routes.repository, "get_direccion_general_totales", lambda cursor, desde, hasta, area: _fake_totales()
+    )
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_por_cliente",
-        lambda cursor, desde, hasta: [_fake_grupo(10, "CHANTILLY")],
+        lambda cursor, desde, hasta, area: [_fake_grupo(10, "CHANTILLY")],
     )
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_por_tipo",
-        lambda cursor, desde, hasta: [_fake_grupo(3, "Nuevo")],
+        lambda cursor, desde, hasta, area: [_fake_grupo(3, "Nuevo")],
     )
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_por_area",
-        lambda cursor, desde, hasta: [_fake_grupo("Desarrollador", "Desarrollador")],
+        lambda cursor, desde, hasta, area: [_fake_grupo("Desarrollador", "Desarrollador")],
     )
     monkeypatch.setattr(
         routes.repository,
         "list_distribucion_estatus_solicitud",
-        lambda cursor: [{"codigo_estatus": "EN PROGRESO", "descripcion": "En progreso", "total": 12}],
+        lambda cursor, area: [{"codigo_estatus": "EN PROGRESO", "descripcion": "En progreso", "total": 12}],
     )
     monkeypatch.setattr(
         routes.repository,
         "list_distribucion_estatus",
-        lambda cursor: [{"codigo_estatus_tarea": "EN PROGRESO", "descripcion": "En progreso", "total": 30}],
+        lambda cursor, area: [{"codigo_estatus_tarea": "EN PROGRESO", "descripcion": "En progreso", "total": 30}],
     )
 
 
@@ -88,6 +90,38 @@ def test_direccion_general_kpis_success(monkeypatch):
     assert body["totales"]["horas_estimadas_periodo"] == 80
     assert body["por_cliente"][0]["grupo"] == "CHANTILLY"
     assert body["por_area"][0]["grupo"] == "Desarrollador"
+
+
+def test_direccion_general_kpis_propaga_filtro_area(monkeypatch):
+    areas_recibidas = []
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: None)
+    monkeypatch.setattr(
+        routes.repository,
+        "get_direccion_general_totales",
+        lambda cursor, desde, hasta, area: areas_recibidas.append(area) or _fake_totales(),
+    )
+    monkeypatch.setattr(routes.repository, "list_direccion_general_por_cliente", lambda cursor, desde, hasta, area: [])
+    monkeypatch.setattr(routes.repository, "list_direccion_general_por_tipo", lambda cursor, desde, hasta, area: [])
+    monkeypatch.setattr(routes.repository, "list_direccion_general_por_area", lambda cursor, desde, hasta, area: [])
+    monkeypatch.setattr(routes.repository, "list_distribucion_estatus_solicitud", lambda cursor, area: [])
+    monkeypatch.setattr(routes.repository, "list_distribucion_estatus", lambda cursor, area: [])
+
+    response = client.get(
+        "/api/direccion-general/kpis",
+        params={"desde": "2026-08-01", "hasta": "2026-08-31", "area": "Desarrollador"},
+    )
+
+    assert response.status_code == 200
+    assert areas_recibidas == ["Desarrollador"]
+
+
+def test_direccion_general_kpis_area_es_opcional(monkeypatch):
+    _mockear_repository(monkeypatch)
+
+    response = client.get("/api/direccion-general/kpis", params={"desde": "2026-08-01", "hasta": "2026-08-31"})
+
+    assert response.status_code == 200
 
 
 def test_direccion_general_kpis_400_si_hasta_antes_de_desde(monkeypatch):
@@ -164,7 +198,7 @@ def _mockear_detalle(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_detalle_solicitudes",
-        lambda cursor, metrica, desde, hasta: [_fake_solicitud_detalle()],
+        lambda cursor, metrica, desde, hasta, area: [_fake_solicitud_detalle()],
     )
 
 

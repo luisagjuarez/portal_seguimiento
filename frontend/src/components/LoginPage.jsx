@@ -34,7 +34,7 @@ export default function LoginPage({ onIngreso }) {
   };
 
   return (
-    <div className="inicio-page">
+    <div className="inicio-page auth-page">
       <h2>Iniciar sesión</h2>
       <p>Esta sección es solo para el equipo DOVELA.</p>
       <form className="crear-solicitud-form" onSubmit={enviar}>

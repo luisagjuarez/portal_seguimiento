@@ -525,6 +525,10 @@ button:disabled {
   max-width: 1100px;
 }
 
+.auth-page {
+  max-width: 400px;
+}
+
 .inicio-acciones {
   display: flex;
   gap: 0.5rem;
@@ -1085,22 +1089,10 @@ button:disabled {
   height: 100%;
 }
 
-.monitor-bar-fill-por-hacer { background: var(--tag-gray-text); }
-.monitor-bar-fill-en-progreso { background: var(--tag-blue-text); }
-.monitor-bar-fill-en-revision { background: var(--tag-purple-text); }
-.monitor-bar-fill-completado { background: var(--success-text); }
-.monitor-bar-fill-cancelado { background: var(--danger); }
-
-.monitor-bar-cumplida { background: var(--success-text); }
-.monitor-bar-atrasada { background: var(--danger); }
-
 .monitor-bar-valor {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-
-.monitor-dias-vencida { color: var(--danger-text); font-weight: 600; }
-.monitor-dias-por-vencer { color: var(--warning-text); font-weight: 600; }
 
 .direccion-general-rango {
   display: flex;

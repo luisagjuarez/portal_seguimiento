@@ -28,11 +28,7 @@ export default function Sidebar({
       ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }]
       : OPCIONES;
   if (puedeVerReportesGerenciales) {
-    opciones = [
-      ...opciones,
-      { ruta: "/monitor", etiqueta: "Monitor" },
-      { ruta: "/direccion-general", etiqueta: "Dirección General" },
-    ];
+    opciones = [...opciones, { ruta: "/direccion-general", etiqueta: "Dirección General" }];
   }
 
   return (

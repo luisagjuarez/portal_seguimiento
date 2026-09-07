@@ -40,7 +40,7 @@ function agruparTop5(filas, campo) {
   return principales;
 }
 
-export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetrica, desde, hasta, onVolver }) {
+export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetrica, desde, hasta, area, onVolver }) {
   const [filas, setFilas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -48,11 +48,11 @@ export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetric
   useEffect(() => {
     setCargando(true);
     setError(null);
-    fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta)
+    fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta, area || undefined)
       .then(setFilas)
       .catch((err) => setError(err.message || "No se pudo cargar el detalle."))
       .finally(() => setCargando(false));
-  }, [metrica, desde, hasta]);
+  }, [metrica, desde, hasta, area]);
 
   return (
     <div className="direccion-general-detalle">

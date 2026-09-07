@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date
 
 from app.models import NuevaSolicitud
 
@@ -597,6 +597,15 @@ def list_estatus(cursor) -> list[dict]:
     return [{"codigo": row[0], "descripcion": row[1]} for row in cursor.fetchall()]
 
 
+def list_perfiles_equipo(cursor) -> list[str]:
+    """Catálogo de áreas/perfiles distintos de `miembros_equipo` (Punto 3, 2026-09-07), para
+    poblar el filtro "Área responsable" de Dirección General."""
+    cursor.execute(
+        "SELECT DISTINCT perfil FROM miembros_equipo WHERE perfil IS NOT NULL ORDER BY perfil"
+    )
+    return [row[0] for row in cursor.fetchall()]
+
+
 def get_solicitud_by_id(cursor, solicitud_id: int) -> dict | None:
     """Detalle completo para la vista maestro-detalle: incluye textos legibles de los
     catálogos (para mostrar) y los ids crudos de cliente/tipo (para precargar los <select>
@@ -814,120 +823,47 @@ def list_tareas(
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
-_COLUMNAS_TAREA_MONITOR = [
-    "id", "solicitud_id", "solicitud_nombre", "cliente", "nombre", "responsable_id",
-    "responsable", "codigo_estatus_tarea", "estatus_tarea_descripcion", "fecha_fin", "dias",
-]
-
-
-def list_tareas_vencidas(cursor, hoy: date) -> list[dict]:
-    """Tareas activas, no completadas, cuya fecha_fin planeada ya pasó. `dias` = días de
-    atraso (positivo)."""
-    cursor.execute(
-        """
-        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
-               t.nombre, t.responsable_id, m.nombre_completo AS responsable,
-               t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
-               t.fecha_fin, (%(hoy)s - t.fecha_fin) AS dias
-        FROM tareas t
-        JOIN solicitudes s ON s.id = t.solicitud_id
-        LEFT JOIN clientes c ON c.id = s.cliente
-        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
-        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
-          AND t.fecha_fin < %(hoy)s
-        ORDER BY t.fecha_fin
-        """,
-        {"hoy": hoy},
-    )
-    return [dict(zip(_COLUMNAS_TAREA_MONITOR, row)) for row in cursor.fetchall()]
-
-
-def list_tareas_por_vencer(cursor, hoy: date, dias_ventana: int = 7) -> list[dict]:
-    """Tareas activas, no completadas, cuya fecha_fin planeada cae dentro de los próximos
-    `dias_ventana` días. `dias` = días restantes (positivo, 0 = vence hoy)."""
-    cursor.execute(
-        """
-        SELECT t.id, t.solicitud_id, s.nombre AS solicitud_nombre, c.nombre AS cliente,
-               t.nombre, t.responsable_id, m.nombre_completo AS responsable,
-               t.codigo_estatus_tarea, et.descripcion AS estatus_tarea_descripcion,
-               t.fecha_fin, (t.fecha_fin - %(hoy)s) AS dias
-        FROM tareas t
-        JOIN solicitudes s ON s.id = t.solicitud_id
-        LEFT JOIN clientes c ON c.id = s.cliente
-        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
-        LEFT JOIN estatus_tarea et ON et.codigo = t.codigo_estatus_tarea
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
-          AND t.fecha_fin >= %(hoy)s AND t.fecha_fin <= %(limite)s
-        ORDER BY t.fecha_fin
-        """,
-        {"hoy": hoy, "limite": hoy + timedelta(days=dias_ventana)},
-    )
-    return [dict(zip(_COLUMNAS_TAREA_MONITOR, row)) for row in cursor.fetchall()]
-
-
-def list_carga_por_responsable(cursor) -> list[dict]:
-    """Tareas activas no completadas por responsable, incluye un bucket responsable_id=NULL
-    ('Sin asignar')."""
-    cursor.execute(
-        """
-        SELECT t.responsable_id, m.nombre_completo AS responsable, count(*) AS tareas_abiertas
-        FROM tareas t
-        LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
-        WHERE t.borrado_en IS NULL AND t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')
-        GROUP BY t.responsable_id, m.nombre_completo
-        ORDER BY tareas_abiertas DESC, responsable NULLS LAST
-        """
-    )
-    columnas = ["responsable_id", "responsable", "tareas_abiertas"]
-    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
-
-
-def list_distribucion_estatus(cursor) -> list[dict]:
-    """Cuántas tareas activas hay en cada estatus del catálogo (incluye estatus en 0)."""
+def list_distribucion_estatus(cursor, area: str | None = None) -> list[dict]:
+    """Cuántas tareas activas hay en cada estatus del catálogo (incluye estatus en 0).
+    `area` (Dirección General) filtra por el área/perfil del responsable de atención de la
+    solicitud padre de cada tarea — solo cuenta las tareas cuya solicitud tiene ese
+    responsable de atención asignado."""
     cursor.execute(
         """
         SELECT et.codigo, et.descripcion, count(t.id) AS total
         FROM estatus_tarea et
         LEFT JOIN tareas t ON t.codigo_estatus_tarea = et.codigo AND t.borrado_en IS NULL
+          AND (
+            %(area)s::text IS NULL OR EXISTS (
+                SELECT 1 FROM solicitudes s
+                JOIN miembros_equipo ra ON ra.id = s.responsable_atencion_id
+                WHERE s.id = t.solicitud_id AND coalesce(ra.perfil, 'Sin área') = %(area)s
+            )
+          )
         GROUP BY et.codigo, et.descripcion, et.orden_visualizacion
         ORDER BY et.orden_visualizacion
-        """
+        """,
+        {"area": area},
     )
     columnas = ["codigo_estatus_tarea", "descripcion", "total"]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
-def get_cumplimiento_planeado_real(cursor) -> dict:
-    """Entre las tareas con fecha_fin_real registrada, cuántas cumplieron fecha_fin
-    planeada vs. cuántas se atrasaron, y el atraso promedio (en días) de las atrasadas."""
-    cursor.execute(
-        """
-        SELECT
-            count(*) AS total_con_fecha_real,
-            count(*) FILTER (WHERE fecha_fin_real <= fecha_fin) AS cumplidas,
-            count(*) FILTER (WHERE fecha_fin_real > fecha_fin) AS atrasadas,
-            avg(fecha_fin_real - fecha_fin) FILTER (WHERE fecha_fin_real > fecha_fin) AS promedio_atraso
-        FROM tareas
-        WHERE borrado_en IS NULL AND fecha_fin_real IS NOT NULL
-        """
-    )
-    total, cumplidas, atrasadas, promedio = cursor.fetchone()
-    return {
-        "total_con_fecha_real": total,
-        "cumplidas": cumplidas,
-        "atrasadas": atrasadas,
-        "porcentaje_cumplimiento": round(cumplidas / total * 100, 1) if total else None,
-        "promedio_dias_atraso": round(float(promedio), 1) if promedio is not None else None,
-    }
+_CONDICION_AREA_SOLICITUD = (
+    "(%(area)s::text IS NULL OR EXISTS ("
+    "SELECT 1 FROM miembros_equipo ra WHERE ra.id = s.responsable_atencion_id "
+    "AND coalesce(ra.perfil, 'Sin área') = %(area)s))"
+)
 
 
-def get_direccion_general_totales(cursor, desde: date, hasta: date) -> dict:
+def get_direccion_general_totales(cursor, desde: date, hasta: date, area: str | None = None) -> dict:
     """KPIs agregados de toda la organización para el tablero de Dirección General
     (Fase 1.15): 'en proceso' es un snapshot (no depende del rango); el resto se filtra por
-    [desde, hasta]. Horas estimadas = de tareas cuya solicitud padre fue creada en el rango."""
+    [desde, hasta]. Horas estimadas = de tareas cuya solicitud padre fue creada en el rango.
+    `area` (Punto 3, 2026-09-07) filtra por el área/perfil del responsable de atención de la
+    solicitud — mismo campo que ya usa el filtro de Solicitudes."""
     cursor.execute(
-        """
+        f"""
         SELECT
             count(*) FILTER (WHERE codigo_estatus NOT IN ('COMPLETADO', 'CANCELADO')),
             count(*) FILTER (
@@ -935,15 +871,15 @@ def get_direccion_general_totales(cursor, desde: date, hasta: date) -> dict:
                 AND fecha_completado::date BETWEEN %(desde)s AND %(hasta)s
             ),
             count(*) FILTER (WHERE creado_en::date BETWEEN %(desde)s AND %(hasta)s)
-        FROM solicitudes
-        WHERE borrado_en IS NULL
+        FROM solicitudes s
+        WHERE s.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     sol_en_proceso, sol_concluidas, sol_nuevas = cursor.fetchone()
 
     cursor.execute(
-        """
+        f"""
         SELECT
             count(*) FILTER (WHERE t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')),
             count(*) FILTER (
@@ -956,9 +892,9 @@ def get_direccion_general_totales(cursor, desde: date, hasta: date) -> dict:
             ), 0)
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id AND s.borrado_en IS NULL
-        WHERE t.borrado_en IS NULL
+        WHERE t.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     tarea_en_proceso, tarea_concluidas, tarea_nuevas, horas_periodo = cursor.fetchone()
 
@@ -1013,10 +949,13 @@ def _combinar_por_grupo(filas_solicitudes: list[dict], filas_tareas: list[dict])
     return sorted(combinado.values(), key=lambda f: str(f["grupo"]))
 
 
-def list_direccion_general_por_cliente(cursor, desde: date, hasta: date) -> list[dict]:
-    """Desglose por cliente para el tablero de Dirección General (Fase 1.15)."""
+def list_direccion_general_por_cliente(
+    cursor, desde: date, hasta: date, area: str | None = None
+) -> list[dict]:
+    """Desglose por cliente para el tablero de Dirección General (Fase 1.15). `area` (Punto
+    3, 2026-09-07) filtra por el área/perfil del responsable de atención de la solicitud."""
     cursor.execute(
-        """
+        f"""
         SELECT
             c.id, c.nombre,
             count(*) FILTER (WHERE s.codigo_estatus NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1027,16 +966,16 @@ def list_direccion_general_por_cliente(cursor, desde: date, hasta: date) -> list
             count(*) FILTER (WHERE s.creado_en::date BETWEEN %(desde)s AND %(hasta)s)
         FROM solicitudes s
         JOIN clientes c ON c.id = s.cliente
-        WHERE s.borrado_en IS NULL
+        WHERE s.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY c.id, c.nombre
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     columnas = ["grupo_id", "grupo", "en_proceso", "concluidas_periodo", "nuevas_periodo"]
     filas_solicitudes = [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
     cursor.execute(
-        """
+        f"""
         SELECT
             c.id, c.nombre,
             count(*) FILTER (WHERE t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1051,10 +990,10 @@ def list_direccion_general_por_cliente(cursor, desde: date, hasta: date) -> list
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id AND s.borrado_en IS NULL
         JOIN clientes c ON c.id = s.cliente
-        WHERE t.borrado_en IS NULL
+        WHERE t.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY c.id, c.nombre
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     columnas_tareas = [
         "grupo_id", "grupo", "en_proceso", "concluidas_periodo", "nuevas_periodo",
@@ -1065,10 +1004,13 @@ def list_direccion_general_por_cliente(cursor, desde: date, hasta: date) -> list
     return _combinar_por_grupo(filas_solicitudes, filas_tareas)
 
 
-def list_direccion_general_por_tipo(cursor, desde: date, hasta: date) -> list[dict]:
-    """Desglose por tipo de solicitud para el tablero de Dirección General (Fase 1.15)."""
+def list_direccion_general_por_tipo(
+    cursor, desde: date, hasta: date, area: str | None = None
+) -> list[dict]:
+    """Desglose por tipo de solicitud para el tablero de Dirección General (Fase 1.15).
+    `area` (Punto 3, 2026-09-07) filtra por el área/perfil del responsable de atención."""
     cursor.execute(
-        """
+        f"""
         SELECT
             tp.id, tp.tipo,
             count(*) FILTER (WHERE s.codigo_estatus NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1079,16 +1021,16 @@ def list_direccion_general_por_tipo(cursor, desde: date, hasta: date) -> list[di
             count(*) FILTER (WHERE s.creado_en::date BETWEEN %(desde)s AND %(hasta)s)
         FROM solicitudes s
         JOIN tipos_solicitud tp ON tp.id = s.tipo
-        WHERE s.borrado_en IS NULL
+        WHERE s.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY tp.id, tp.tipo
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     columnas = ["grupo_id", "grupo", "en_proceso", "concluidas_periodo", "nuevas_periodo"]
     filas_solicitudes = [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
     cursor.execute(
-        """
+        f"""
         SELECT
             tp.id, tp.tipo,
             count(*) FILTER (WHERE t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1103,10 +1045,10 @@ def list_direccion_general_por_tipo(cursor, desde: date, hasta: date) -> list[di
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id AND s.borrado_en IS NULL
         JOIN tipos_solicitud tp ON tp.id = s.tipo
-        WHERE t.borrado_en IS NULL
+        WHERE t.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY tp.id, tp.tipo
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     columnas_tareas = [
         "grupo_id", "grupo", "en_proceso", "concluidas_periodo", "nuevas_periodo",
@@ -1117,13 +1059,17 @@ def list_direccion_general_por_tipo(cursor, desde: date, hasta: date) -> list[di
     return _combinar_por_grupo(filas_solicitudes, filas_tareas)
 
 
-def list_direccion_general_por_area(cursor, desde: date, hasta: date) -> list[dict]:
+def list_direccion_general_por_area(
+    cursor, desde: date, hasta: date, area: str | None = None
+) -> list[dict]:
     """Desglose por área (perfil del miembro) para el tablero de Dirección General (Fase
     1.15). El lado solicitudes usa el perfil del *solicitante*; el lado tareas usa el perfil
     del *responsable* — son roles distintos (quién pidió vs. quién ejecuta) unidos por la
-    misma etiqueta de área a propósito, para leer demanda vs. capacidad por área."""
+    misma etiqueta de área a propósito, para leer demanda vs. capacidad por área. El parámetro
+    `area` (Punto 3, 2026-09-07) es un filtro global distinto: reduce las filas consideradas a
+    las de solicitudes cuyo *responsable de atención* tiene ese perfil, antes de agrupar."""
     cursor.execute(
-        """
+        f"""
         SELECT
             coalesce(m.perfil, 'Sin área'),
             count(*) FILTER (WHERE s.codigo_estatus NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1134,10 +1080,10 @@ def list_direccion_general_por_area(cursor, desde: date, hasta: date) -> list[di
             count(*) FILTER (WHERE s.creado_en::date BETWEEN %(desde)s AND %(hasta)s)
         FROM solicitudes s
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
-        WHERE s.borrado_en IS NULL
+        WHERE s.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY coalesce(m.perfil, 'Sin área')
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     filas_solicitudes = [
         {
@@ -1151,7 +1097,7 @@ def list_direccion_general_por_area(cursor, desde: date, hasta: date) -> list[di
     ]
 
     cursor.execute(
-        """
+        f"""
         SELECT
             coalesce(m.perfil, 'Sin área'),
             count(*) FILTER (WHERE t.codigo_estatus_tarea NOT IN ('COMPLETADO', 'CANCELADO')),
@@ -1166,10 +1112,10 @@ def list_direccion_general_por_area(cursor, desde: date, hasta: date) -> list[di
         FROM tareas t
         JOIN solicitudes s ON s.id = t.solicitud_id AND s.borrado_en IS NULL
         LEFT JOIN miembros_equipo m ON m.id = t.responsable_id
-        WHERE t.borrado_en IS NULL
+        WHERE t.borrado_en IS NULL AND {_CONDICION_AREA_SOLICITUD}
         GROUP BY coalesce(m.perfil, 'Sin área')
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     filas_tareas = [
         {
@@ -1196,12 +1142,13 @@ _FILTRO_DETALLE_POR_METRICA = {
 
 
 def list_direccion_general_detalle_solicitudes(
-    cursor, metrica: str, desde: date, hasta: date
+    cursor, metrica: str, desde: date, hasta: date, area: str | None = None
 ) -> list[dict]:
     """Solicitudes individuales detrás de una de las 3 métricas de conteo de solicitudes del
     tablero de Dirección General (Fase 1.15+, subvista por métrica). Mismo criterio de filtro
     que `get_direccion_general_totales` para cada métrica — 'en_proceso' es un snapshot, ignora
-    desde/hasta, igual que el tile."""
+    desde/hasta, igual que el tile. `area` (Punto 3, 2026-09-07) filtra por el área/perfil del
+    responsable de atención."""
     filtro = _FILTRO_DETALLE_POR_METRICA[metrica]
     cursor.execute(
         f"""
@@ -1210,27 +1157,35 @@ def list_direccion_general_detalle_solicitudes(
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
-        WHERE s.borrado_en IS NULL AND {filtro}
+        WHERE s.borrado_en IS NULL AND {filtro} AND {_CONDICION_AREA_SOLICITUD}
         ORDER BY s.creado_en DESC
         """,
-        {"desde": desde, "hasta": hasta},
+        {"desde": desde, "hasta": hasta, "area": area},
     )
     columnas = ["id", "nombre", "cliente", "area", "solicitante", "creado_en"]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
-def list_distribucion_estatus_solicitud(cursor) -> list[dict]:
+def list_distribucion_estatus_solicitud(cursor, area: str | None = None) -> list[dict]:
     """Cuántas solicitudes activas hay en cada estatus del catálogo (incluye estatus en 0).
     Equivalente a `list_distribucion_estatus` pero del lado de solicitudes — son catálogos
-    distintos (`estatus` vs. `estatus_tarea`), no se combinan en una sola tabla."""
+    distintos (`estatus` vs. `estatus_tarea`), no se combinan en una sola tabla. `area`
+    (Punto 3, 2026-09-07) filtra por el área/perfil del responsable de atención."""
     cursor.execute(
         """
         SELECT e.codigo, e.descripcion, count(s.id) AS total
         FROM estatus e
         LEFT JOIN solicitudes s ON s.codigo_estatus = e.codigo AND s.borrado_en IS NULL
+          AND (
+            %(area)s::text IS NULL OR EXISTS (
+                SELECT 1 FROM miembros_equipo ra WHERE ra.id = s.responsable_atencion_id
+                AND coalesce(ra.perfil, 'Sin área') = %(area)s
+            )
+          )
         GROUP BY e.codigo, e.descripcion, e.orden_visualizacion
         ORDER BY e.orden_visualizacion
-        """
+        """,
+        {"area": area},
     )
     columnas = ["codigo_estatus", "descripcion", "total"]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]

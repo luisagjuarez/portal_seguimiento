@@ -254,16 +254,17 @@ export async function fetchInicioResumen() {
   return parseJsonOrThrow(response);
 }
 
-export async function fetchMonitorKpis() {
-  const response = await fetch(`${API_BASE_URL}/api/monitor/kpis`, { headers: authHeaders() });
-  return parseJsonOrThrow(response);
-}
-
-export async function fetchDireccionGeneralKpis(desde, hasta) {
+export async function fetchDireccionGeneralKpis(desde, hasta, area) {
   const url = new URL(`${API_BASE_URL}/api/direccion-general/kpis`);
   url.searchParams.set("desde", desde);
   url.searchParams.set("hasta", hasta);
+  if (area) url.searchParams.set("area", area);
   const response = await fetch(url, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchPerfilesEquipo() {
+  const response = await fetch(`${API_BASE_URL}/api/perfiles-equipo`, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
 
@@ -272,11 +273,12 @@ export async function fetchCargaEquipo() {
   return parseJsonOrThrow(response);
 }
 
-export async function fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta) {
+export async function fetchDireccionGeneralDetalleSolicitudes(metrica, desde, hasta, area) {
   const url = new URL(`${API_BASE_URL}/api/direccion-general/detalle-solicitudes`);
   url.searchParams.set("metrica", metrica);
   url.searchParams.set("desde", desde);
   url.searchParams.set("hasta", hasta);
+  if (area) url.searchParams.set("area", area);
   const response = await fetch(url, { headers: authHeaders() });
   return parseJsonOrThrow(response);
 }
