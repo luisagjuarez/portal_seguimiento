@@ -59,8 +59,9 @@ def _notificar_menciones(cursor, texto: str, tarea: dict, usuario_actual: Usuari
 
 @router.get("/tareas", response_model=list[TareaTableroOut])
 def listar_tareas(
-    cliente: str = Query(default="", max_length=200),
+    cliente: list[str] | None = Query(default=None),
     responsable_id: list[int] | None = Query(default=None),
+    area: str | None = Query(default=None),
     desde: date | None = Query(default=None),
     hasta: date | None = Query(default=None),
     _: UsuarioActual = Depends(require_no_externo),
@@ -69,7 +70,7 @@ def listar_tareas(
     try:
         cursor = db_conn.cursor()
         filas = repository.list_tareas(
-            cursor, cliente=cliente or None, responsable_ids=responsable_id, desde=desde, hasta=hasta
+            cursor, clientes=cliente, responsable_ids=responsable_id, area=area, desde=desde, hasta=hasta
         )
     finally:
         release_connection(db_conn)

@@ -21,7 +21,7 @@ def find_cliente_by_name(cursor, nombre: str) -> str | None:
 
 
 def list_cliente_names(cursor) -> list[str]:
-    cursor.execute("SELECT nombre FROM clientes WHERE nombre IS NOT NULL")
+    cursor.execute("SELECT nombre FROM clientes WHERE nombre IS NOT NULL ORDER BY nombre")
     return [row[0] for row in cursor.fetchall()]
 
 
@@ -778,8 +778,9 @@ def list_estatus_tarea(cursor) -> list[dict]:
 
 def list_tareas(
     cursor,
-    cliente: str | None = None,
+    clientes: list[str] | None = None,
     responsable_ids: list[int] | None = None,
+    area: str | None = None,
     desde: date | None = None,
     hasta: date | None = None,
     limit: int = 200,
@@ -787,23 +788,37 @@ def list_tareas(
     """Listado global para el Tablero Scrum: todas las tareas de todas las solicitudes,
     con el mismo shape que get_tarea_by_id (necesario para que el PUT de drag-and-drop no
     borre campos que no vienen en la tarjeta) más solicitud_nombre/cliente de referencia.
-    `responsable_ids` (Punto 2, 2026-09-07) filtra por una lista de responsables (filtro
-    multi-selectivo, agrupado por área en el frontend). `desde`/`hasta` (Punto 1) delimitan
-    `fecha_fin` (fecha de término planeada de la tarea)."""
+    `clientes` (Punto 5, 2026-09-07) filtra por una lista de nombres de cliente exactos.
+    `responsable_ids` (Punto 4) filtra por una lista de responsables. `area` (Punto 3) filtra
+    por el área/perfil del responsable de la tarea (filtro independiente, no solo un acotador
+    de `responsable_ids` — si se manda solo `area`, aplica a cualquier responsable de esa
+    área). `desde`/`hasta` (Puntos 1-2) delimitan `fecha_fin_real` (fecha real de término), y
+    **solo aplican a tareas en estatus COMPLETADO** — el resto de las tareas (Por hacer, En
+    progreso, En revisión) se muestran siempre sin importar el rango; una tarea Completada sin
+    `fecha_fin_real` capturada queda excluida cuando el rango está activo."""
     condiciones = ["t.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
-    if cliente:
-        condiciones.append("c.nombre ILIKE %(cliente)s")
-        parametros["cliente"] = f"%{cliente}%"
+    if clientes:
+        condiciones.append("c.nombre = ANY(%(clientes)s)")
+        parametros["clientes"] = list(clientes)
     if responsable_ids:
         condiciones.append("t.responsable_id = ANY(%(responsable_ids)s)")
         parametros["responsable_ids"] = list(responsable_ids)
-    if desde:
-        condiciones.append("t.fecha_fin >= %(desde)s")
-        parametros["desde"] = desde
-    if hasta:
-        condiciones.append("t.fecha_fin <= %(hasta)s")
-        parametros["hasta"] = hasta
+    if area:
+        condiciones.append(
+            "EXISTS (SELECT 1 FROM miembros_equipo ma WHERE ma.id = t.responsable_id "
+            "AND coalesce(ma.perfil, 'Sin área') = %(area)s)"
+        )
+        parametros["area"] = area
+    if desde or hasta:
+        condicion_fecha_real = "t.fecha_fin_real IS NOT NULL"
+        if desde:
+            condicion_fecha_real += " AND t.fecha_fin_real >= %(desde)s"
+            parametros["desde"] = desde
+        if hasta:
+            condicion_fecha_real += " AND t.fecha_fin_real <= %(hasta)s"
+            parametros["hasta"] = hasta
+        condiciones.append(f"(t.codigo_estatus_tarea != 'COMPLETADO' OR ({condicion_fecha_real}))")
 
     where = f"WHERE {' AND '.join(condiciones)}"
     cursor.execute(

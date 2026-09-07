@@ -232,10 +232,11 @@ export async function fetchSolicitudes({ cliente, nombre, estatus, area, ordenPo
   return parseJsonOrThrow(response);
 }
 
-export async function fetchTareasTablero({ cliente, responsableIds, desde, hasta } = {}) {
+export async function fetchTareasTablero({ clientes, responsableIds, area, desde, hasta } = {}) {
   const url = new URL(`${API_BASE_URL}/api/tareas`);
-  if (cliente) url.searchParams.set("cliente", cliente);
+  (clientes || []).forEach((c) => url.searchParams.append("cliente", c));
   (responsableIds || []).forEach((id) => url.searchParams.append("responsable_id", id));
+  if (area) url.searchParams.set("area", area);
   if (desde) url.searchParams.set("desde", desde);
   if (hasta) url.searchParams.set("hasta", hasta);
   const response = await fetch(url, { headers: authHeaders() });

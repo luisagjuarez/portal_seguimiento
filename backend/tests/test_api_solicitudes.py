@@ -50,6 +50,17 @@ def test_buscar_clientes(monkeypatch):
     assert response.json() == [{"nombre": "Chantilly"}]
 
 
+def test_buscar_clientes_sin_query_devuelve_catalogo_completo(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "list_cliente_names", lambda cursor: ["Chantilly", "Llano"])
+
+    response = client.get("/api/clientes")
+
+    assert response.status_code == 200
+    assert response.json() == [{"nombre": "Chantilly"}, {"nombre": "Llano"}]
+
+
 def test_crear_solicitud_chat_success(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())

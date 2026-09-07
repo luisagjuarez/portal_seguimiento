@@ -70,33 +70,35 @@ def test_listar_tareas(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_tareas(cursor, cliente=None, responsable_ids=None, desde=None, hasta=None):
+    def _fake_list_tareas(cursor, clientes=None, responsable_ids=None, area=None, desde=None, hasta=None):
         filtros_recibidos.update(
-            {"cliente": cliente, "responsable_ids": responsable_ids, "desde": desde, "hasta": hasta}
+            {"clientes": clientes, "responsable_ids": responsable_ids, "area": area, "desde": desde, "hasta": hasta}
         )
         return [_fake_tarea_tablero()]
 
     monkeypatch.setattr(routes.repository, "list_tareas", _fake_list_tareas)
 
-    response = client.get("/api/tareas", params={"cliente": "chan", "responsable_id": 6})
+    response = client.get("/api/tareas", params={"cliente": "Chantilly", "responsable_id": 6})
 
     assert response.status_code == 200
     body = response.json()
     assert len(body) == 1
     assert body[0]["solicitud_nombre"] == "Reporte de gastos"
     assert body[0]["cliente"] == "Chantilly"
-    assert filtros_recibidos == {"cliente": "chan", "responsable_ids": [6], "desde": None, "hasta": None}
+    assert filtros_recibidos == {
+        "clientes": ["Chantilly"], "responsable_ids": [6], "area": None, "desde": None, "hasta": None,
+    }
 
 
-def test_listar_tareas_multiples_responsables_y_rango_fechas(monkeypatch):
+def test_listar_tareas_multiples_clientes_responsables_area_y_rango_fechas(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
 
     filtros_recibidos = {}
 
-    def _fake_list_tareas(cursor, cliente=None, responsable_ids=None, desde=None, hasta=None):
+    def _fake_list_tareas(cursor, clientes=None, responsable_ids=None, area=None, desde=None, hasta=None):
         filtros_recibidos.update(
-            {"cliente": cliente, "responsable_ids": responsable_ids, "desde": desde, "hasta": hasta}
+            {"clientes": clientes, "responsable_ids": responsable_ids, "area": area, "desde": desde, "hasta": hasta}
         )
         return []
 
@@ -104,13 +106,22 @@ def test_listar_tareas_multiples_responsables_y_rango_fechas(monkeypatch):
 
     response = client.get(
         "/api/tareas",
-        params=[("responsable_id", 6), ("responsable_id", 10), ("desde", "2026-08-20"), ("hasta", "2026-08-28")],
+        params=[
+            ("cliente", "Chantilly"),
+            ("cliente", "Llano"),
+            ("responsable_id", 6),
+            ("responsable_id", 10),
+            ("area", "Desarrollador"),
+            ("desde", "2026-08-20"),
+            ("hasta", "2026-08-28"),
+        ],
     )
 
     assert response.status_code == 200
     assert filtros_recibidos == {
-        "cliente": None,
+        "clientes": ["Chantilly", "Llano"],
         "responsable_ids": [6, 10],
+        "area": "Desarrollador",
         "desde": date(2026, 8, 20),
         "hasta": date(2026, 8, 28),
     }

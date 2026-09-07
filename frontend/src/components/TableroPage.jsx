@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import TableroColumna from "./TableroColumna.jsx";
-import FiltroResponsableMultiple from "./FiltroResponsableMultiple.jsx";
-import { actualizarTarea, fetchEstatusTarea, fetchMiembrosEquipo, fetchTareasTablero } from "../api.js";
+import FiltroMultiple from "./FiltroMultiple.jsx";
+import {
+  actualizarTarea,
+  fetchClientes,
+  fetchEstatusTarea,
+  fetchMiembrosEquipo,
+  fetchPerfilesEquipo,
+  fetchTareasTablero,
+} from "../api.js";
 
 const ROLES_VEN_TODAS_POR_DEFAULT = new Set(["PRODUCT OWNER"]);
 const DIAS_VENTANA_DEFAULT = 8;
@@ -24,12 +31,16 @@ export default function TableroPage({ usuarioActual }) {
   const [tareas, setTareas] = useState([]);
   const [estatusTarea, setEstatusTarea] = useState([]);
   const [miembros, setMiembros] = useState([]);
-  const [filtroCliente, setFiltroCliente] = useState("");
+  const [areas, setAreas] = useState([]);
+  const [clientesCatalogo, setClientesCatalogo] = useState([]);
+  const [filtroClientes, setFiltroClientes] = useState([]);
+  const [area, setArea] = useState("");
   // Por defecto, cada quien ve solo sus propias tareas; solo Product Owner ve todas por
   // default (necesita la vista completa del equipo) — Scrum Master también arranca en las
   // suyas. "Todos los responsables" sigue disponible para cualquiera que quiera cambiarlo
-  // manualmente (ahora multi-selectivo, agrupado por área). Si se llega con ?responsable=<id>
-  // en la URL (deep link desde "Carga del equipo"), ese valor manda sobre el default de rol.
+  // manualmente (multi-selectivo, acotado por el área seleccionada). Si se llega con
+  // ?responsable=<id> en la URL (deep link desde "Carga del equipo"), ese valor manda sobre
+  // el default de rol.
   const [filtroResponsables, setFiltroResponsables] = useState(() => {
     const responsableUrl = searchParams.get("responsable");
     if (responsableUrl) return [responsableUrl];
@@ -37,8 +48,8 @@ export default function TableroPage({ usuarioActual }) {
       ? [String(usuarioActual.id)]
       : [];
   });
-  // Punto 1 (2026-09-07): delimita la fecha de término (fecha_fin) planeada de las tareas.
-  // Por defecto, los últimos 8 días hasta hoy.
+  // Puntos 1-2 (2026-09-07): delimitan fecha_fin_real y solo aplican a tareas Completadas —
+  // el resto se muestra siempre. Por defecto, los últimos 8 días hasta hoy.
   const [desde, setDesde] = useState(() => haceDiasISO(DIAS_VENTANA_DEFAULT));
   const [hasta, setHasta] = useState(hoyISO);
   const [cargando, setCargando] = useState(true);
@@ -46,10 +57,13 @@ export default function TableroPage({ usuarioActual }) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  // Punto 4: el filtro de Responsable queda acotado por el Área seleccionada (Punto 3).
+  const miembrosFiltrados = area ? miembros.filter((m) => (m.perfil || "Sin área") === area) : miembros;
+
   const cargarTareas = () => {
     setCargando(true);
     setError(null);
-    fetchTareasTablero({ cliente: filtroCliente, responsableIds: filtroResponsables, desde, hasta })
+    fetchTareasTablero({ clientes: filtroClientes, responsableIds: filtroResponsables, area, desde, hasta })
       .then(setTareas)
       .catch((err) => setError(err.message || "No se pudieron cargar las tareas."))
       .finally(() => setCargando(false));
@@ -64,13 +78,29 @@ export default function TableroPage({ usuarioActual }) {
       .catch(() => {
         /* el filtro de responsable queda solo con "Todos" si esto falla */
       });
+    fetchPerfilesEquipo()
+      .then(setAreas)
+      .catch(() => setAreas([]));
+    fetchClientes()
+      .then(setClientesCatalogo)
+      .catch(() => setClientesCatalogo([]));
   }, []);
+
+  // Si cambia el área, se quitan de la selección los responsables que ya no pertenecen a ella.
+  useEffect(() => {
+    setFiltroResponsables((actuales) => {
+      const idsVisibles = new Set(miembrosFiltrados.map((m) => String(m.id)));
+      const filtrados = actuales.filter((id) => idsVisibles.has(id));
+      return filtrados.length === actuales.length ? actuales : filtrados;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [area, miembros]);
 
   useEffect(() => {
     const timeoutId = setTimeout(cargarTareas, 300);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroCliente, filtroResponsables, desde, hasta]);
+  }, [filtroClientes, filtroResponsables, area, desde, hasta]);
 
   const alTerminarDrag = async (event) => {
     const { active, over } = event;
@@ -110,12 +140,6 @@ export default function TableroPage({ usuarioActual }) {
       </div>
 
       <div className="solicitudes-filtros">
-        <input
-          type="text"
-          placeholder="Filtrar por cliente..."
-          value={filtroCliente}
-          onChange={(event) => setFiltroCliente(event.target.value)}
-        />
         <div className="direccion-general-rango">
           <label>
             Fecha inicio
@@ -126,7 +150,28 @@ export default function TableroPage({ usuarioActual }) {
             <input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} />
           </label>
         </div>
-        <FiltroResponsableMultiple miembros={miembros} valor={filtroResponsables} onCambiar={setFiltroResponsables} />
+        <select value={area} onChange={(e) => setArea(e.target.value)}>
+          <option value="">Todas las áreas</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        <FiltroMultiple
+          etiqueta="Responsable de la tarea"
+          etiquetaTodos="Todos los responsables"
+          opciones={miembrosFiltrados.map((m) => ({ id: m.id, etiqueta: m.nombre_completo }))}
+          valor={filtroResponsables}
+          onCambiar={setFiltroResponsables}
+        />
+        <FiltroMultiple
+          etiqueta="Cliente"
+          etiquetaTodos="Todos los clientes"
+          opciones={clientesCatalogo.map((c) => ({ id: c, etiqueta: c }))}
+          valor={filtroClientes}
+          onCambiar={setFiltroClientes}
+        />
       </div>
 
       {error && <p className="error-text">{error}</p>}

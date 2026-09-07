@@ -98,10 +98,13 @@ def health() -> HealthResponse:
 
 @router.get("/clientes", response_model=list[ClienteSugerido])
 def buscar_clientes(q: str = Query(default="", max_length=200)) -> list[ClienteSugerido]:
+    """Sin `q`, devuelve el catálogo completo (usado por el filtro multi-selectivo de
+    Cliente en el Tablero, Punto 5 2026-09-07); con `q`, el autocompletar parcial de
+    siempre (wizard de chat)."""
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        nombres = repository.search_cliente_names(cursor, q)
+        nombres = repository.list_cliente_names(cursor) if not q else repository.search_cliente_names(cursor, q)
     finally:
         release_connection(db_conn)
     return [ClienteSugerido(nombre=nombre) for nombre in nombres]
