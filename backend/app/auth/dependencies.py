@@ -63,16 +63,6 @@ def require_no_externo(usuario_actual: UsuarioActual = Depends(get_current_user)
     return usuario_actual
 
 
-def require_scrum_master_or_product_owner(
-    usuario_actual: UsuarioActual = Depends(get_current_user),
-) -> UsuarioActual:
-    if usuario_actual.codigo_rol_scrum not in {"SCRUM MASTER", "PRODUCT OWNER"}:
-        raise HTTPException(
-            status_code=403, detail="Solo el Scrum Master o el Product Owner pueden ver esto"
-        )
-    return usuario_actual
-
-
 def require_autor_o_scrum_master(usuario_actual: UsuarioActual, creado_por: str) -> None:
     """A diferencia de las dependencias de arriba, esta no puede ser un `Depends` de FastAPI:
     el `creado_por` a comparar solo se conoce después de leer el registro de la BD dentro del

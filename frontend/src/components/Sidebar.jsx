@@ -19,7 +19,7 @@ export default function Sidebar({
   usuarioActual,
   esScrumMaster,
   esExterno,
-  puedeVerReportesGerenciales,
+  puedeVerPresentacionAvance,
   onCerrarSesion,
 }) {
   let opciones = esExterno
@@ -27,7 +27,7 @@ export default function Sidebar({
     : esScrumMaster
       ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }]
       : OPCIONES;
-  if (puedeVerReportesGerenciales) {
+  if (puedeVerPresentacionAvance) {
     opciones = [...opciones, { ruta: "/direccion-general", etiqueta: "Presentación de avance" }];
   }
 

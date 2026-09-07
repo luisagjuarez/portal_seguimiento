@@ -1,9 +1,8 @@
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.app import app
-from app.auth.dependencies import UsuarioActual, get_current_user, require_scrum_master_or_product_owner
+from app.auth.dependencies import UsuarioActual, get_current_user
 import app.api.routes_direccion_general as routes
 
 client = TestClient(app)
@@ -137,17 +136,22 @@ def test_direccion_general_kpis_400_si_hasta_antes_de_desde(monkeypatch):
     assert response.status_code == 400
 
 
-def _denegar():
-    raise HTTPException(status_code=403, detail="Solo el Scrum Master o el Product Owner pueden ver esto")
-
-
-def test_direccion_general_kpis_403_si_no_autorizado():
-    app.dependency_overrides[require_scrum_master_or_product_owner] = _denegar
+def test_direccion_general_kpis_403_para_externo(monkeypatch):
+    _mockear_repository(monkeypatch)
+    usuario_externo = UsuarioActual(
+        id=8,
+        usuario="DOVELA_EXT",
+        nombre_completo="Cliente Externo",
+        codigo_rol_scrum="EXTERNO",
+        correo_electronico=None,
+        debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: usuario_externo
     try:
         response = client.get("/api/direccion-general/kpis", params={"desde": "2026-08-01", "hasta": "2026-08-31"})
         assert response.status_code == 403
     finally:
-        del app.dependency_overrides[require_scrum_master_or_product_owner]
+        del app.dependency_overrides[get_current_user]
 
 
 def test_direccion_general_kpis_permite_product_owner(monkeypatch):
@@ -168,7 +172,7 @@ def test_direccion_general_kpis_permite_product_owner(monkeypatch):
         del app.dependency_overrides[get_current_user]
 
 
-def test_direccion_general_kpis_403_para_team(monkeypatch):
+def test_direccion_general_kpis_permite_team(monkeypatch):
     _mockear_repository(monkeypatch)
     usuario_team = UsuarioActual(
         id=3,
@@ -181,7 +185,7 @@ def test_direccion_general_kpis_403_para_team(monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: usuario_team
     try:
         response = client.get("/api/direccion-general/kpis", params={"desde": "2026-08-01", "hasta": "2026-08-31"})
-        assert response.status_code == 403
+        assert response.status_code == 200
     finally:
         del app.dependency_overrides[get_current_user]
 
@@ -252,8 +256,17 @@ def test_direccion_general_detalle_solicitudes_400_si_hasta_antes_de_desde(monke
     assert response.status_code == 400
 
 
-def test_direccion_general_detalle_solicitudes_403_si_no_autorizado():
-    app.dependency_overrides[require_scrum_master_or_product_owner] = _denegar
+def test_direccion_general_detalle_solicitudes_403_para_externo(monkeypatch):
+    _mockear_detalle(monkeypatch)
+    usuario_externo = UsuarioActual(
+        id=8,
+        usuario="DOVELA_EXT",
+        nombre_completo="Cliente Externo",
+        codigo_rol_scrum="EXTERNO",
+        correo_electronico=None,
+        debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: usuario_externo
     try:
         response = client.get(
             "/api/direccion-general/detalle-solicitudes",
@@ -261,7 +274,28 @@ def test_direccion_general_detalle_solicitudes_403_si_no_autorizado():
         )
         assert response.status_code == 403
     finally:
-        del app.dependency_overrides[require_scrum_master_or_product_owner]
+        del app.dependency_overrides[get_current_user]
+
+
+def test_direccion_general_detalle_solicitudes_permite_team(monkeypatch):
+    _mockear_detalle(monkeypatch)
+    usuario_team = UsuarioActual(
+        id=3,
+        usuario="DOVELA_WA",
+        nombre_completo="Wilber Alegria",
+        codigo_rol_scrum="TEAM",
+        correo_electronico=None,
+        debe_cambiar_password=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: usuario_team
+    try:
+        response = client.get(
+            "/api/direccion-general/detalle-solicitudes",
+            params={"metrica": "en_proceso", "desde": "2026-08-01", "hasta": "2026-08-31"},
+        )
+        assert response.status_code == 200
+    finally:
+        del app.dependency_overrides[get_current_user]
 
 
 def test_direccion_general_detalle_solicitudes_permite_product_owner(monkeypatch):

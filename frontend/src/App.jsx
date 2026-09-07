@@ -89,9 +89,7 @@ export default function App() {
 
   const esScrumMaster = usuarioActual?.codigo_rol_scrum === "SCRUM MASTER";
   const esExterno = usuarioActual?.codigo_rol_scrum === "EXTERNO";
-  const puedeVerReportesGerenciales = ["SCRUM MASTER", "PRODUCT OWNER"].includes(
-    usuarioActual?.codigo_rol_scrum,
-  );
+  const puedeVerPresentacionAvance = Boolean(usuarioActual) && !esExterno;
   const requiereSesion = !usuarioActual;
   const debeCambiarPassword = Boolean(usuarioActual?.debe_cambiar_password);
   const pantallaSinSidebar = Boolean(resetToken) || restaurandoSesion || requiereSesion || debeCambiarPassword;
@@ -105,7 +103,7 @@ export default function App() {
           usuarioActual={usuarioActual}
           esScrumMaster={esScrumMaster}
           esExterno={esExterno}
-          puedeVerReportesGerenciales={puedeVerReportesGerenciales}
+          puedeVerPresentacionAvance={puedeVerPresentacionAvance}
           onCerrarSesion={cerrarSesion}
         />
       )}
@@ -163,7 +161,7 @@ export default function App() {
               <Route
                 path="/direccion-general"
                 element={
-                  puedeVerReportesGerenciales ? <DireccionGeneralPage /> : <Navigate to="/" replace />
+                  puedeVerPresentacionAvance ? <DireccionGeneralPage /> : <Navigate to="/" replace />
                 }
               />
               <Route

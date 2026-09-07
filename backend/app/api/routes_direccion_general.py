@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.schemas import DireccionGeneralKpisOut, SolicitudDireccionGeneralOut
-from app.auth.dependencies import UsuarioActual, require_scrum_master_or_product_owner
+from app.auth.dependencies import UsuarioActual, require_no_externo
 from app.db import repository
 from app.db.connection import get_connection, release_connection
 
@@ -20,7 +20,7 @@ def obtener_direccion_general_kpis(
     desde: date = Query(...),
     hasta: date = Query(...),
     area: str | None = Query(default=None),
-    _: UsuarioActual = Depends(require_scrum_master_or_product_owner),
+    _: UsuarioActual = Depends(require_no_externo),
 ) -> DireccionGeneralKpisOut:
     if hasta < desde:
         raise HTTPException(status_code=400, detail="hasta no puede ser anterior a desde")
@@ -49,7 +49,7 @@ def obtener_direccion_general_detalle_solicitudes(
     desde: date = Query(...),
     hasta: date = Query(...),
     area: str | None = Query(default=None),
-    _: UsuarioActual = Depends(require_scrum_master_or_product_owner),
+    _: UsuarioActual = Depends(require_no_externo),
 ) -> list[SolicitudDireccionGeneralOut]:
     if hasta < desde:
         raise HTTPException(status_code=400, detail="hasta no puede ser anterior a desde")
