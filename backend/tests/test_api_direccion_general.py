@@ -197,6 +197,7 @@ def _fake_solicitud_detalle():
         "cliente": "CHANTILLY",
         "area": "Desarrollador",
         "solicitante": "Victor Castañeda",
+        "responsable": "Ramon Rosales",
         "creado_en": "2026-08-15T10:00:00",
     }
 
@@ -229,6 +230,7 @@ def test_direccion_general_detalle_solicitudes_success(monkeypatch, metrica):
             "cliente": "CHANTILLY",
             "area": "Desarrollador",
             "solicitante": "Victor Castañeda",
+            "responsable": "Ramon Rosales",
             "creado_en": "2026-08-15T10:00:00",
         }
     ]

@@ -258,6 +258,7 @@ class SolicitudDireccionGeneralOut(BaseModel):
     cliente: str | None
     area: str
     solicitante: str | None
+    responsable: str | None
     creado_en: datetime
 
 

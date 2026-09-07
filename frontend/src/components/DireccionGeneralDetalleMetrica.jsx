@@ -90,6 +90,7 @@ export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetric
                       <th>Cliente</th>
                       <th>Fecha de solicitud</th>
                       <th>Solicitante</th>
+                      <th>Responsable</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -107,6 +108,7 @@ export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetric
                         <td>{fila.cliente || "—"}</td>
                         <td>{formatearFecha(fila.creado_en)}</td>
                         <td>{fila.solicitante || "—"}</td>
+                        <td>{fila.responsable || "—"}</td>
                       </tr>
                     ))}
                   </tbody>

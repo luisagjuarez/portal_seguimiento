@@ -1045,16 +1045,17 @@ def list_direccion_general_detalle_solicitudes(
     cursor.execute(
         f"""
         SELECT s.id, s.nombre, c.nombre AS cliente, coalesce(m.perfil, 'Sin área') AS area,
-               m.nombre_completo AS solicitante, s.creado_en
+               m.nombre_completo AS solicitante, ra.nombre_completo AS responsable, s.creado_en
         FROM solicitudes s
         LEFT JOIN clientes c ON c.id = s.cliente
         LEFT JOIN miembros_equipo m ON m.id = s.solicitante
+        LEFT JOIN miembros_equipo ra ON ra.id = s.responsable_atencion_id
         WHERE s.borrado_en IS NULL AND {filtro} AND {_CONDICION_AREA_SOLICITUD}
         ORDER BY s.creado_en DESC
         """,
         {"desde": desde, "hasta": hasta, "area": area},
     )
-    columnas = ["id", "nombre", "cliente", "area", "solicitante", "creado_en"]
+    columnas = ["id", "nombre", "cliente", "area", "solicitante", "responsable", "creado_en"]
     return [dict(zip(columnas, row)) for row in cursor.fetchall()]
 
 
