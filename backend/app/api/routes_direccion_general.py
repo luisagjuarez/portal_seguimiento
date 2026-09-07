@@ -34,7 +34,6 @@ def obtener_direccion_general_kpis(
             por_tipo=repository.list_direccion_general_por_tipo(cursor, desde, hasta, area),
             por_area=repository.list_direccion_general_por_area(cursor, desde, hasta, area),
             solicitudes_por_estatus=repository.list_distribucion_estatus_solicitud(cursor, area),
-            tareas_por_estatus=repository.list_distribucion_estatus(cursor, area),
         )
     finally:
         release_connection(db_conn)

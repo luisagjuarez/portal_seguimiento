@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import DireccionGeneralDetalleMetrica from "./DireccionGeneralDetalleMetrica.jsx";
-import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import { fetchDireccionGeneralKpis, fetchPerfilesEquipo } from "../api.js";
 
 const ETIQUETA_POR_METRICA = {
@@ -54,6 +53,42 @@ function TablaGrupo({ titulo, etiquetaColumna, filas }) {
                   <td className="celda-numero">{f.tareas_concluidas_periodo}</td>
                   <td className="celda-numero">{f.tareas_nuevas_periodo}</td>
                   <td className="celda-numero">{f.horas_estimadas_periodo}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TablaGrupoSolicitudes({ titulo, etiquetaColumna, filas }) {
+  return (
+    <div className="monitor-section">
+      <h3>{titulo}</h3>
+      {filas.length === 0 ? (
+        <p>Sin datos en este rango.</p>
+      ) : (
+        <div className="tabla-scroll">
+          <table className="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>{etiquetaColumna}</th>
+                <th>En proceso</th>
+                <th>Concluidas</th>
+                <th>Nuevas</th>
+                <th>En espera</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.grupo_id ?? f.grupo}>
+                  <td>{f.grupo}</td>
+                  <td className="celda-numero">{f.solicitudes_en_proceso}</td>
+                  <td className="celda-numero">{f.solicitudes_concluidas_periodo}</td>
+                  <td className="celda-numero">{f.solicitudes_nuevas_periodo}</td>
+                  <td className="celda-numero">{f.solicitudes_en_espera}</td>
                 </tr>
               ))}
             </tbody>
@@ -123,7 +158,7 @@ export default function DireccionGeneralPage() {
     return (
       <div className="monitor-page">
         <div className="solicitudes-encabezado">
-          <h2>Dirección General</h2>
+          <h2>Presentación de avance</h2>
         </div>
         <DireccionGeneralDetalleMetrica
           metrica={metricaSeleccionada}
@@ -140,7 +175,7 @@ export default function DireccionGeneralPage() {
   return (
     <div className="monitor-page">
       <div className="solicitudes-encabezado">
-        <h2>Dirección General</h2>
+        <h2>Presentación de avance</h2>
         <div className="direccion-general-rango">
           <label>
             Desde
@@ -178,10 +213,6 @@ export default function DireccionGeneralPage() {
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_en_proceso}</span>
               <span className="monitor-stat-etiqueta">Solicitudes en proceso</span>
             </button>
-            <div className="monitor-stat-tile">
-              <span className="monitor-stat-valor">{kpis.totales.tareas_en_proceso}</span>
-              <span className="monitor-stat-etiqueta">Tareas en proceso</span>
-            </div>
             <button
               type="button"
               className="monitor-stat-tile monitor-stat-tile--clicable"
@@ -190,10 +221,6 @@ export default function DireccionGeneralPage() {
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_concluidas_periodo}</span>
               <span className="monitor-stat-etiqueta">Solicitudes concluidas</span>
             </button>
-            <div className="monitor-stat-tile">
-              <span className="monitor-stat-valor">{kpis.totales.tareas_concluidas_periodo}</span>
-              <span className="monitor-stat-etiqueta">Tareas concluidas</span>
-            </div>
             <button
               type="button"
               className="monitor-stat-tile monitor-stat-tile--clicable"
@@ -202,30 +229,16 @@ export default function DireccionGeneralPage() {
               <span className="monitor-stat-valor">{kpis.totales.solicitudes_nuevas_periodo}</span>
               <span className="monitor-stat-etiqueta">Nuevas solicitudes</span>
             </button>
-            <div className="monitor-stat-tile">
-              <span className="monitor-stat-valor">{kpis.totales.tareas_nuevas_periodo}</span>
-              <span className="monitor-stat-etiqueta">Nuevas tareas</span>
-            </div>
-            <div className="monitor-stat-tile">
-              <span className="monitor-stat-valor">{kpis.totales.horas_estimadas_periodo}</span>
-              <span className="monitor-stat-etiqueta">Horas estimadas</span>
-            </div>
           </div>
 
-          <TablaGrupo titulo="Por cliente" etiquetaColumna="Cliente" filas={kpis.por_cliente} />
+          <TablaGrupoSolicitudes titulo="Por cliente" etiquetaColumna="Cliente" filas={kpis.por_cliente} />
           <TablaGrupo titulo="Por tipo de solicitud" etiquetaColumna="Tipo" filas={kpis.por_tipo} />
-          <TablaGrupo titulo="Por área" etiquetaColumna="Área" filas={kpis.por_area} />
+          <TablaGrupoSolicitudes titulo="Por área" etiquetaColumna="Área" filas={kpis.por_area} />
 
           <TablaEstatus
             titulo="Solicitudes por estatus"
             filas={kpis.solicitudes_por_estatus}
             codigoClave="codigo_estatus"
-          />
-          <TablaEstatus
-            titulo="Tareas por estatus"
-            filas={kpis.tareas_por_estatus}
-            codigoClave="codigo_estatus_tarea"
-            claseBadge={CLASE_POR_ESTATUS}
           />
         </>
       )}

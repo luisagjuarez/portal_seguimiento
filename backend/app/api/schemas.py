@@ -190,12 +190,6 @@ class TareaCreateUpdate(BaseModel):
     horas_reales: int | None = None
 
 
-class DistribucionEstatusOut(BaseModel):
-    codigo_estatus_tarea: str
-    descripcion: str
-    total: int
-
-
 class ResumenPorValor(BaseModel):
     valor: str
     descripcion: str
@@ -219,12 +213,8 @@ class InicioResumenOut(BaseModel):
 
 class DireccionGeneralTotalesOut(BaseModel):
     solicitudes_en_proceso: int
-    tareas_en_proceso: int
     solicitudes_concluidas_periodo: int
-    tareas_concluidas_periodo: int
     solicitudes_nuevas_periodo: int
-    tareas_nuevas_periodo: int
-    horas_estimadas_periodo: int
 
 
 class DireccionGeneralGrupoOut(BaseModel):
@@ -239,6 +229,15 @@ class DireccionGeneralGrupoOut(BaseModel):
     horas_estimadas_periodo: int
 
 
+class DireccionGeneralGrupoSolicitudesOut(BaseModel):
+    grupo_id: int | str | None
+    grupo: str
+    solicitudes_en_proceso: int
+    solicitudes_concluidas_periodo: int
+    solicitudes_nuevas_periodo: int
+    solicitudes_en_espera: int
+
+
 class DistribucionEstatusSolicitudOut(BaseModel):
     codigo_estatus: str
     descripcion: str
@@ -247,11 +246,10 @@ class DistribucionEstatusSolicitudOut(BaseModel):
 
 class DireccionGeneralKpisOut(BaseModel):
     totales: DireccionGeneralTotalesOut
-    por_cliente: list[DireccionGeneralGrupoOut]
+    por_cliente: list[DireccionGeneralGrupoSolicitudesOut]
     por_tipo: list[DireccionGeneralGrupoOut]
-    por_area: list[DireccionGeneralGrupoOut]
+    por_area: list[DireccionGeneralGrupoSolicitudesOut]
     solicitudes_por_estatus: list[DistribucionEstatusSolicitudOut]
-    tareas_por_estatus: list[DistribucionEstatusOut]
 
 
 class SolicitudDireccionGeneralOut(BaseModel):

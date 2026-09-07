@@ -21,16 +21,13 @@ class _FakeConnection:
 def _fake_totales():
     return {
         "solicitudes_en_proceso": 12,
-        "tareas_en_proceso": 30,
         "solicitudes_concluidas_periodo": 4,
-        "tareas_concluidas_periodo": 9,
         "solicitudes_nuevas_periodo": 5,
-        "tareas_nuevas_periodo": 11,
-        "horas_estimadas_periodo": 80,
     }
 
 
 def _fake_grupo(grupo_id, grupo):
+    """Fila completa (solicitudes + tareas) — la sigue devolviendo `list_direccion_general_por_tipo`."""
     return {
         "grupo_id": grupo_id,
         "grupo": grupo,
@@ -44,6 +41,19 @@ def _fake_grupo(grupo_id, grupo):
     }
 
 
+def _fake_grupo_solicitudes(grupo_id, grupo):
+    """Fila solo-solicitudes — la devuelven `list_direccion_general_por_cliente`/`por_area`
+    desde la Fase 1.25."""
+    return {
+        "grupo_id": grupo_id,
+        "grupo": grupo,
+        "solicitudes_en_proceso": 2,
+        "solicitudes_concluidas_periodo": 1,
+        "solicitudes_nuevas_periodo": 1,
+        "solicitudes_en_espera": 1,
+    }
+
+
 def _mockear_repository(monkeypatch):
     monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
     monkeypatch.setattr(routes, "release_connection", lambda conn: None)
@@ -53,7 +63,7 @@ def _mockear_repository(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_por_cliente",
-        lambda cursor, desde, hasta, area: [_fake_grupo(10, "CHANTILLY")],
+        lambda cursor, desde, hasta, area: [_fake_grupo_solicitudes(10, "CHANTILLY")],
     )
     monkeypatch.setattr(
         routes.repository,
@@ -63,17 +73,12 @@ def _mockear_repository(monkeypatch):
     monkeypatch.setattr(
         routes.repository,
         "list_direccion_general_por_area",
-        lambda cursor, desde, hasta, area: [_fake_grupo("Desarrollador", "Desarrollador")],
+        lambda cursor, desde, hasta, area: [_fake_grupo_solicitudes("Desarrollador", "Desarrollador")],
     )
     monkeypatch.setattr(
         routes.repository,
         "list_distribucion_estatus_solicitud",
         lambda cursor, area: [{"codigo_estatus": "EN PROGRESO", "descripcion": "En progreso", "total": 12}],
-    )
-    monkeypatch.setattr(
-        routes.repository,
-        "list_distribucion_estatus",
-        lambda cursor, area: [{"codigo_estatus_tarea": "EN PROGRESO", "descripcion": "En progreso", "total": 30}],
     )
 
 
@@ -85,10 +90,11 @@ def test_direccion_general_kpis_success(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert set(body.keys()) == {
-        "totales", "por_cliente", "por_tipo", "por_area", "solicitudes_por_estatus", "tareas_por_estatus",
+        "totales", "por_cliente", "por_tipo", "por_area", "solicitudes_por_estatus",
     }
-    assert body["totales"]["horas_estimadas_periodo"] == 80
+    assert "tareas_en_proceso" not in body["totales"]
     assert body["por_cliente"][0]["grupo"] == "CHANTILLY"
+    assert body["por_cliente"][0]["solicitudes_en_espera"] == 1
     assert body["por_area"][0]["grupo"] == "Desarrollador"
 
 
@@ -105,7 +111,6 @@ def test_direccion_general_kpis_propaga_filtro_area(monkeypatch):
     monkeypatch.setattr(routes.repository, "list_direccion_general_por_tipo", lambda cursor, desde, hasta, area: [])
     monkeypatch.setattr(routes.repository, "list_direccion_general_por_area", lambda cursor, desde, hasta, area: [])
     monkeypatch.setattr(routes.repository, "list_distribucion_estatus_solicitud", lambda cursor, area: [])
-    monkeypatch.setattr(routes.repository, "list_distribucion_estatus", lambda cursor, area: [])
 
     response = client.get(
         "/api/direccion-general/kpis",
