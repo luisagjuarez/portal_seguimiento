@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import BotonRegresar from "./BotonRegresar.jsx";
 import PieChart from "./PieChart.jsx";
 import { fetchDireccionGeneralDetalleSolicitudes } from "../api.js";
@@ -41,6 +42,7 @@ function agruparTop5(filas, campo) {
 }
 
 export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetrica, desde, hasta, area, onVolver }) {
+  const navigate = useNavigate();
   const [filas, setFilas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -93,7 +95,15 @@ export default function DireccionGeneralDetalleMetrica({ metrica, etiquetaMetric
                   <tbody>
                     {filas.map((fila) => (
                       <tr key={fila.id}>
-                        <td>{fila.nombre}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="enlace"
+                            onClick={() => navigate(`/solicitudes/${fila.id}`)}
+                          >
+                            {fila.nombre}
+                          </button>
+                        </td>
                         <td>{fila.cliente || "—"}</td>
                         <td>{formatearFecha(fila.creado_en)}</td>
                         <td>{fila.solicitante || "—"}</td>
