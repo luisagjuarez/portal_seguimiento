@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-07 (login angosto, vista Monitor eliminada y filtro de "Área responsable" en Dirección General; verificado por tests/curl contra BD real local y de TEST, y desplegado en TEST; falta la pasada visual del usuario en TEST)
+Última actualización: 2026-09-07 (login angosto, vista Monitor eliminada, filtro de "Área responsable" y renombre a "Presentación de avance" con foco solo en solicitudes en esa vista; verificado por tests/curl contra BD real local y de TEST, y desplegado en TEST; falta la pasada visual del usuario en TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -26,7 +26,8 @@
 [~] Fase 1.22 (extraoficial) — Botones "Regresar"/"Volver" más chicos con ícono, dashboard de indicadores en Inicio (por rol: TEAM/Externo ven lo propio, Product Owner/Scrum Master ven totales) y nuevo rol EXTERNO (solicitantes externos con acceso muy limitado) — implementado, verificado por 198 tests de backend + curl e2e, aprobado visualmente por el usuario ("Ya lo veo Bien" tras corregir un 500 real en el dashboard) y desplegado en TEST (2026-09-03); falta la pasada visual del usuario en TEST
 [~] Fase 1.23 (extraoficial) — 6 puntos de seguimiento: bloquear asignar trabajo a un Externo (tarea/responsable de atención/"por hacer"), dashboard de Inicio del Externo solo con sus solicitudes, área del responsable en Solicitudes (vista + búsqueda), auto-transición de la solicitud a "En progreso" al iniciar su primera tarea, campo "SR de EBS", y menciones @ restringidas (Externo solo arrobable a nivel solicitud, nunca a nivel tarea) — implementado y verificado por 213 tests de backend + curl e2e contra la BD real (2026-09-04); desplegado en TEST (2026-09-04); falta la pasada visual del usuario en TEST
 [~] Fase 1.24 (extraoficial) — Vista "Tareas en proceso": carga del equipo en vivo por área, agrupada por perfil, con las próximas 3 tareas de cada miembro Team/Scrum Master (En progreso primero, luego Por hacer, por prioridad y fecha de inicio), refresco automático cada 5 min + botón manual, deep link al Tablero filtrado por responsable, y notificación (dedup, una sola vez) cada 10 min a quien se quede sin tarea En progreso — implementado y verificado por 225 tests de backend + curl e2e contra la BD real (2026-09-06); desplegado en TEST (2026-09-06); falta la pasada visual del usuario en TEST
-[~] Fase 1.25 (extraoficial) — 3 puntos de seguimiento: ancho estándar de formulario (400px) en Login/Recuperar/Restablecer contraseña, eliminación completa de la vista "Monitor" (ruta, sidebar, componente, router/schemas/repositorio de backend y tests), y filtro "Área responsable" en Dirección General (perfil del responsable de atención, reflejado en totales/desgloses/detalle) con nuevo catálogo GET /api/perfiles-equipo — implementado y verificado por 218 tests de backend + curl e2e contra la BD real local y de TEST (2026-09-07); desplegado en TEST (2026-09-07); falta la pasada visual del usuario en TEST
+[~] Fase 1.25 (extraoficial) — 3 puntos de seguimiento: ancho estándar de formulario (400px) en Login/Recuperar/Restablecer contraseña, eliminación completa de la vista "Monitor" (ruta, sidebar, componente, router/schemas/repositorio de backend y tests), y filtro "Área responsable" en Dirección General (perfil del responsable de atención, reflejado en totales/desgloses/detalle) con nuevo catálogo GET /api/perfiles-equipo — implementado y verificado por 218 tests de backend + curl e2e contra la BD real local y de TEST (2026-09-07); desplegado en TEST (2026-09-07)
+[~] Fase 1.25b (extraoficial) — Dirección General renombrada a "Presentación de avance" (título y sidebar) y reducida a solo solicitudes: se quitan los indicadores de tareas de los tiles superiores y la tabla completa "Tareas por estatus"; "Por cliente" y "Por área" pasan a mostrar únicamente En proceso/Concluidas/Nuevas/En espera de solicitudes (con "en proceso" ahora excluyendo "EN ESPERA" en esas 2 tablas para no traslaparse) — implementado y verificado por 218 tests de backend + curl e2e contra la BD real local, cuadrando exacto contra los totales de "solicitudes_por_estatus" (2026-09-07); desplegado en TEST (2026-09-07); falta la pasada visual del usuario en TEST
 ```
 
 **2026-09-03 — Fase 1.22, botones Regresar/Volver + dashboard de Inicio + rol Externo (modo
@@ -751,16 +752,18 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
-**⭐ Verificar visualmente en TEST la Fase 1.25** (2026-09-07): login/recuperar/restablecer
-contraseña con ancho angosto (400px) en vez del ancho completo del tablero; el ítem "Monitor" ya
-no aparece en el sidebar de Scrum Master/Product Owner (ni la ruta `/monitor` responde); y en
-Dirección General el nuevo `<select>` "Área responsable" (junto a Desde/Hasta) filtra todo el
-contenido de la vista — probar con un área real (p. ej. "Fabrica de software" en TEST) y
-confirmar que totales, las 3 tablas de desglose, las 2 de distribución por estatus y la subvista
-de detalle por métrica cambian de forma consistente; "Todas" (default) debe verse igual que
-antes del cambio. Implementado, verificado por 218 tests de backend + curl e2e contra la BD real
-(local y TEST) y desplegado en TEST — sin pasada visual conducida por Claude (la extensión de
-Chrome no conectó en esta sesión).
+**⭐ Verificar visualmente en TEST las Fases 1.25 y 1.25b** (2026-09-07), ambas en la misma
+vista "Presentación de avance" (antes "Dirección General"): login/recuperar/restablecer
+contraseña con ancho angosto (400px); el ítem "Monitor" ya no aparece en el sidebar (ni la ruta
+`/monitor` responde); el `<select>` "Área responsable" (junto a Desde/Hasta) filtra todo el
+contenido de la vista — probar con un área real (p. ej. "Fabrica de software" en TEST); el
+título de la vista y del sidebar ahora dice "Presentación de avance"; los tiles superiores y las
+tablas "Por cliente"/"Por área" ya no muestran nada de tareas (solo Solicitudes: En proceso/
+Concluidas/Nuevas/En espera); la tabla "Tareas por estatus" ya no existe; "Por tipo de
+solicitud" sigue igual que antes (con su desglose de tareas, no se tocó). Implementado,
+verificado por 218 tests de backend + curl e2e contra la BD real (local y TEST, cuadrando exacto
+contra los totales por estatus) y desplegado en TEST — sin pasada visual conducida por Claude
+(la extensión de Chrome no conectó en esta sesión).
 
 **⭐ Verificar visualmente en TEST la Fase 1.24, "Tareas en proceso"** (2026-09-06). Implementada,
 verificada por 225 tests de backend + curl e2e contra la BD real, y **desplegada en TEST**
