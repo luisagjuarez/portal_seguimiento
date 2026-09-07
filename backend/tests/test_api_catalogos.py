@@ -26,7 +26,10 @@ def test_listar_miembros_equipo(monkeypatch):
         routes.repository,
         "list_miembros",
         lambda cursor, excluir_externos=False: [
-            {"id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
+            {
+                "id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales",
+                "correo_electronico": "ramon@x.com", "perfil": "Desarrollador",
+            }
         ],
     )
 
@@ -34,7 +37,10 @@ def test_listar_miembros_equipo(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == [
-        {"id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales", "correo_electronico": "ramon@x.com"}
+        {
+            "id": 1, "usuario": "DOVELA_RR", "nombre_completo": "Ramon Rosales",
+            "correo_electronico": "ramon@x.com", "perfil": "Desarrollador",
+        }
     ]
 
 

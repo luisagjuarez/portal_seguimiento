@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -59,13 +60,17 @@ def _notificar_menciones(cursor, texto: str, tarea: dict, usuario_actual: Usuari
 @router.get("/tareas", response_model=list[TareaTableroOut])
 def listar_tareas(
     cliente: str = Query(default="", max_length=200),
-    responsable_id: int | None = Query(default=None),
+    responsable_id: list[int] | None = Query(default=None),
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
     _: UsuarioActual = Depends(require_no_externo),
 ) -> list[TareaTableroOut]:
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
-        filas = repository.list_tareas(cursor, cliente=cliente or None, responsable_id=responsable_id)
+        filas = repository.list_tareas(
+            cursor, cliente=cliente or None, responsable_ids=responsable_id, desde=desde, hasta=hasta
+        )
     finally:
         release_connection(db_conn)
     return [TareaTableroOut(**fila) for fila in filas]

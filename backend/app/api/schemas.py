@@ -40,6 +40,7 @@ class MiembroEquipoOut(BaseModel):
     usuario: str
     nombre_completo: str
     correo_electronico: str | None
+    perfil: str | None
 
 
 class TipoSolicitudOut(BaseModel):

@@ -70,8 +70,10 @@ def test_listar_tareas(monkeypatch):
 
     filtros_recibidos = {}
 
-    def _fake_list_tareas(cursor, cliente=None, responsable_id=None):
-        filtros_recibidos.update({"cliente": cliente, "responsable_id": responsable_id})
+    def _fake_list_tareas(cursor, cliente=None, responsable_ids=None, desde=None, hasta=None):
+        filtros_recibidos.update(
+            {"cliente": cliente, "responsable_ids": responsable_ids, "desde": desde, "hasta": hasta}
+        )
         return [_fake_tarea_tablero()]
 
     monkeypatch.setattr(routes.repository, "list_tareas", _fake_list_tareas)
@@ -83,7 +85,35 @@ def test_listar_tareas(monkeypatch):
     assert len(body) == 1
     assert body[0]["solicitud_nombre"] == "Reporte de gastos"
     assert body[0]["cliente"] == "Chantilly"
-    assert filtros_recibidos == {"cliente": "chan", "responsable_id": 6}
+    assert filtros_recibidos == {"cliente": "chan", "responsable_ids": [6], "desde": None, "hasta": None}
+
+
+def test_listar_tareas_multiples_responsables_y_rango_fechas(monkeypatch):
+    monkeypatch.setattr(routes, "get_connection", lambda: _FakeConnection())
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+
+    filtros_recibidos = {}
+
+    def _fake_list_tareas(cursor, cliente=None, responsable_ids=None, desde=None, hasta=None):
+        filtros_recibidos.update(
+            {"cliente": cliente, "responsable_ids": responsable_ids, "desde": desde, "hasta": hasta}
+        )
+        return []
+
+    monkeypatch.setattr(routes.repository, "list_tareas", _fake_list_tareas)
+
+    response = client.get(
+        "/api/tareas",
+        params=[("responsable_id", 6), ("responsable_id", 10), ("desde", "2026-08-20"), ("hasta", "2026-08-28")],
+    )
+
+    assert response.status_code == 200
+    assert filtros_recibidos == {
+        "cliente": None,
+        "responsable_ids": [6, 10],
+        "desde": date(2026, 8, 20),
+        "hasta": date(2026, 8, 28),
+    }
 
 
 def test_obtener_tarea_success(monkeypatch):

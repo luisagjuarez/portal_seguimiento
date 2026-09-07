@@ -313,6 +313,61 @@ header {
   color: var(--text-muted);
 }
 
+/* Filtro multi-selectivo de responsable, anidado por área (Tablero de tareas, Punto 2 2026-09-07) */
+.filtro-responsable-wrap {
+  position: relative;
+}
+
+.filtro-responsable-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: 280px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  padding: 0.75rem;
+  z-index: 20;
+}
+
+.filtro-responsable-panel-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+
+.filtro-responsable-grupo {
+  margin-bottom: 0.6rem;
+}
+
+.filtro-responsable-area {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.filtro-responsable-miembros {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0.25rem 0 0 1.4rem;
+}
+
+.filtro-responsable-miembro {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
 .main-content > main {
   flex: 1;
   display: flex;

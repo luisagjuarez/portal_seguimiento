@@ -322,11 +322,14 @@ def list_miembros(cursor, excluir_externos: bool = False) -> list[dict]:
     if excluir_externos:
         condiciones.append("(codigo_rol_scrum IS NULL OR codigo_rol_scrum != 'EXTERNO')")
     cursor.execute(
-        f"SELECT id, usuario, nombre_completo, correo_electronico FROM miembros_equipo "
+        f"SELECT id, usuario, nombre_completo, correo_electronico, perfil FROM miembros_equipo "
         f"WHERE {' AND '.join(condiciones)} ORDER BY nombre_completo"
     )
     return [
-        {"id": row[0], "usuario": row[1], "nombre_completo": row[2], "correo_electronico": row[3]}
+        {
+            "id": row[0], "usuario": row[1], "nombre_completo": row[2],
+            "correo_electronico": row[3], "perfil": row[4],
+        }
         for row in cursor.fetchall()
     ]
 
@@ -776,20 +779,31 @@ def list_estatus_tarea(cursor) -> list[dict]:
 def list_tareas(
     cursor,
     cliente: str | None = None,
-    responsable_id: int | None = None,
+    responsable_ids: list[int] | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
     limit: int = 200,
 ) -> list[dict]:
     """Listado global para el Tablero Scrum: todas las tareas de todas las solicitudes,
     con el mismo shape que get_tarea_by_id (necesario para que el PUT de drag-and-drop no
-    borre campos que no vienen en la tarjeta) más solicitud_nombre/cliente de referencia."""
+    borre campos que no vienen en la tarjeta) más solicitud_nombre/cliente de referencia.
+    `responsable_ids` (Punto 2, 2026-09-07) filtra por una lista de responsables (filtro
+    multi-selectivo, agrupado por área en el frontend). `desde`/`hasta` (Punto 1) delimitan
+    `fecha_fin` (fecha de término planeada de la tarea)."""
     condiciones = ["t.borrado_en IS NULL"]
     parametros: dict = {"max_rows": limit}
     if cliente:
         condiciones.append("c.nombre ILIKE %(cliente)s")
         parametros["cliente"] = f"%{cliente}%"
-    if responsable_id:
-        condiciones.append("t.responsable_id = %(responsable_id)s")
-        parametros["responsable_id"] = responsable_id
+    if responsable_ids:
+        condiciones.append("t.responsable_id = ANY(%(responsable_ids)s)")
+        parametros["responsable_ids"] = list(responsable_ids)
+    if desde:
+        condiciones.append("t.fecha_fin >= %(desde)s")
+        parametros["desde"] = desde
+    if hasta:
+        condiciones.append("t.fecha_fin <= %(hasta)s")
+        parametros["hasta"] = hasta
 
     where = f"WHERE {' AND '.join(condiciones)}"
     cursor.execute(
