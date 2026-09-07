@@ -368,6 +368,24 @@ header {
   font-weight: 400;
 }
 
+/* .solicitudes-filtros input fuerza flex:1/min-width:200px en TODO <input> descendiente
+   (pensado para el buscador de texto) — sin este reset, los checkboxes del panel y los
+   inputs de fecha del rango quedan estirados y deformes. */
+.filtro-responsable-area input,
+.filtro-responsable-miembro input {
+  flex: none;
+  min-width: 0;
+  width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.solicitudes-filtros .direccion-general-rango input {
+  flex: none;
+  min-width: 0;
+}
+
 .main-content > main {
   flex: 1;
   display: flex;
