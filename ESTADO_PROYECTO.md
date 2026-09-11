@@ -1,6 +1,6 @@
 # Estado del proyecto — Portal de Seguimiento DOVELA
 
-Última actualización: 2026-09-07 (login angosto, vista Monitor eliminada, filtro de "Área responsable" y renombre a "Presentación de avance" con foco solo en solicitudes en esa vista; verificado por tests/curl contra BD real local y de TEST, y desplegado en TEST; falta la pasada visual del usuario en TEST)
+Última actualización: 2026-09-11 (Fase 1.29, identificador visible S-{id}/S-{id}-T-{id} en solicitudes y tareas; respaldo diario de Postgres en TEST vía cron + script de restauración; evaluación de notificaciones a Microsoft Teams, pendiente de que el usuario genere la(s) URL(s) de webhook. Falta la pasada visual del usuario de todas las fases acumuladas, incluida la 1.29, y desplegar la 1.28/1.29 a TEST)
 
 ## Dónde vamos en el roadmap
 
@@ -28,10 +28,14 @@
 [~] Fase 1.24 (extraoficial) — Vista "Tareas en proceso": carga del equipo en vivo por área, agrupada por perfil, con las próximas 3 tareas de cada miembro Team/Scrum Master (En progreso primero, luego Por hacer, por prioridad y fecha de inicio), refresco automático cada 5 min + botón manual, deep link al Tablero filtrado por responsable, y notificación (dedup, una sola vez) cada 10 min a quien se quede sin tarea En progreso — implementado y verificado por 225 tests de backend + curl e2e contra la BD real (2026-09-06); desplegado en TEST (2026-09-06); falta la pasada visual del usuario en TEST
 [~] Fase 1.25 (extraoficial) — 3 puntos de seguimiento: ancho estándar de formulario (400px) en Login/Recuperar/Restablecer contraseña, eliminación completa de la vista "Monitor" (ruta, sidebar, componente, router/schemas/repositorio de backend y tests), y filtro "Área responsable" en Dirección General (perfil del responsable de atención, reflejado en totales/desgloses/detalle) con nuevo catálogo GET /api/perfiles-equipo — implementado y verificado por 218 tests de backend + curl e2e contra la BD real local y de TEST (2026-09-07); desplegado en TEST (2026-09-07)
 [~] Fase 1.25b (extraoficial) — Dirección General renombrada a "Presentación de avance" (título y sidebar) y reducida a solo solicitudes: se quitan los indicadores de tareas de los tiles superiores y la tabla completa "Tareas por estatus"; "Por cliente" y "Por área" pasan a mostrar únicamente En proceso/Concluidas/Nuevas/En espera de solicitudes (con "en proceso" ahora excluyendo "EN ESPERA" en esas 2 tablas para no traslaparse) — implementado y verificado por 218 tests de backend + curl e2e contra la BD real local, cuadrando exacto contra los totales de "solicitudes_por_estatus" (2026-09-07); desplegado en TEST (2026-09-07); falta la pasada visual del usuario en TEST
-[~] Fase 1.25c (extraoficial) — "Presentación de avance" ahora también la ve el rol TEAM (antes solo Scrum Master/Product Owner); backend reutiliza `require_no_externo` (misma regla que Tablero/Tareas en proceso), frontend reemplaza la lista blanca de 2 roles por `!esExterno` — implementado y verificado por 219 tests de backend + curl e2e contra la BD real local (token real de TEAM → 200, de EXTERNO → 403) (2026-09-07); falta desplegar a TEST y la pasada visual del usuario
-[~] Fase 1.25d (extraoficial) — Scrum Master ve "mías"/"mis tareas" por default en Solicitudes y Tablero (antes veía "Todas" igual que Product Owner, que conserva ese default); cambio de estado inicial en el frontend, sin tocar backend — verificado por `npm run build` (sin suite de tests de frontend) (2026-09-07); falta desplegar a TEST y la pasada visual del usuario
+[~] Fase 1.25c (extraoficial) — "Presentación de avance" ahora también la ve el rol TEAM (antes solo Scrum Master/Product Owner); backend reutiliza `require_no_externo` (misma regla que Tablero/Tareas en proceso), frontend reemplaza la lista blanca de 2 roles por `!esExterno` — implementado y verificado por 219 tests de backend + curl e2e contra la BD real local (token real de TEAM → 200, de EXTERNO → 403) (2026-09-07); desplegado en TEST (2026-09-10, verificado que el commit ya estaba en TEST y se reconstruyeron los contenedores); falta la pasada visual del usuario
+[~] Fase 1.25d (extraoficial) — Scrum Master ve "mías"/"mis tareas" por default en Solicitudes y Tablero (antes veía "Todas" igual que Product Owner, que conserva ese default); cambio de estado inicial en el frontend, sin tocar backend — verificado por `npm run build` (sin suite de tests de frontend) (2026-09-07); desplegado en TEST (2026-09-10); falta la pasada visual del usuario
 [~] Fase 1.26 (extraoficial, **reemplazada por la 1.27**) — primer intento de filtros del Tablero: rango sobre `fecha_fin` planeada aplicado a todas las tareas + responsable multi-selectivo agrupado por área dentro del mismo control. Al usuario no le gustó el resultado visual/de diseño; ver Fase 1.27 para el diseño final — desplegado en TEST el 2026-09-07 y luego sobrescrito por el deploy de la 1.27 el mismo día
-[~] Fase 1.27 (extraoficial) — Rediseño de los filtros del Tablero de tareas en 5 controles independientes (modo plan): Fecha inicio/Fecha fin (ahora delimitan `fecha_fin_real` y solo aplican a tareas Completado — el resto siempre se muestra), `<select>` de Área responsable (filtro real, no solo agrupador), Responsable multi-selectivo acotado por el área elegida, y nuevo multi-selectivo de Cliente (reemplaza el texto libre); `GET /api/clientes` reusado como catálogo completo cuando no manda `q` — implementado y verificado por 221 tests de backend + curl e2e contra la BD real local (2026-09-07); falta desplegar a TEST y la pasada visual del usuario
+[~] Fase 1.27 (extraoficial) — Rediseño de los filtros del Tablero de tareas en 5 controles independientes (modo plan): Fecha inicio/Fecha fin (ahora delimitan `fecha_fin_real` y solo aplican a tareas Completado — el resto siempre se muestra), `<select>` de Área responsable (filtro real, no solo agrupador), Responsable multi-selectivo acotado por el área elegida, y nuevo multi-selectivo de Cliente (reemplaza el texto libre); `GET /api/clientes` reusado como catálogo completo cuando no manda `q` — implementado y verificado por 221 tests de backend + curl e2e contra la BD real local (2026-09-07); desplegado en TEST (2026-09-10); falta la pasada visual del usuario
+[~] Fase 1.27b (extraoficial) — `FiltroMultiple.jsx` de Responsable/Cliente pasa de botón+panel flotante a checklist siempre visible, sin desplegable, para eliminar la clase de bugs de posicionamiento — solo CSS/frontend, sin cambios de backend; verificado por `npm run build` (2026-09-07); desplegado en TEST (2026-09-10); falta la pasada visual del usuario
+[~] Fase 1.27c (extraoficial) — Responsable y Cliente vuelven a ser `<select>` simple con "Todos", sin multi-selección; se borra `FiltroMultiple.jsx`; sin cambios de backend (`/api/tareas` ya aceptaba listas de 0/1 elemento) — verificado por `npm run build` y 221 tests de backend sin cambios (2026-09-07); desplegado en TEST (2026-09-10, confirmado por ausencia de `FiltroMultiple` en el bundle servido); falta la pasada visual del usuario
+[~] Fase 1.28 (extraoficial) — Solicitudes recurrentes: catálogo de plantillas de solicitud (tipo + listado ordenado de tareas con responsable fijo y fechas por offset de días), vista de mantenimiento solo Scrum Master (`/plantillas-solicitud`), y generación automática de tareas al crear una solicitud eligiendo una plantilla — implementado y verificado por 240 tests de backend + `npm run build` + prueba e2e directa contra la BD real local (sin HTTP) (2026-09-10); falta la pasada visual del usuario y desplegar a TEST (incluye correr `backend/sql/018_plantillas_solicitud.sql` allá)
+[~] Fase 1.29 (extraoficial) — Identificador visible `S-{id}` para solicitud y `S-{solicitud_id}-T-{id}` para tarea (usa los IDs reales ya existentes, sin consecutivo nuevo ni migración) en tarjetas de listado, Tablero y ambos detalles — implementado, verificado por `npm run build` (2026-09-11); falta la pasada visual del usuario y desplegar a TEST
 ```
 
 **2026-09-03 — Fase 1.22, botones Regresar/Volver + dashboard de Inicio + rol Externo (modo
@@ -756,6 +760,43 @@ Castañeda, `canal=1`).
 
 ## Pendientes / próximos pasos sugeridos
 
+**⭐ Verificar visualmente y desplegar a TEST la Fase 1.29** (identificador visible de
+solicitud/tarea, 2026-09-11): confirmar en el navegador que el badge `S-{id}` aparece en las
+tarjetas de listado de Solicitudes y en el detalle, y que `S-{solicitud_id}-T-{id}` aparece en
+el Tablero, en la lista de tareas dentro del detalle de solicitud, y en el detalle de tarea.
+
+**Backup diario de Postgres en TEST (2026-09-11):** no existía ningún mecanismo de respaldo.
+Se agregó `scripts/backup_postgres.sh` (pg_dump comprimido con fecha, retención 30 días) y
+`scripts/restore_postgres.sh` (restauración con confirmación explícita), documentados en
+`scripts/README.md`. Instalado por cron del usuario `analitica` en `t_apex`, corre diario a la
+1:00 am, guarda en `/u01/RESPALDOS_BD` (ruta pedida explícitamente por el usuario). Probado con
+una corrida manual real (dump de 56K, 21 tablas, contenido verificado). **Pendiente de
+decisión del usuario:** hoy los respaldos solo viven en ese mismo servidor — cubre
+corrupción/borrado accidental de datos pero no la pérdida total de `t_apex`; si se quiere
+cubrir ese escenario falta copiar los respaldos a un destino externo.
+
+**Notificaciones a Microsoft Teams — evaluado, no implementado (2026-09-11):** se evaluaron 3
+alternativas (webhook vía app "Workflows", Microsoft Graph API app-only, email al canal); el
+usuario eligió la primera por no depender de aprobación del admin de M365. **Bloqueado hasta
+que el usuario genere la(s) URL(s) de webhook desde Teams** y decida qué eventos se notifican
+y a cuántos canales/grupos.
+
+**⭐ Verificar visualmente y desplegar a TEST la Fase 1.28** (solicitudes recurrentes,
+2026-09-10). Implementada y verificada por 240 tests de backend + `npm run build` + una prueba
+e2e directa contra la BD real local (creación de plantilla con 2 tareas, generación de una
+solicitud de prueba, confirmando fechas por offset/responsable copiado/estatus "POR HACER"/sin
+auto-transición; datos de prueba borrados). **Sin pasada visual todavía** y sin desplegar a
+TEST — el deploy incluye correr `backend/sql/018_plantillas_solicitud.sql` en la BD de TEST.
+Checklist sugerido: como Scrum Master, entrar a "Plantillas de solicitud" en el sidebar, crear
+una plantilla con 2-3 tareas (offsets de días, responsable), confirmar que aparece en la tabla;
+editarla y confirmar que la lista de tareas se reemplaza correctamente; en "Solicitudes", crear
+una nueva eligiendo esa plantilla en el `<select>` de "Tipo de solicitud recurrente" y confirmar
+que el `<select>` de Tipo se autocompleta y bloquea; abrir el detalle de la solicitud creada y
+confirmar que las tareas aparecen con las fechas/responsable esperados; dar de baja la
+plantilla y confirmar que ya no aparece como opción al crear una solicitud nueva; confirmar que
+un rol distinto de Scrum Master no ve el link "Plantillas de solicitud" en el sidebar ni puede
+entrar a la ruta directamente.
+
 **⭐ Verificar visualmente en TEST las Fases 1.25 y 1.25b** (2026-09-07), ambas en la misma
 vista "Presentación de avance" (antes "Dirección General"): login/recuperar/restablecer
 contraseña con ancho angosto (400px); el ítem "Monitor" ya no aparece en el sidebar (ni la ruta
@@ -785,13 +826,13 @@ vivo en TEST hace falta que algún miembro Team/Scrum Master real se quede sin n
 progreso y esperar el ciclo (o pedir que se dispare manualmente, ver
 `repository.sincronizar_alertas_sin_tarea_activa`).
 
-**⭐ Verificar visualmente y desplegar a TEST la Fase 1.23** (los 6 puntos del 2026-09-03/04:
+**⭐ Verificar visualmente la Fase 1.23** (los 6 puntos del 2026-09-03/04:
 bloquear asignar trabajo a un Externo, dashboard de Inicio del Externo solo con sus solicitudes,
 área del responsable en Solicitudes, auto-transición a "En progreso", campo "SR de EBS", y
 menciones @ restringidas). Implementada y verificada por 213 tests de backend + curl e2e contra
-la BD real (cuenta Externo real `DOVELA_MM`, datos de prueba borrados al terminar), pero **sin
-pasada visual todavía** y sin desplegar a TEST. El deploy incluye correr
-`backend/sql/016_sr_ebs_solicitud.sql` en la BD de TEST. Checklist sugerido: intentar asignar una
+la BD real (cuenta Externo real `DOVELA_MM`, datos de prueba borrados al terminar), **ya
+desplegada en TEST desde el 2026-09-04** (incluyó correr `backend/sql/016_sr_ebs_solicitud.sql`
+en la BD de TEST). Checklist sugerido: intentar asignar una
 tarea/responsable de atención a un usuario Externo y confirmar el error; dashboard de Inicio de
 un Externo sin los bloques de responsable/tareas; filtrar Solicitudes por área; planear una
 solicitud, crear y arrancar una tarea, confirmar que la solicitud pasa sola a "En progreso";
