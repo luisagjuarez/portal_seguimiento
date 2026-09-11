@@ -13,6 +13,7 @@ import PorHacerItem from "./PorHacerItem.jsx";
 import PrioridadBadge from "./PrioridadBadge.jsx";
 import VencimientoBadge from "./VencimientoBadge.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
+import { formatearIdTarea } from "../utils/ids.js";
 import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import {
   actualizarPorHacer,
@@ -241,7 +242,10 @@ export default function TareaDetallePage({ usuarioActual, esScrumMaster }) {
 
       <div className="solicitud-detalle-info">
         <div className="solicitudes-encabezado">
-          <h2>Tarea: {tarea.nombre}</h2>
+          <h2>
+            <span className="id-badge">{formatearIdTarea(tarea.solicitud_id, tarea.id)}</span> Tarea:{" "}
+            {tarea.nombre}
+          </h2>
           <div className="tarea-detalle-badges">
             <PrioridadBadge nivel={tarea.solicitud_prioridad} codigoEstatus={tarea.solicitud_codigo_estatus} />
             <VencimientoBadge

@@ -1,6 +1,7 @@
 import { CLASE_POR_ESTATUS } from "../constants/estatusTarea.js";
 import PrioridadBadge from "./PrioridadBadge.jsx";
 import VencimientoBadge from "./VencimientoBadge.jsx";
+import { formatearIdTarea } from "../utils/ids.js";
 
 export default function TareaItem({ tarea, onEditar, onBorrar, onAbrirDetalle }) {
   const claseEstatus = CLASE_POR_ESTATUS[tarea.codigo_estatus_tarea] || "";
@@ -19,7 +20,9 @@ export default function TareaItem({ tarea, onEditar, onBorrar, onAbrirDetalle })
       }}
     >
       <div className="tarea-item-info">
-        <h4>{tarea.nombre}</h4>
+        <h4>
+          <span className="id-badge">{formatearIdTarea(tarea.solicitud_id, tarea.id)}</span> {tarea.nombre}
+        </h4>
         {tarea.descripcion && <p>{tarea.descripcion}</p>}
         <p className="tarea-item-meta">
           <span>Responsable: {tarea.responsable || "Sin asignar"}</span>

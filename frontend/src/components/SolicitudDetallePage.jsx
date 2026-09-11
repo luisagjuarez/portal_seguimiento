@@ -12,6 +12,7 @@ import PrioridadBadge from "./PrioridadBadge.jsx";
 import VencimientoBadge from "./VencimientoBadge.jsx";
 import TareaFormulario from "./TareaFormulario.jsx";
 import TareaItem from "./TareaItem.jsx";
+import { formatearIdSolicitud } from "../utils/ids.js";
 import {
   agregarAdjuntosSolicitud,
   descargarAdjuntoSolicitud,
@@ -212,7 +213,10 @@ export default function SolicitudDetallePage({ esScrumMaster, usuarioActual }) {
 
       <div className="solicitud-detalle-info">
         <div className="solicitudes-encabezado">
-          <h2>Solicitud: {solicitud.nombre}</h2>
+          <h2>
+            <span className="id-badge">{formatearIdSolicitud(solicitud.id)}</span> Solicitud:{" "}
+            {solicitud.nombre}
+          </h2>
           <span className="solicitud-estatus">{solicitud.estatus_descripcion || solicitud.codigo_estatus}</span>
         </div>
         <p>{solicitud.descripcion}</p>

@@ -1,5 +1,6 @@
 import PrioridadBadge from "./PrioridadBadge.jsx";
 import VencimientoBadge from "./VencimientoBadge.jsx";
+import { formatearIdSolicitud } from "../utils/ids.js";
 
 function formatearFecha(iso) {
   try {
@@ -23,7 +24,9 @@ export default function SolicitudCard({ solicitud, onSeleccionar }) {
         }
       }}
     >
-      <h3>{solicitud.nombre}</h3>
+      <h3>
+        <span className="id-badge">{formatearIdSolicitud(solicitud.id)}</span> {solicitud.nombre}
+      </h3>
       <p>
         <strong>Cliente:</strong> {solicitud.cliente || "Sin definir"}
       </p>

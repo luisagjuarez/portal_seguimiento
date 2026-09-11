@@ -1,6 +1,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import PrioridadBadge from "./PrioridadBadge.jsx";
 import VencimientoBadge from "./VencimientoBadge.jsx";
+import { formatearIdTarea } from "../utils/ids.js";
 
 export default function TareaCardTablero({ tarea, onAbrir }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -21,7 +22,9 @@ export default function TareaCardTablero({ tarea, onAbrir }) {
       {...attributes}
     >
       <div className="tarea-card-tablero-encabezado">
-        <h4>{tarea.nombre}</h4>
+        <h4>
+          <span className="id-badge">{formatearIdTarea(tarea.solicitud_id, tarea.id)}</span> {tarea.nombre}
+        </h4>
         <PrioridadBadge nivel={tarea.solicitud_prioridad} codigoEstatus={tarea.solicitud_codigo_estatus} />
       </div>
       <p className="tarea-card-tablero-referencia">
