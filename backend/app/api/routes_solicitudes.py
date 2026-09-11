@@ -614,13 +614,18 @@ async def crear_solicitud_formulario(
     cliente: Annotated[str | None, Form(max_length=100)] = None,
     orden_prioridad: Annotated[int, Form(ge=1, le=5)] = 3,
     sr_ebs: Annotated[str | None, Form(max_length=100)] = None,
+    plantilla_solicitud_id: Annotated[int | None, Form()] = None,
     files: Annotated[list[UploadFile], File()] = [],
     usuario_actual: UsuarioActual = Depends(get_current_user),
 ) -> ChatSolicitudResponse:
     """Fase 1.6 — página de Solicitudes: formulario tradicional (un solo paso), con
     solicitante y tipo elegidos de catálogo en vez de resueltos/asumidos como en chat/correo.
     A diferencia de chat/correo, aquí el canal también lo elige el usuario (por defecto
-    "Formulario" en el frontend, pero editable) en vez de asumirse fijo por el origen."""
+    "Formulario" en el frontend, pero editable) en vez de asumirse fijo por el origen.
+
+    Solicitudes recurrentes: si viene `plantilla_solicitud_id`, además de guardarlo en la
+    solicitud (trazabilidad) se generan en la misma transacción todas las tareas de esa
+    plantilla (responsable fijo, fechas por offset de días desde hoy)."""
     contenidos = await _leer_y_validar_adjuntos(files)
 
     now = datetime.now(timezone.utc)
@@ -629,6 +634,18 @@ async def crear_solicitud_formulario(
     db_conn = get_connection()
     try:
         cursor = db_conn.cursor()
+
+        if plantilla_solicitud_id is not None:
+            plantilla = repository.get_plantilla_solicitud_by_id(cursor, plantilla_solicitud_id)
+            if plantilla is None or not plantilla["activo"]:
+                raise HTTPException(
+                    status_code=404, detail="Plantilla de solicitud no encontrada o inactiva"
+                )
+            if repository.find_tipo_id(cursor, tipo) != plantilla["tipo_solicitud_id"]:
+                raise HTTPException(
+                    status_code=422,
+                    detail="El tipo de solicitud debe coincidir con el tipo configurado en la plantilla elegida",
+                )
 
         cliente_resuelto = repository.get_or_create_cliente(cursor, cliente)
 
@@ -644,11 +661,21 @@ async def crear_solicitud_formulario(
             canal_nombre=canal,
             orden_prioridad=orden_prioridad,
             sr_ebs=sr_ebs,
+            plantilla_solicitud_id=plantilla_solicitud_id,
         )
 
         id_solicitud = _crear_solicitud_con_adjuntos(
             cursor, solicitud, contenidos, dedupe_seed, now, actor=usuario_actual.usuario
         )
+
+        if plantilla_solicitud_id is not None:
+            repository.generar_tareas_desde_plantilla(
+                cursor,
+                id_solicitud,
+                plantilla_solicitud_id,
+                fecha_base=now.date(),
+                actor=usuario_actual.usuario,
+            )
 
         db_conn.commit()
         logger.info(
@@ -656,6 +683,9 @@ async def crear_solicitud_formulario(
             id_solicitud,
             cliente_resuelto or "SIN IDENTIFICAR",
         )
+    except HTTPException:
+        db_conn.rollback()
+        raise
     except Exception:
         db_conn.rollback()
         logger.exception("Error creando solicitud de formulario")

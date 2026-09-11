@@ -41,3 +41,7 @@ class NuevaSolicitud:
     # Punto 5 (2026-09-04): número de Service Request del EBS de Oracle, solo lo llena el
     # equipo interno vía formulario — nunca lo pide el chat/correo ni el rol Externo.
     sr_ebs: str | None = None
+    # Solicitudes recurrentes: plantilla elegida al crear (solo vía formulario). Se guarda en
+    # la propia solicitud para trazabilidad; la generación en lote de sus tareas la dispara
+    # crear_solicitud_formulario por separado, después de insertar la solicitud.
+    plantilla_solicitud_id: int | None = None

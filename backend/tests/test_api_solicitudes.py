@@ -419,6 +419,160 @@ def test_crear_solicitud_formulario_sin_sr_ebs_no_es_obligatorio(monkeypatch, tm
     assert solicitudes_creadas["sr_ebs"] is None
 
 
+def _fake_plantilla_solicitud(activo=True, tipo_solicitud_id=3):
+    return {
+        "id": 1,
+        "nombre": "Implementación portal DOVELA Inteligencia Fiscal",
+        "tipo_solicitud_id": tipo_solicitud_id,
+        "tipo_solicitud": "Nuevo",
+        "descripcion_default": None,
+        "orden_prioridad_default": 3,
+        "activo": activo,
+        "tareas": [],
+    }
+
+
+def test_crear_solicitud_formulario_con_plantilla_genera_tareas(monkeypatch, tmp_path):
+    """Solicitudes recurrentes: al mandar plantilla_solicitud_id, se guarda en la solicitud y
+    se generan sus tareas en la misma transacción (antes del commit)."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "get_plantilla_solicitud_by_id", lambda cursor, id: _fake_plantilla_solicitud())
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 3)
+    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud, **kwargs: 789)
+    monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
+    monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
+
+    llamada_generar = {}
+
+    def _fake_generar(cursor, solicitud_id, plantilla_id, fecha_base, actor):
+        llamada_generar.update(
+            solicitud_id=solicitud_id, plantilla_id=plantilla_id, fecha_base=fecha_base, actor=actor
+        )
+        return 7
+
+    monkeypatch.setattr(routes.repository, "generar_tareas_desde_plantilla", _fake_generar)
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Impl. portal Cliente X",
+            "descripcion": "Implementación DOVELA IF",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "cliente": "Cliente X",
+            "plantilla_solicitud_id": "1",
+        },
+    )
+
+    assert response.status_code == 201
+    assert fake_conn.committed is True
+    assert llamada_generar["solicitud_id"] == 789
+    assert llamada_generar["plantilla_id"] == 1
+
+
+def test_crear_solicitud_formulario_sin_plantilla_no_genera_tareas(monkeypatch, tmp_path):
+    """Regresión: sin plantilla_solicitud_id el comportamiento actual no cambia."""
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_or_create_cliente", lambda cursor, nombre: nombre)
+    monkeypatch.setattr(routes.repository, "insert_solicitud", lambda cursor, solicitud, **kwargs: 789)
+    monkeypatch.setattr(routes.repository, "insert_solicitud_md", lambda cursor, id_solicitud, ruta: None)
+    monkeypatch.setattr(routes, "render_solicitud_md", lambda *args, **kwargs: str(tmp_path / "789.md"))
+
+    llamado = {"veces": 0}
+    monkeypatch.setattr(
+        routes.repository,
+        "generar_tareas_desde_plantilla",
+        lambda *args, **kwargs: llamado.__setitem__("veces", llamado["veces"] + 1),
+    )
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud capturada por formulario.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+        },
+    )
+
+    assert response.status_code == 201
+    assert llamado["veces"] == 0
+
+
+def test_crear_solicitud_formulario_plantilla_inactiva_404(monkeypatch, tmp_path):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_plantilla_solicitud_by_id", lambda cursor, id: _fake_plantilla_solicitud(activo=False))
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "plantilla_solicitud_id": "1",
+        },
+    )
+
+    assert response.status_code == 404
+    assert fake_conn.rolled_back is True
+
+
+def test_crear_solicitud_formulario_plantilla_inexistente_404(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_plantilla_solicitud_by_id", lambda cursor, id: None)
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud.",
+            "tipo": "Nuevo",
+            "canal": "Formulario",
+            "plantilla_solicitud_id": "999",
+        },
+    )
+
+    assert response.status_code == 404
+    assert fake_conn.rolled_back is True
+
+
+def test_crear_solicitud_formulario_tipo_no_coincide_con_plantilla_422(monkeypatch):
+    fake_conn = _FakeConnection()
+    monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)
+    monkeypatch.setattr(routes, "release_connection", lambda conn: conn.close())
+    monkeypatch.setattr(routes.repository, "get_plantilla_solicitud_by_id", lambda cursor, id: _fake_plantilla_solicitud(tipo_solicitud_id=3))
+    monkeypatch.setattr(routes.repository, "find_tipo_id", lambda cursor, tipo: 99)
+
+    response = client.post(
+        "/api/solicitudes/formulario",
+        data={
+            "solicitante_email": "ramon_rosales@stoconsulting.com",
+            "titulo": "Nueva integración",
+            "descripcion": "Detalle de la solicitud.",
+            "tipo": "Soporte",
+            "canal": "Formulario",
+            "plantilla_solicitud_id": "1",
+        },
+    )
+
+    assert response.status_code == 422
+    assert fake_conn.rolled_back is True
+
+
 def test_actualizar_solicitud_pasa_sr_ebs_al_repositorio(monkeypatch):
     fake_conn = _FakeConnection()
     monkeypatch.setattr(routes, "get_connection", lambda: fake_conn)

@@ -6,6 +6,7 @@ import {
   crearSolicitudFormulario,
   fetchCanalesSolicitud,
   fetchMiembrosEquipo,
+  fetchPlantillasSolicitud,
   fetchTiposSolicitud,
 } from "../api.js";
 
@@ -14,6 +15,7 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
   const [miembros, setMiembros] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [canales, setCanales] = useState([]);
+  const [plantillas, setPlantillas] = useState([]);
   const [solicitanteEmail, setSolicitanteEmail] = useState(esExterno ? usuarioActual.correo_electronico : "");
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -22,6 +24,7 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
   const [ordenPrioridad, setOrdenPrioridad] = useState(3);
   const [cliente, setCliente] = useState(null);
   const [srEbs, setSrEbs] = useState("");
+  const [plantillaSolicitudId, setPlantillaSolicitudId] = useState("");
   const [adjuntos, setAdjuntos] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
@@ -31,6 +34,9 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
       fetchMiembrosEquipo()
         .then(setMiembros)
         .catch(() => setError("No se pudo cargar la lista de miembros del equipo."));
+      fetchPlantillasSolicitud()
+        .then(setPlantillas)
+        .catch(() => setError("No se pudo cargar el catálogo de plantillas de solicitud recurrente."));
     }
     fetchTiposSolicitud()
       .then(setTipos)
@@ -46,6 +52,17 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
       })
       .catch(() => setError("No se pudo cargar el catálogo de canales."));
   }, []);
+
+  const alElegirPlantilla = (event) => {
+    const id = event.target.value;
+    setPlantillaSolicitudId(id);
+    if (id) {
+      const plantilla = plantillas.find((p) => String(p.id) === id);
+      if (plantilla) {
+        setTipo(plantilla.tipo_solicitud);
+      }
+    }
+  };
 
   const enviar = async (event) => {
     event.preventDefault();
@@ -66,6 +83,7 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
         ordenPrioridad,
         cliente,
         srEbs: srEbs.trim() || null,
+        plantillaSolicitudId: plantillaSolicitudId || null,
         adjuntos,
       });
       onCreada(respuesta);
@@ -122,7 +140,12 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
 
       <label>
         Tipo
-        <select value={tipo} onChange={(event) => setTipo(event.target.value)} required>
+        <select
+          value={tipo}
+          onChange={(event) => setTipo(event.target.value)}
+          disabled={Boolean(plantillaSolicitudId)}
+          required
+        >
           <option value="" disabled>
             Selecciona un tipo...
           </option>
@@ -133,6 +156,25 @@ export default function CrearSolicitudFormulario({ usuarioActual, onCreada, onCa
           ))}
         </select>
       </label>
+
+      {!esExterno && plantillas.length > 0 && (
+        <label>
+          Tipo de solicitud recurrente (opcional)
+          <select value={plantillaSolicitudId} onChange={alElegirPlantilla}>
+            <option value="">Ninguna</option>
+            {plantillas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+          {plantillaSolicitudId && (
+            <p className="crear-solicitud-etiqueta">
+              Al crear la solicitud se generarán automáticamente las tareas definidas en esta plantilla.
+            </p>
+          )}
+        </label>
+      )}
 
       {!esExterno && (
         <div className="tarea-form-fila">

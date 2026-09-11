@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from app.models import NuevaSolicitud
 
@@ -137,11 +137,12 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") 
         """
         INSERT INTO solicitudes
             (nombre, descripcion, solicitante, cliente, tipo, codigo_estatus, canal,
-             orden_prioridad, sr_ebs, creado_en, creado_por, actualizado_en, actualizado_por)
+             orden_prioridad, sr_ebs, plantilla_solicitud_id,
+             creado_en, creado_por, actualizado_en, actualizado_por)
         VALUES
             (%(nombre)s, %(descripcion)s, %(solicitante)s, %(cliente)s, %(tipo)s,
-             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, %(sr_ebs)s, now(), %(actor)s,
-             now(), %(actor)s)
+             %(codigo_estatus)s, %(canal)s, %(orden_prioridad)s, %(sr_ebs)s,
+             %(plantilla_solicitud_id)s, now(), %(actor)s, now(), %(actor)s)
         RETURNING id
         """,
         {
@@ -154,6 +155,7 @@ def insert_solicitud(cursor, solicitud: NuevaSolicitud, actor: str = "PUBLICO") 
             "canal": canal_id,
             "orden_prioridad": solicitud.orden_prioridad,
             "sr_ebs": solicitud.sr_ebs,
+            "plantilla_solicitud_id": solicitud.plantilla_solicitud_id,
             "actor": actor,
         },
     )
@@ -593,6 +595,211 @@ def list_roles_scrum(cursor) -> list[dict]:
 def list_tipos_solicitud(cursor) -> list[dict]:
     cursor.execute("SELECT id, tipo FROM tipos_solicitud WHERE tipo IS NOT NULL ORDER BY orden")
     return [{"id": row[0], "tipo": row[1]} for row in cursor.fetchall()]
+
+
+def list_plantillas_solicitud(cursor, solo_activas: bool = True) -> list[dict]:
+    """Catálogo de plantillas de solicitud recurrente. `solo_activas=False` (solo lo pide la
+    vista de mantenimiento, gateada a Scrum Master en el router) también trae las dadas de
+    baja, para poder reactivarlas/editarlas."""
+    filtro = "WHERE p.borrado_en IS NULL" if solo_activas else ""
+    cursor.execute(
+        f"""
+        SELECT p.id, p.nombre, p.tipo_solicitud_id, t.tipo AS tipo_solicitud,
+               p.orden_prioridad_default,
+               (SELECT count(*) FROM plantilla_solicitud_tareas pt WHERE pt.plantilla_solicitud_id = p.id) AS cantidad_tareas,
+               (p.borrado_en IS NULL) AS activo
+        FROM plantillas_solicitud p
+        JOIN tipos_solicitud t ON t.id = p.tipo_solicitud_id
+        {filtro}
+        ORDER BY p.nombre
+        """
+    )
+    columnas = ["id", "nombre", "tipo_solicitud_id", "tipo_solicitud", "orden_prioridad_default", "cantidad_tareas", "activo"]
+    return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+
+
+def get_plantilla_solicitud_by_id(cursor, plantilla_id: int) -> dict | None:
+    """Detalle completo (cabecera + tareas ordenadas), incluso si está inactiva — la usa tanto
+    la vista de edición (Scrum Master) como la generación automática de tareas al crear una
+    solicitud con plantilla."""
+    cursor.execute(
+        """
+        SELECT p.id, p.nombre, p.tipo_solicitud_id, t.tipo AS tipo_solicitud,
+               p.descripcion_default, p.orden_prioridad_default, (p.borrado_en IS NULL) AS activo
+        FROM plantillas_solicitud p
+        JOIN tipos_solicitud t ON t.id = p.tipo_solicitud_id
+        WHERE p.id = %(id)s
+        """,
+        {"id": plantilla_id},
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columnas = ["id", "nombre", "tipo_solicitud_id", "tipo_solicitud", "descripcion_default", "orden_prioridad_default", "activo"]
+    plantilla = dict(zip(columnas, row))
+
+    cursor.execute(
+        """
+        SELECT pt.id, pt.orden, pt.nombre, pt.descripcion, pt.responsable_id,
+               m.nombre_completo AS responsable_nombre,
+               pt.offset_inicio_dias, pt.offset_fin_dias, pt.horas_estimadas
+        FROM plantilla_solicitud_tareas pt
+        LEFT JOIN miembros_equipo m ON m.id = pt.responsable_id
+        WHERE pt.plantilla_solicitud_id = %(id)s
+        ORDER BY pt.orden
+        """,
+        {"id": plantilla_id},
+    )
+    columnas_tarea = [
+        "id", "orden", "nombre", "descripcion", "responsable_id", "responsable_nombre",
+        "offset_inicio_dias", "offset_fin_dias", "horas_estimadas",
+    ]
+    plantilla["tareas"] = [dict(zip(columnas_tarea, row)) for row in cursor.fetchall()]
+    return plantilla
+
+
+def _reemplazar_tareas_plantilla_solicitud(cursor, plantilla_id: int, tareas: list[dict]) -> None:
+    """Reemplaza en bloque las tareas de una plantilla (delete + reinsert): el frontend manda
+    siempre la lista completa deseada, igual que AdjuntosInput.jsx hace con los adjuntos antes
+    de enviar el formulario. `orden` nunca lo manda el cliente: se recalcula aquí como la
+    posición en la lista recibida."""
+    cursor.execute(
+        "DELETE FROM plantilla_solicitud_tareas WHERE plantilla_solicitud_id = %(id)s",
+        {"id": plantilla_id},
+    )
+    for orden, tarea in enumerate(tareas, start=1):
+        cursor.execute(
+            """
+            INSERT INTO plantilla_solicitud_tareas
+                (plantilla_solicitud_id, orden, nombre, descripcion, responsable_id,
+                 offset_inicio_dias, offset_fin_dias, horas_estimadas)
+            VALUES
+                (%(plantilla_id)s, %(orden)s, %(nombre)s, %(descripcion)s, %(responsable_id)s,
+                 %(offset_inicio_dias)s, %(offset_fin_dias)s, %(horas_estimadas)s)
+            """,
+            {
+                "plantilla_id": plantilla_id,
+                "orden": orden,
+                "nombre": tarea["nombre"],
+                "descripcion": tarea.get("descripcion"),
+                "responsable_id": tarea.get("responsable_id"),
+                "offset_inicio_dias": tarea.get("offset_inicio_dias", 0),
+                "offset_fin_dias": tarea.get("offset_fin_dias", 0),
+                "horas_estimadas": tarea.get("horas_estimadas"),
+            },
+        )
+
+
+def insert_plantilla_solicitud(
+    cursor,
+    nombre: str,
+    tipo_solicitud_id: int,
+    descripcion_default: str | None,
+    orden_prioridad_default: int,
+    tareas: list[dict],
+    actor: str,
+) -> int:
+    cursor.execute(
+        """
+        INSERT INTO plantillas_solicitud
+            (nombre, tipo_solicitud_id, descripcion_default, orden_prioridad_default,
+             creado_en, creado_por, actualizado_en, actualizado_por)
+        VALUES
+            (%(nombre)s, %(tipo_solicitud_id)s, %(descripcion_default)s, %(orden_prioridad_default)s,
+             now(), %(actor)s, now(), %(actor)s)
+        RETURNING id
+        """,
+        {
+            "nombre": nombre,
+            "tipo_solicitud_id": tipo_solicitud_id,
+            "descripcion_default": descripcion_default,
+            "orden_prioridad_default": orden_prioridad_default,
+            "actor": actor,
+        },
+    )
+    plantilla_id = cursor.fetchone()[0]
+    _reemplazar_tareas_plantilla_solicitud(cursor, plantilla_id, tareas)
+    return plantilla_id
+
+
+def update_plantilla_solicitud(
+    cursor,
+    plantilla_id: int,
+    nombre: str,
+    tipo_solicitud_id: int,
+    descripcion_default: str | None,
+    orden_prioridad_default: int,
+    tareas: list[dict],
+    actor: str,
+) -> int:
+    cursor.execute(
+        """
+        UPDATE plantillas_solicitud
+        SET nombre = %(nombre)s, tipo_solicitud_id = %(tipo_solicitud_id)s,
+            descripcion_default = %(descripcion_default)s,
+            orden_prioridad_default = %(orden_prioridad_default)s,
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
+        """,
+        {
+            "id": plantilla_id,
+            "nombre": nombre,
+            "tipo_solicitud_id": tipo_solicitud_id,
+            "descripcion_default": descripcion_default,
+            "orden_prioridad_default": orden_prioridad_default,
+            "actor": actor,
+        },
+    )
+    filas_afectadas = cursor.rowcount
+    if filas_afectadas:
+        _reemplazar_tareas_plantilla_solicitud(cursor, plantilla_id, tareas)
+    return filas_afectadas
+
+
+def dar_de_baja_plantilla_solicitud(cursor, plantilla_id: int, actor: str) -> int:
+    cursor.execute(
+        """
+        UPDATE plantillas_solicitud
+        SET borrado_en = now(), borrado_por = %(actor)s,
+            actualizado_en = now(), actualizado_por = %(actor)s
+        WHERE id = %(id)s AND borrado_en IS NULL
+        """,
+        {"id": plantilla_id, "actor": actor},
+    )
+    return cursor.rowcount
+
+
+def generar_tareas_desde_plantilla(
+    cursor, solicitud_id: int, plantilla_id: int, fecha_base: date, actor: str
+) -> int:
+    """Genera en lote las tareas de una solicitud recién creada a partir de una plantilla:
+    responsable fijo (copiado tal cual) y fechas calculadas como offset de días desde
+    `fecha_base` (la fecha de creación de la solicitud). Todas nacen en "POR HACER" — nunca
+    disparan marcar_solicitud_en_progreso, que solo reacciona a "EN PROGRESO"."""
+    cursor.execute(
+        """
+        SELECT nombre, descripcion, responsable_id, offset_inicio_dias, offset_fin_dias, horas_estimadas
+        FROM plantilla_solicitud_tareas
+        WHERE plantilla_solicitud_id = %(id)s
+        ORDER BY orden
+        """,
+        {"id": plantilla_id},
+    )
+    filas = cursor.fetchall()
+    for nombre, descripcion, responsable_id, offset_inicio, offset_fin, horas_estimadas in filas:
+        insert_tarea(
+            cursor,
+            solicitud_id,
+            nombre=nombre,
+            descripcion=descripcion,
+            responsable_id=responsable_id,
+            codigo_estatus_tarea="POR HACER",
+            actor=actor,
+            fecha_inicio=fecha_base + timedelta(days=offset_inicio),
+            fecha_fin=fecha_base + timedelta(days=offset_fin),
+            horas_estimadas=horas_estimadas,
+        )
+    return len(filas)
 
 
 def list_estatus(cursor) -> list[dict]:

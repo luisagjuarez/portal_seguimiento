@@ -9,6 +9,7 @@ import TareaDetallePage from "./components/TareaDetallePage.jsx";
 import TableroPage from "./components/TableroPage.jsx";
 import CargaEquipoPage from "./components/CargaEquipoPage.jsx";
 import UsuariosPage from "./components/UsuariosPage.jsx";
+import PlantillasSolicitudPage from "./components/PlantillasSolicitudPage.jsx";
 import DireccionGeneralPage from "./components/DireccionGeneralPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 import ResetPasswordPage from "./components/ResetPasswordPage.jsx";
@@ -177,6 +178,10 @@ export default function App() {
               <Route
                 path="/usuarios"
                 element={esScrumMaster ? <UsuariosPage /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/plantillas-solicitud"
+                element={esScrumMaster ? <PlantillasSolicitudPage /> : <Navigate to="/" replace />}
               />
               <Route
                 path="/cambiar-password"

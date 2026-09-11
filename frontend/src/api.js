@@ -190,6 +190,67 @@ export async function darDeBajaUsuario(miembroId) {
   }
 }
 
+export async function fetchPlantillasSolicitud(incluirInactivas = false) {
+  const url = new URL(`${API_BASE_URL}/api/plantillas-solicitud`);
+  if (incluirInactivas) {
+    url.searchParams.set("incluir_inactivas", "true");
+  }
+  const response = await fetch(url, { headers: authHeaders() });
+  return parseJsonOrThrow(response);
+}
+
+export async function fetchPlantillaSolicitudDetalle(plantillaId) {
+  const response = await fetch(`${API_BASE_URL}/api/plantillas-solicitud/${plantillaId}`, {
+    headers: authHeaders(),
+  });
+  return parseJsonOrThrow(response);
+}
+
+function _plantillaSolicitudBody({ nombre, tipoSolicitudId, descripcionDefault, ordenPrioridadDefault, tareas }) {
+  return {
+    nombre,
+    tipo_solicitud_id: tipoSolicitudId,
+    descripcion_default: descripcionDefault || null,
+    orden_prioridad_default: ordenPrioridadDefault,
+    tareas: tareas.map((tarea) => ({
+      nombre: tarea.nombre,
+      descripcion: tarea.descripcion || null,
+      responsable_id: tarea.responsableId || null,
+      offset_inicio_dias: tarea.offsetInicioDias,
+      offset_fin_dias: tarea.offsetFinDias,
+      horas_estimadas: tarea.horasEstimadas || null,
+    })),
+  };
+}
+
+export async function crearPlantillaSolicitud(datos) {
+  const response = await fetch(`${API_BASE_URL}/api/plantillas-solicitud`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(_plantillaSolicitudBody(datos)),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function actualizarPlantillaSolicitud(plantillaId, datos) {
+  const response = await fetch(`${API_BASE_URL}/api/plantillas-solicitud/${plantillaId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(_plantillaSolicitudBody(datos)),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function darDeBajaPlantillaSolicitud(plantillaId) {
+  const response = await fetch(`${API_BASE_URL}/api/plantillas-solicitud/${plantillaId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response);
+  }
+}
+
 export async function fetchClientes(query) {
   const url = new URL(`${API_BASE_URL}/api/clientes`);
   if (query) {
@@ -661,6 +722,7 @@ export async function crearSolicitudFormulario({
   ordenPrioridad,
   cliente,
   srEbs,
+  plantillaSolicitudId,
   adjuntos,
 }) {
   const formData = new FormData();
@@ -675,6 +737,9 @@ export async function crearSolicitudFormulario({
   }
   if (srEbs) {
     formData.append("sr_ebs", srEbs);
+  }
+  if (plantillaSolicitudId) {
+    formData.append("plantilla_solicitud_id", plantillaSolicitudId);
   }
   for (const archivo of adjuntos || []) {
     formData.append("files", archivo);

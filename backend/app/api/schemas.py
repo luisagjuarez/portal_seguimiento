@@ -191,6 +191,56 @@ class TareaCreateUpdate(BaseModel):
     horas_reales: int | None = None
 
 
+class PlantillaSolicitudTareaIn(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    responsable_id: int | None = None
+    offset_inicio_dias: int = Field(default=0, ge=0)
+    offset_fin_dias: int = Field(default=0, ge=0)
+    horas_estimadas: int | None = None
+
+    @model_validator(mode="after")
+    def _offset_fin_no_menor_a_inicio(self) -> "PlantillaSolicitudTareaIn":
+        if self.offset_fin_dias < self.offset_inicio_dias:
+            raise ValueError("offset_fin_dias no puede ser menor que offset_inicio_dias")
+        return self
+
+
+class PlantillaSolicitudCreateUpdate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    tipo_solicitud_id: int
+    descripcion_default: str | None = Field(default=None, max_length=4000)
+    orden_prioridad_default: int = Field(default=3, ge=1, le=5)
+    tareas: list[PlantillaSolicitudTareaIn] = Field(min_length=1)
+
+
+class PlantillaSolicitudTareaOut(PlantillaSolicitudTareaIn):
+    id: int
+    orden: int
+    responsable_nombre: str | None
+
+
+class PlantillaSolicitudResumenOut(BaseModel):
+    id: int
+    nombre: str
+    tipo_solicitud_id: int
+    tipo_solicitud: str
+    orden_prioridad_default: int
+    cantidad_tareas: int
+    activo: bool
+
+
+class PlantillaSolicitudDetalleOut(BaseModel):
+    id: int
+    nombre: str
+    tipo_solicitud_id: int
+    tipo_solicitud: str
+    descripcion_default: str | None
+    orden_prioridad_default: int
+    activo: bool
+    tareas: list[PlantillaSolicitudTareaOut]
+
+
 class ResumenPorValor(BaseModel):
     valor: str
     descripcion: str

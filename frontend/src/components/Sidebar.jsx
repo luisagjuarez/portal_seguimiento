@@ -25,7 +25,11 @@ export default function Sidebar({
   let opciones = esExterno
     ? OPCIONES_EXTERNO
     : esScrumMaster
-      ? [...OPCIONES, { ruta: "/usuarios", etiqueta: "Usuarios" }]
+      ? [
+          ...OPCIONES,
+          { ruta: "/usuarios", etiqueta: "Usuarios" },
+          { ruta: "/plantillas-solicitud", etiqueta: "Plantillas de solicitud" },
+        ]
       : OPCIONES;
   if (puedeVerPresentacionAvance) {
     opciones = [...opciones, { ruta: "/direccion-general", etiqueta: "Presentación de avance" }];
